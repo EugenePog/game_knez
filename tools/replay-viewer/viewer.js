@@ -195,7 +195,10 @@
     drawMap();
     const squads = sample('squads', t);
     const fighters = sample('fighters', t);
-    if (show.anchors) drawAnchors(squads);
+    if (show.anchors) {
+      drawOrders(squads); // sampled rows: the anchor is interpolated, the order columns come from the frame
+      drawAnchors(squads);
+    }
     drawFighters(fighters);
     if (show.labels) drawLabels(squads);
   }
@@ -246,6 +249,36 @@
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
     ctx.stroke();
+  }
+
+  /** Move orders: a dashed line from the anchor to the target, a ring there and a tick for the arrival facing. */
+  function drawOrders(squads) {
+    for (const [id, x, y, , ordered, tx, ty, tf] of squads) {
+      const info = squadInfo.get(id);
+      if (!info || ordered !== 1) continue;
+      const px = sx(tx);
+      const py = sy(ty);
+      ctx.strokeStyle = info.color;
+      ctx.globalAlpha = 0.7;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([2, 4]);
+      ctx.beginPath();
+      ctx.moveTo(sx(x), sy(y));
+      ctx.lineTo(px, py);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      const ring = Math.max(5, 0.3 * view.scale);
+      ctx.beginPath();
+      ctx.arc(px, py, ring, 0, Math.PI * 2);
+      ctx.stroke();
+      const rad = (tf * Math.PI) / 180;
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(px + Math.cos(rad) * ring * 2.2, py - Math.sin(rad) * ring * 2.2);
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
   }
 
   function drawAnchors(squads) {

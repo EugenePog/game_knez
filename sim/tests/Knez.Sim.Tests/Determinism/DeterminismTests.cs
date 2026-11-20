@@ -16,7 +16,7 @@ public class DeterminismTests
     /// Final hash of <c>Run(TestBattle.Create(42), 300)</c>. A change here means outcomes changed: if that was intended
     /// (a rule change), update the constant and say why in the commit message; if not, it is a determinism bug.
     /// </summary>
-    private const ulong GoldenFinalHash = 0xb0b9acf1c59bf1d6UL;
+    private const ulong GoldenFinalHash = 0x657b7709bb113e60UL;
 
     [Test]
     public void TwinRun_SameSeedAndCommands_IdenticalHashEveryTick()
@@ -71,6 +71,83 @@ public class DeterminismTests
         var a = Run(BattleSimulation.Restore(snapshot, TestBattle.SystemsWithWander()), Ticks);
         var b = Run(BattleSimulation.Restore(snapshot, TestBattle.SystemsWithWander()), Ticks);
         Assert.That(b, Is.EqualTo(a));
+    }
+
+    /// <summary>
+    /// Final hash of <see cref="TestDefs.March"/> after 400 ticks (seed 42): marching, turning in place, arrival facing
+    /// and slot following. Same rule as <see cref="GoldenFinalHash"/>: a change means movement outcomes changed.
+    /// </summary>
+    private const ulong GoldenMarchHash = 0x179a518c18f4d6b2UL;
+
+    [Test]
+    public void Golden_March_FinalHashMatchesRecordedValue()
+    {
+        var sim = new BattleSimulation(BattleSetup.Create(TestDefs.March(), 42));
+        sim.StepTicks(400);
+        ulong actual = sim.ComputeHash().Total;
+        Assert.That(actual, Is.EqualTo(GoldenMarchHash),
+            $"March hash is 0x{actual:x16}. If movement changed on purpose, update GoldenMarchHash and say why in the commit.");
+    }
+
+    [Test]
+    public void SnapshotRestore_MidMarch_ContinuesExactlyLikeTheUninterruptedRun()
+    {
+        var whole = new BattleSimulation(BattleSetup.Create(TestDefs.March(), 7));
+        var expected = new List<StateHash>();
+        for (int i = 0; i < 400; i++)
+        {
+            whole.Step();
+            expected.Add(whole.ComputeHash());
+        }
+
+        var first = new BattleSimulation(BattleSetup.Create(TestDefs.March(), 7));
+        first.StepTicks(150); // both squads mid-move: the column is turning or marching, the line marching
+        Assert.That(first.State.Squads.Select(s => s.Order.Kind), Has.All.EqualTo(Knez.Sim.Orders.SquadOrderKind.Move));
+        var restored = BattleSimulation.Restore(first.TakeSnapshot());
+        var continued = new List<StateHash>();
+        for (int i = 150; i < 400; i++)
+        {
+            restored.Step();
+            continued.Add(restored.ComputeHash());
+        }
+
+        Assert.That(continued, Is.EqualTo(expected.Skip(150)));
+    }
+
+    [Test]
+    public void MoveSquadCommands_ThroughTheQueue_TwinRunAndSnapshotWithAPendingOrder_SameHashes()
+    {
+        // The script covers Validate/Apply; this covers MoveSquad as player input: queued, logged, carried by a snapshot.
+        static List<StateHash> Play(BattleSimulation sim, int from, int until)
+        {
+            var hashes = new List<StateHash>();
+            for (int tick = from; tick < until; tick++)
+            {
+                if (tick == 0)
+                {
+                    var line = sim.State.Squads[0];
+                    sim.Enqueue(new Knez.Sim.Commands.MoveSquadCommand(0, line.Id, Knez.Sim.Numerics.FixVec2.FromInts(30, 25)));
+                    sim.EnqueueAt(180, new Knez.Sim.Commands.MoveSquadCommand(0, line.Id, Knez.Sim.Numerics.FixVec2.FromInts(10, 20),
+                        Knez.Sim.Numerics.Angle.FromDegrees(200)));
+                }
+
+                sim.Step();
+                hashes.Add(sim.ComputeHash());
+            }
+
+            return hashes;
+        }
+
+        var a = Play(new BattleSimulation(BattleSetup.Create(TestDefs.OneLine(), 5)), 0, 400);
+        var b = Play(new BattleSimulation(BattleSetup.Create(TestDefs.OneLine(), 5)), 0, 400);
+        Assert.That(b, Is.EqualTo(a));
+
+        var first = new BattleSimulation(BattleSetup.Create(TestDefs.OneLine(), 5));
+        Play(first, 0, 100);
+        var snapshot = first.TakeSnapshot();
+        Assert.That(snapshot.Commands.Pending, Is.Not.Empty, "the tick-180 order crosses the snapshot");
+        var continued = Play(BattleSimulation.Restore(snapshot), 100, 400);
+        Assert.That(continued, Is.EqualTo(a.Skip(100)));
     }
 
     [Test]

@@ -44,7 +44,7 @@ public class FormationLayoutTests
     public void SlotOffset_MirroredFiles_HaveExactlyMirroredOffsets()
     {
         // Spacing with an odd raw value: the /2 must truncate symmetrically.
-        var odd = new Knez.Sim.Defs.FormationDef("odd", Fix.FromRaw(65537), Fix.One, ranks: 1, width: 0);
+        var odd = new Knez.Sim.Defs.FormationDef("odd", Fix.FromRaw(65537), Fix.One, ranks: 1, width: 0, turnRate: Fix.FromInt(45));
         for (int count = 1; count <= 9; count++)
         {
             for (int slot = 0; slot < count; slot++)

@@ -14,8 +14,8 @@ namespace Knez.Sim.Content
     public sealed class DefLibrary
     {
         private const string FileMembers = "description, fighters, formations";
-        private const string FighterMembers = "id, radius";
-        private const string FormationMembers = "id, spacing, rankSpacing, ranks, width";
+        private const string FighterMembers = "id, radius, walkSpeed, runSpeed, turnRate";
+        private const string FormationMembers = "id, spacing, rankSpacing, ranks, width, turnRate";
 
         private readonly Dictionary<string, FighterDef> _fighters;
         private readonly Dictionary<string, FormationDef> _formations;
@@ -64,9 +64,12 @@ namespace Knez.Sim.Content
                     var item = JsonObjectReader.Of(fighterItems[i], $"fighters[{i}]", file.Name);
                     string id = item.RequireString("id");
                     var radius = item.RequireFix("radius");
+                    var walkSpeed = item.RequireFix("walkSpeed");
+                    var runSpeed = item.RequireFix("runSpeed");
+                    var turnRate = item.RequireFix("turnRate");
                     item.RejectUnknownMembers(FighterMembers);
                     Claim(seen, "fighter", id, item, fighterItems[i], file.Name);
-                    fighters.Add(Build(item, fighterItems[i], () => new FighterDef(id, radius)));
+                    fighters.Add(Build(item, fighterItems[i], () => new FighterDef(id, radius, walkSpeed, runSpeed, turnRate)));
                 }
 
                 IReadOnlyList<JsonValue> formationItems = root.OptionalArray("formations");
@@ -78,9 +81,11 @@ namespace Knez.Sim.Content
                     var rankSpacing = item.RequireFix("rankSpacing");
                     int ranks = item.OptionalInt("ranks", 0);
                     int width = item.OptionalInt("width", 0);
+                    var formationTurnRate = item.RequireFix("turnRate");
                     item.RejectUnknownMembers(FormationMembers);
                     Claim(seen, "formation", id, item, formationItems[i], file.Name);
-                    formations.Add(Build(item, formationItems[i], () => new FormationDef(id, spacing, rankSpacing, ranks, width)));
+                    formations.Add(Build(item, formationItems[i],
+                        () => new FormationDef(id, spacing, rankSpacing, ranks, width, formationTurnRate)));
                 }
 
                 root.RejectUnknownMembers(FileMembers);

@@ -11,7 +11,9 @@ Contract: `docs/battle-sim.md` §17. If a command or flag doesn't exist yet, say
 **Status (M1 step 2):** `run <scenario> [--seed N] [--ticks N] [--frames FILE] [--json]` and the replay viewer
 exist. `run` loads the scenario and the defs from the nearest `defs/` folder above it, and prints forces per side, tick
 count and final hash (exit codes 0 / 1 sim error / 2 bad args, content or frames path — content errors are located as
-`file:line:col: json.path: message`). Squads don't move until step 3. `--out` (replay files), `batch`, `bench` and
+`file:line:col: json.path: message`). Squads move on `MoveSquad` orders; the CLI can't issue commands, so a scenario's
+`script` gives timed orders (battle-sim.md §7) — `content/scenarios/march.json` is the example, and the viewer draws
+each order as a dashed line to a ring with the arrival facing. `--out` (replay files), `batch`, `bench` and
 `replay verify` arrive in later M1 steps — those sections below describe the target. CLI code lives in
 `sim/tools/Knez.Sim.Cli/` (`CliApp.cs`, `ScenarioFiles.cs`, `FrameRecorder.cs`); its tests in
 `sim/tests/Knez.Sim.Tests/Cli/`. Frames format and viewer options: battle-sim.md §17.

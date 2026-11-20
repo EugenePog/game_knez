@@ -13,13 +13,16 @@ namespace Knez.Sim.Content
     /// { "id": "formations", "description": "…",
     ///   "map": { "width": 60, "height": 40 },
     ///   "squads": [ { "name": "Line", "side": 0, "fighter": "warrior", "count": 8, "formation": "line",
-    ///                 "position": [20, 12], "facing": 90 } ] }
+    ///                 "position": [20, 12], "facing": 90 } ],
+    ///   "script": [ { "tick": 20, "order": "move", "squad": "Line", "target": [20, 24], "facing": 90 } ] }
     /// </code>
     /// Metres for lengths, degrees for <c>facing</c> (0 = east, 90 = north). Numbers may have up to 9 decimals.
+    /// <c>script</c> is optional and in tick order; a scripted <c>facing</c> is optional (default: the march direction).
     /// </summary>
     public static class ScenarioLoader
     {
-        private const string ScenarioMembers = "id, description, map, squads";
+        private const string ScenarioMembers = "id, description, map, squads, script";
+        private const string ScriptMembers = "tick, order, squad, target, facing";
         private const string MapMembers = "width, height";
         private const string SquadMembers = "name, side, fighter, count, formation, position, facing";
 
@@ -45,10 +48,35 @@ namespace Knez.Sim.Content
                 squads.Add(ReadSquad(squadItems[i], $"squads[{i}]", source.Name, defs));
             }
 
+            IReadOnlyList<JsonValue> scriptItems = root.OptionalArray("script");
+            var script = new List<ScriptedOrderDef>(scriptItems.Count);
+            for (int i = 0; i < scriptItems.Count; i++)
+            {
+                script.Add(ReadScriptedOrder(scriptItems[i], $"script[{i}]", source.Name));
+            }
+
             root.RejectUnknownMembers(ScenarioMembers);
 
-            // Whole-scenario checks (unique names, slots on the map) name the squad as squads[i] themselves.
-            return Build(root, rootValue.Get("squads")!, () => new ScenarioDef(id, description, map, squads));
+            // Whole-scenario checks (unique names, slots on the map, script order and squads) name the entry themselves.
+            return Build(root, rootValue.Get("squads")!, () => new ScenarioDef(id, description, map, squads, script));
+        }
+
+        private static ScriptedOrderDef ReadScriptedOrder(JsonValue value, string path, string sourceName)
+        {
+            var item = JsonObjectReader.Of(value, path, sourceName);
+            int tick = item.RequireInt("tick");
+            string order = item.RequireString("order");
+            string squad = item.RequireString("squad");
+            FixVec2 target = item.RequireVec2("target");
+            Fix? facingDegrees = item.OptionalFix("facing");
+            item.RejectUnknownMembers(ScriptMembers);
+            if (order != "move")
+            {
+                throw item.Error(value.Get("order")!, item.MemberPath("order"), $"unknown order '{order}' (known: move)");
+            }
+
+            Angle? facing = facingDegrees.HasValue ? Angle.FromDegrees(facingDegrees.Value) : (Angle?)null;
+            return Build(item, value, () => new ScriptedOrderDef(tick, squad, target, facing));
         }
 
         private static SquadSpawnDef ReadSquad(JsonValue value, string path, string sourceName, DefLibrary defs)

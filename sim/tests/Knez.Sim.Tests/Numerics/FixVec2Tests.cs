@@ -36,4 +36,29 @@ public class FixVec2Tests
             Assert.That(FixVec2.Dot(a, b), Is.EqualTo(Fix.FromInt(-5)));
         });
     }
+
+    [Test]
+    public void WithLength_ScalesWithoutLosingPrecision_AndKeepsZeroZero()
+    {
+        var north10 = FixVec2.FromInts(0, 10);
+        var step = Fix.FromRaw(4587); // 1.4 m/s per tick
+        Assert.Multiple(() =>
+        {
+            Assert.That(north10.WithLength(step), Is.EqualTo(new FixVec2(Fix.Zero, step)));
+            Assert.That(FixVec2.FromInts(-3, 4).WithLength(Fix.One), Is.EqualTo(new FixVec2(-Fix.Ratio(3, 5), Fix.Ratio(4, 5))));
+            Assert.That(FixVec2.Zero.WithLength(Fix.One), Is.EqualTo(FixVec2.Zero));
+        });
+    }
+
+    [Test]
+    public void ClampLength_OnlyShortens()
+    {
+        var v = FixVec2.FromInts(3, 4);
+        Assert.Multiple(() =>
+        {
+            Assert.That(v.ClampLength(Fix.FromInt(10)), Is.EqualTo(v));
+            Assert.That(v.ClampLength(Fix.FromInt(5)), Is.EqualTo(v));
+            Assert.That(v.ClampLength(Fix.One), Is.EqualTo(new FixVec2(Fix.Ratio(3, 5), Fix.Ratio(4, 5))));
+        });
+    }
 }

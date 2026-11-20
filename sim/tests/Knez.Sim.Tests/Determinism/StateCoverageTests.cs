@@ -19,9 +19,11 @@ public class StateCoverageTests
         [typeof(BattleState)] = ["<Scenario>k__BackingField", "<Seed>k__BackingField", "<Tick>k__BackingField", "_events",
             "_fighters", "_nextEntityId", "_rng", "_squads"],
         [typeof(Squad)] = ["<Anchor>k__BackingField", "<Facing>k__BackingField", "<Formation>k__BackingField",
-            "<Id>k__BackingField", "<Name>k__BackingField", "<SideId>k__BackingField", "_members"],
+            "<Id>k__BackingField", "<Name>k__BackingField", "<Order>k__BackingField", "<SideId>k__BackingField",
+            "<Spin>k__BackingField", "<Velocity>k__BackingField", "_members"],
         [typeof(Fighter)] = ["<Def>k__BackingField", "<Facing>k__BackingField", "<Id>k__BackingField", "<IsAlive>k__BackingField",
-            "<Position>k__BackingField", "<SideId>k__BackingField", "<SlotIndex>k__BackingField", "<SquadId>k__BackingField"],
+            "<Position>k__BackingField", "<SideId>k__BackingField", "<SlotIndex>k__BackingField", "<SquadId>k__BackingField",
+            "<Velocity>k__BackingField"],
         [typeof(SimRng)] = ["_increment", "_state"],
         [typeof(CommandQueue)] = ["_log", "_nextSequence", "_pending"],
     };
@@ -32,14 +34,17 @@ public class StateCoverageTests
     /// </summary>
     private static readonly Dictionary<Type, string[]> KnownDefFields = new()
     {
-        [typeof(FighterDef)] = ["<Id>k__BackingField", "<Radius>k__BackingField"],
+        [typeof(FighterDef)] = ["<Id>k__BackingField", "<Radius>k__BackingField", "<RunSpeed>k__BackingField",
+            "<TurnRate>k__BackingField", "<WalkSpeed>k__BackingField"],
         [typeof(FormationDef)] = ["<Id>k__BackingField", "<RankSpacing>k__BackingField", "<Ranks>k__BackingField",
-            "<Spacing>k__BackingField", "<Width>k__BackingField"],
+            "<Spacing>k__BackingField", "<TurnRate>k__BackingField", "<Width>k__BackingField"],
+        [typeof(ScriptedOrderDef)] = ["<Facing>k__BackingField", "<SquadName>k__BackingField", "<Target>k__BackingField",
+            "<Tick>k__BackingField"],
         [typeof(MapDef)] = ["<Height>k__BackingField", "<Width>k__BackingField"],
         [typeof(SquadSpawnDef)] = ["<Count>k__BackingField", "<Facing>k__BackingField", "<Fighter>k__BackingField",
             "<Formation>k__BackingField", "<Name>k__BackingField", "<Position>k__BackingField", "<SideId>k__BackingField"],
         [typeof(ScenarioDef)] = ["<Description>k__BackingField", "<Fingerprint>k__BackingField", "<Id>k__BackingField",
-            "<Map>k__BackingField", "<Squads>k__BackingField"],
+            "<Map>k__BackingField", "<Script>k__BackingField", "<Squads>k__BackingField"],
     };
 
     [TestCaseSource(nameof(DefTypes))]

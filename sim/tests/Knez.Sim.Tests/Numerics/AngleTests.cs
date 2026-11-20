@@ -46,6 +46,30 @@ public class AngleTests
         });
     }
 
+    [TestCase(0, 90, 16384)]
+    [TestCase(90, 0, -16384)]
+    [TestCase(350, 10, 3640)]       // across zero, the short way: +20° (each end rounds to whole units)
+    [TestCase(10, 350, -3640)]
+    [TestCase(0, 180, -32768)]      // exactly half a turn: always clockwise
+    [TestCase(180, 0, -32768)]
+    public void DeltaTo_ShortestSignedTurn(int fromDegrees, int toDegrees, int expected)
+    {
+        Assert.That(Angle.FromDegrees(fromDegrees).DeltaTo(Angle.FromDegrees(toDegrees)), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void TurnToward_StepsAtMostMaxAndStopsOnTheTarget()
+    {
+        var target = Angle.FromDegrees(90);
+        Assert.Multiple(() =>
+        {
+            Assert.That(Angle.Zero.TurnToward(target, 1000).Raw, Is.EqualTo(1000));
+            Assert.That(Angle.FromDegrees(80).TurnToward(target, 5000), Is.EqualTo(target));
+            Assert.That(Angle.FromDegrees(10).TurnToward(Angle.FromDegrees(350), 100).Raw, Is.EqualTo(Angle.FromDegrees(10).Raw - 100));
+            Assert.That(target.TurnToward(target, 0), Is.EqualTo(target));
+        });
+    }
+
     [Test]
     public void ToString_ShowsDegreesWithTwoDecimals()
     {

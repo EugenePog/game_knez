@@ -3,6 +3,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using Knez.Sim.Events;
 using Knez.Sim.Numerics;
+using Knez.Sim.Orders;
 using Knez.Sim.Units;
 
 namespace Knez.Sim.Cli;
@@ -100,6 +101,11 @@ public sealed class FrameRecorder : IDisposable
             _json.WriteNumberValue(Metres(squad.Anchor.X));
             _json.WriteNumberValue(Metres(squad.Anchor.Y));
             _json.WriteNumberValue(Degrees(squad.Facing));
+            bool moving = squad.Order.Kind == SquadOrderKind.Move;
+            _json.WriteNumberValue(moving ? 1 : 0);
+            _json.WriteNumberValue(moving ? Metres(squad.Order.Target.X) : 0);
+            _json.WriteNumberValue(moving ? Metres(squad.Order.Target.Y) : 0);
+            _json.WriteNumberValue(moving ? Degrees(squad.Order.Facing) : 0);
             _json.WriteEndArray();
         }
 

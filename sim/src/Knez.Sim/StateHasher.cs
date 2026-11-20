@@ -39,6 +39,13 @@ namespace Knez.Sim
                 squads.Add(squad.Anchor.X.Raw);
                 squads.Add(squad.Anchor.Y.Raw);
                 squads.Add((int)squad.Facing.Raw);
+                squads.Add((int)squad.Order.Kind);
+                squads.Add(squad.Order.Target.X.Raw);
+                squads.Add(squad.Order.Target.Y.Raw);
+                squads.Add((int)squad.Order.Facing.Raw);
+                squads.Add(squad.Velocity.X.Raw);
+                squads.Add(squad.Velocity.Y.Raw);
+                squads.Add(squad.Spin);
                 List<EntityId> members = squad.MemberList;
                 squads.Add(members.Count);
                 for (int m = 0; m < members.Count; m++)
@@ -59,6 +66,8 @@ namespace Knez.Sim
                 fighters.Add(fighter.IsAlive);
                 fighters.Add(fighter.Position.X.Raw);
                 fighters.Add(fighter.Position.Y.Raw);
+                fighters.Add(fighter.Velocity.X.Raw);
+                fighters.Add(fighter.Velocity.Y.Raw);
                 fighters.Add((int)fighter.Facing.Raw);
                 fighters.Add(fighter.SquadId.Value);
                 fighters.Add(fighter.SlotIndex);

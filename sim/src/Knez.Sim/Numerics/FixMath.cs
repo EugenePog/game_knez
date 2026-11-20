@@ -49,6 +49,59 @@ namespace Knez.Sim.Numerics
         /// <summary>Cosine: the sine a quarter turn later.</summary>
         public static Fix Cos(Angle angle) => Sin(Angle.FromRaw(angle.Raw + SineTable.QuarterTurn));
 
+        /// <summary>
+        /// Direction of the vector (<paramref name="x"/>, <paramref name="y"/>) as an <see cref="Angle"/> (0 = +X,
+        /// counter-clockwise); (0, 0) gives 0. Inverts <see cref="Sin"/>/<see cref="Cos"/> by binary search on the same
+        /// table, so it is exact on the axes and diagonals, exactly mirror-symmetric, and within one unit elsewhere.
+        /// Valid while both components stay below ~2^31 m.
+        /// </summary>
+        public static Angle Atan2(Fix y, Fix x)
+        {
+            long ax = x.Raw < 0 ? -x.Raw : x.Raw;
+            long ay = y.Raw < 0 ? -y.Raw : y.Raw;
+            if (ax == 0 && ay == 0)
+            {
+                return Angle.Zero;
+            }
+
+            // Reduce to the first octant: the angle whose tangent is short/long, at most 45°.
+            bool steep = ay > ax;
+            long longLeg = steep ? ay : ax;
+            long shortLeg = steep ? ax : ay;
+
+            // Largest a in 0..8192 (45°) with sin(a)·long <= cos(a)·short; tan rises monotonically on the octant.
+            int lo = 0;
+            int hi = SineTable.QuarterTurn / 2;
+            while (lo < hi)
+            {
+                int mid = (lo + hi + 1) >> 1;
+                if (Cross(mid, longLeg, shortLeg) <= 0)
+                {
+                    lo = mid;
+                }
+                else
+                {
+                    hi = mid - 1;
+                }
+            }
+
+            // The neighbour above may be nearer: |cross| is proportional to the sine of the angle error.
+            if (lo < SineTable.QuarterTurn / 2 && Cross(lo + 1, longLeg, shortLeg) < -Cross(lo, longLeg, shortLeg))
+            {
+                lo++;
+            }
+
+            int octant = steep ? SineTable.QuarterTurn - lo : lo;
+            int angle = x.Raw >= 0
+                ? (y.Raw >= 0 ? octant : -octant)
+                : (y.Raw >= 0 ? 2 * SineTable.QuarterTurn - octant : 2 * SineTable.QuarterTurn + octant);
+            return Angle.FromRaw(angle);
+        }
+
+        /// <summary>sin(a)·longLeg − cos(a)·shortLeg for a in the first octant (raw units; fits in a long).</summary>
+        private static long Cross(int units, long longLeg, long shortLeg) =>
+            SineTable.QuarterSin(units) * longLeg - SineTable.QuarterSin(SineTable.QuarterTurn - units) * shortLeg;
+
         /// <summary>Integer square root of a 64-bit value, rounded down (bit-by-bit method).</summary>
         public static ulong IntegerSqrt(ulong n)
         {

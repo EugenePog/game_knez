@@ -20,6 +20,9 @@ namespace Knez.Sim.Commands
         /// <summary>The entity belongs to another side than the one issuing the command.</summary>
         public static readonly RejectReason WrongSide = new RejectReason("wrong-side");
 
+        /// <summary>The command points at a place outside the map.</summary>
+        public static readonly RejectReason OffMap = new RejectReason("off-map");
+
         private RejectReason(string code)
         {
             Code = code;

@@ -36,6 +36,9 @@ namespace Knez.Sim.Units
         /// <summary>Position in metres. Written only by systems and commands.</summary>
         public FixVec2 Position { get; internal set; }
 
+        /// <summary>How far the fighter moves this tick, metres per tick (set by steering, applied by movement).</summary>
+        public FixVec2 Velocity { get; internal set; }
+
         /// <summary>Direction the fighter faces.</summary>
         public Angle Facing { get; internal set; }
 

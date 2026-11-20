@@ -60,6 +60,12 @@ namespace Knez.Sim.Content
 
         public Fix RequireFix(string name) => ToFix(Require(name), MemberPath(name));
 
+        public Fix? OptionalFix(string name)
+        {
+            JsonValue? value = Optional(name);
+            return value == null ? (Fix?)null : ToFix(value, MemberPath(name));
+        }
+
         public int RequireInt(string name) => ToInt(Require(name), MemberPath(name));
 
         public int OptionalInt(string name, int fallback)

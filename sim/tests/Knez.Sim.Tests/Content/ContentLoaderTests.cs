@@ -8,15 +8,16 @@ namespace Knez.Sim.Tests.Content;
 public class ContentLoaderTests
 {
     private const string Fighters = """
-        { "fighters": [ { "id": "warrior", "radius": 0.3 }, { "id": "archer", "radius": 0.25 } ] }
+        { "fighters": [ { "id": "warrior", "radius": 0.3, "walkSpeed": 1.4, "runSpeed": 3.5, "turnRate": 360 },
+                        { "id": "archer", "radius": 0.25, "walkSpeed": 1.5, "runSpeed": 4, "turnRate": 360 } ] }
         """;
 
     private const string Formations = """
         {
           "description": "test formations",
           "formations": [
-            { "id": "line", "spacing": 1.0, "rankSpacing": 1.2, "ranks": 2 },
-            { "id": "column", "spacing": 1.0, "rankSpacing": 1.2, "width": 2 }
+            { "id": "line", "spacing": 1.0, "rankSpacing": 1.2, "ranks": 2, "turnRate": 45 },
+            { "id": "column", "spacing": 1.0, "rankSpacing": 1.2, "width": 2, "turnRate": 90 }
           ]
         }
         """;
@@ -58,21 +59,25 @@ public class ContentLoaderTests
         var ex = Assert.Throws<ContentException>(() => DefLibrary.Parse(
         [
             new SourceText("a.json", Fighters),
-            new SourceText("b.json", """{ "fighters": [ { "id": "warrior", "radius": 0.4 } ] }"""),
+            new SourceText("b.json", """{ "fighters": [ { "id": "warrior", "radius": 0.4, "walkSpeed": 1, "runSpeed": 2, "turnRate": 90 } ] }"""),
         ]));
         Assert.That(ex!.Message, Is.EqualTo("b.json:1:17: fighters[0].id: fighter 'warrior' is already defined at a.json:1:17"));
     }
 
-    [TestCase("""{ "fighters": [ { "id": "w", "radius": 0.3, "radiu": 1 } ] }""",
-        "f.json:1:54: fighters[0].radiu: unknown member 'radiu' (allowed: id, radius)")]
+    [TestCase("""{ "fighters": [ { "id": "w", "radius": 0.3, "walkSpeed": 1, "runSpeed": 2, "turnRate": 90, "radiu": 1 } ] }""",
+        "f.json:1:101: fighters[0].radiu: unknown member 'radiu' (allowed: id, radius, walkSpeed, runSpeed, turnRate)")]
     [TestCase("""{ "fighters": [ { "id": "w" } ] }""",
         "f.json:1:17: fighters[0]: missing member 'radius'")]
     [TestCase("""{ "fighters": [ { "id": "w", "radius": "0.3" } ] }""",
         "f.json:1:40: fighters[0].radius: expected a number, got a string")]
     [TestCase("""{ "fighters": [ { "id": "w", "radius": 3e-1 } ] }""",
         "f.json:1:40: fighters[0].radius: 3e-1: exponents are not allowed in content numbers; write the number out")]
-    [TestCase("""{ "fighters": [ { "id": "w", "radius": -0.3 } ] }""",
+    [TestCase("""{ "fighters": [ { "id": "w", "radius": -0.3, "walkSpeed": 1, "runSpeed": 2, "turnRate": 90 } ] }""",
         "f.json:1:17: fighters[0]: radius must be > 0 and <= 2 m (got -0.30000).")]
+    [TestCase("""{ "fighters": [ { "id": "w", "radius": 0.3, "walkSpeed": 2, "runSpeed": 1.5, "turnRate": 90 } ] }""",
+        "f.json:1:17: fighters[0]: runSpeed must be at least walkSpeed (got 1.50000 < 2.00000).")]
+    [TestCase("""{ "fighters": [ { "id": "w", "radius": 0.3, "walkSpeed": 1 } ] }""",
+        "f.json:1:17: fighters[0]: missing member 'runSpeed'")]
     [TestCase("""{ "fighter": [] }""",
         "f.json:1:14: fighter: unknown member 'fighter' (allowed: description, fighters, formations)")]
     [TestCase("""[]""",
@@ -107,6 +112,55 @@ public class ContentLoaderTests
         string squad = GoodSquad.Replace("\"facing\": 90", "\"facing\": 22.5");
         var scenario = ScenarioLoader.Parse(new SourceText("s.json", Scenario(squad)), Defs());
         Assert.That(scenario.Squads[0].Facing.Raw, Is.EqualTo(4096));
+    }
+
+    [Test]
+    public void ScenarioLoader_Parse_ReadsTheScriptInOrder()
+    {
+        string json = Scenario(GoodSquad).Replace("\n  ]\n}", """
+          ],
+          "script": [
+            { "tick": 5, "order": "move", "squad": "A", "target": [30, 20] },
+            { "tick": 9, "order": "move", "squad": "A", "target": [30.5, 25], "facing": -90 }
+          ]
+        }
+        """.TrimEnd());
+        var script = ScenarioLoader.Parse(new SourceText("s.json", json), Defs()).Script;
+        Assert.Multiple(() =>
+        {
+            Assert.That(script.Select(e => e.Tick), Is.EqualTo(new[] { 5, 9 }));
+            Assert.That(script[0].SquadName, Is.EqualTo("A"));
+            Assert.That(script[0].Facing, Is.Null);
+            Assert.That(script[1].Target, Is.EqualTo(new FixVec2(Fix.Ratio(61, 2), Fix.FromInt(25))));
+            Assert.That(script[1].Facing, Is.EqualTo(Angle.FromDegrees(270)));
+        });
+    }
+
+    [TestCase("""{ "tick": 5, "order": "charge", "squad": "A", "target": [30, 20] }""", "script[0].order: unknown order 'charge' (known: move)")]
+    [TestCase("""{ "tick": 5, "order": "move", "squad": "Nobody", "target": [30, 20] }""", "script[0]: no squad is named 'Nobody'.")]
+    [TestCase("""{ "tick": 0, "order": "move", "squad": "A", "target": [30, 20] }""", "script[0]: tick must be 1..2147483647 (got 0).")]
+    [TestCase("""{ "tick": 5, "order": "move", "squad": "A", "target": [99, 20] }""", "script[0]: target (99.00000, 20.00000) is off the")]
+    [TestCase("""{ "tick": 5, "order": "move", "squad": "A", "target": [30, 20], "speed": 2 }""", "script[0].speed: unknown member 'speed'")]
+    public void ScenarioLoader_Parse_BadScriptEntry_LocatedError(string entry, string expected)
+    {
+        string json = Scenario(GoodSquad).Replace("\n  ]\n}", "\n  ],\n  \"script\": [ " + entry + " ]\n}");
+        var ex = Assert.Throws<ContentException>(() => ScenarioLoader.Parse(new SourceText("s.json", json), Defs()));
+        Assert.That(ex!.Message, Does.Contain(expected));
+    }
+
+    [Test]
+    public void ScenarioLoader_Parse_ScriptOutOfTickOrder_IsAnError()
+    {
+        string json = Scenario(GoodSquad).Replace("\n  ]\n}", """
+          ],
+          "script": [
+            { "tick": 9, "order": "move", "squad": "A", "target": [30, 20] },
+            { "tick": 5, "order": "move", "squad": "A", "target": [30, 25] }
+          ]
+        }
+        """.TrimEnd());
+        var ex = Assert.Throws<ContentException>(() => ScenarioLoader.Parse(new SourceText("s.json", json), Defs()));
+        Assert.That(ex!.Message, Does.Contain("script[1]: tick 5 comes before the previous entry's tick 9"));
     }
 
     [TestCase("\"formation\": \"line\"", "\"formation\": \"wedge\"",

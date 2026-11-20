@@ -47,8 +47,8 @@ public class ScenarioDefTests
     public void Fingerprint_AnyBattleRelevantChange_ChangesIt()
     {
         ulong baseline = TestDefs.TwoSquads().Fingerprint;
-        var widerSpacing = new FormationDef("test-line", Fix.Ratio(11, 10), Fix.Ratio(3, 2), 2, 0);
-        var biggerFighter = new FighterDef("test-warrior", Fix.Ratio(35, 100));
+        var widerSpacing = new FormationDef("test-line", Fix.Ratio(11, 10), Fix.Ratio(3, 2), 2, 0, Fix.FromInt(45));
+        var biggerFighter = TestDefs.Fighter("test-warrior", walkTenths: 14, radiusHundredths: 35);
 
         ulong[] variants =
         [
@@ -80,7 +80,7 @@ public class ScenarioDefTests
     public void Constructor_TwoDifferentDefsWithOneId_Throws()
     {
         // State hashes name defs by id, so one id must mean one set of numbers.
-        var otherLine = new FormationDef("test-line", Fix.FromInt(2), Fix.FromInt(2), ranks: 2, width: 0);
+        var otherLine = new FormationDef("test-line", Fix.FromInt(2), Fix.FromInt(2), ranks: 2, width: 0, turnRate: Fix.FromInt(45));
         var ex = Assert.Throws<ArgumentException>(() => new ScenarioDef("s", "", TestDefs.Map,
         [
             TestDefs.Squad("A", 0, 4, FixVec2.FromInts(10, 10), 90),
@@ -94,18 +94,20 @@ public class ScenarioDefTests
     {
         Assert.Multiple(() =>
         {
-            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: 2, width: 2));
-            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: 0, width: 0));
-            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.Zero, Fix.One, ranks: 2, width: 0));
-            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: int.MaxValue, width: 0));
-            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: 0, width: SquadSpawnDef.MaxCount + 1));
+            var turn = Fix.FromInt(45);
+            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: 2, width: 2, turn));
+            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: 0, width: 0, turn));
+            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.Zero, Fix.One, ranks: 2, width: 0, turn));
+            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: int.MaxValue, width: 0, turn));
+            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: 0, width: SquadSpawnDef.MaxCount + 1, turn));
+            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: 2, width: 0, Fix.Zero));
         });
     }
 
     [Test]
     public void DefErrors_HaveNoParameterSuffix_SameTextOnEveryRuntime()
     {
-        var ex = Assert.Throws<ArgumentException>(() => new FighterDef("w", Fix.Zero));
+        var ex = Assert.Throws<ArgumentException>(() => new FighterDef("w", Fix.Zero, Fix.One, Fix.FromInt(3), Fix.FromInt(360)));
         Assert.Multiple(() =>
         {
             Assert.That(ex!.Message, Is.EqualTo("radius must be > 0 and <= 2 m (got 0.00000)."));

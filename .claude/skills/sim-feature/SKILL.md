@@ -27,6 +27,8 @@ Read `AGENTS.md` hard rules once per session; this playbook is the working loop.
 | External input | `sim/src/Knez.Sim/Commands/<Name>Command.cs` | `Validate(state)` → `RejectReason` (no RNG, no writes); `Apply(state, context)` only if valid |
 | Tunable numbers | content defs in `sim/src/Knez.Sim/Defs/` (`FighterDef`, `FormationDef`, …), values in `content/defs/*.json` | no magic numbers in systems |
 | Reading content | `sim/src/Knez.Sim.Content/` (`DefLibrary`, `ScenarioLoader`, `JsonObjectReader`) | text in, defs out; no files, no `double` |
+| Solver settings (not balance) | a `*Rules` static class next to the system, e.g. `Movement/MovementRules.cs` | named constants with a why; move to content if they turn out to shape feel |
+| Timed orders for tests/bench | the scenario `script` (battle-sim.md §7) | goes through the command's Validate/Apply; not logged |
 | Things the view must react to | `SimEvent` subtype, emitted with `context.Emit(…)` | carry ids and reason codes |
 | Scratch buffers | `TickContext` (internal properties) | never fields on systems or `BattleState` |
 | Math | `Fix`, `FixVec2`, `Angle`, `FixMath` | no float/double anywhere in `sim/src` |

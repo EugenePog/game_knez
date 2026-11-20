@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Knez.Sim.Cli;
 using Knez.Sim.Events;
+using Knez.Sim.Numerics;
 using Knez.Sim.Tests.Support;
 
 namespace Knez.Sim.Tests.Cli;
@@ -152,6 +153,32 @@ public class FrameRecorderTests
             Assert.That(anchor[1].GetDouble(), Is.EqualTo(30.0));
             Assert.That(anchor[2].GetDouble(), Is.EqualTo(30.0));
             Assert.That(anchor[3].GetDouble(), Is.EqualTo(270.0));
+            Assert.That(anchor[4].GetInt32(), Is.EqualTo(0), "no order");
+        });
+    }
+
+    [Test]
+    public void Frames_SquadRowsCarryTheMoveOrder()
+    {
+        var stream = new MemoryStream();
+        var sim = new BattleSimulation(BattleSetup.Create(TestDefs.OneLine(), seed: 1));
+        sim.Enqueue(new Knez.Sim.Commands.MoveSquadCommand(0, sim.State.Squads[0].Id, FixVec2.FromInts(30, 20), Angle.FromDegrees(180)));
+        sim.Step();
+        using (var recorder = new FrameRecorder(stream, sim.State))
+        {
+            recorder.Capture(sim.State);
+            recorder.Complete();
+        }
+
+        using var doc = JsonDocument.Parse(stream.ToArray());
+        var row = doc.RootElement.GetProperty("frames")[0].GetProperty("squads")[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(row.GetArrayLength(), Is.EqualTo(8));
+            Assert.That(row[4].GetInt32(), Is.EqualTo(1));
+            Assert.That(row[5].GetDouble(), Is.EqualTo(30.0));
+            Assert.That(row[6].GetDouble(), Is.EqualTo(20.0));
+            Assert.That(row[7].GetDouble(), Is.EqualTo(180.0));
         });
     }
 

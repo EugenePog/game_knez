@@ -1,0 +1,19 @@
+{
+  "id": "march",
+  "description": "M1 step 3: squads on the march, no collisions yet. Hird line advances 14 m; the column turns about and marches back; the shield wall wheels in place to face east; the raider line sidesteps west (a 90-degree pivot, march, then a turn back to face south); the flankers march to a point and face north-west. Squads pass through each other: separation comes in step 4.",
+  "map": { "width": 60, "height": 40 },
+  "squads": [
+    { "name": "Hird line",     "side": 0, "fighter": "warrior", "count": 8, "formation": "line",       "position": [14, 8],  "facing": 90 },
+    { "name": "Shield wall",   "side": 0, "fighter": "warrior", "count": 8, "formation": "shieldwall", "position": [30, 10], "facing": 90 },
+    { "name": "Raider column", "side": 1, "fighter": "warrior", "count": 6, "formation": "column",     "position": [44, 12], "facing": 90 },
+    { "name": "Raider line",   "side": 1, "fighter": "warrior", "count": 8, "formation": "line",       "position": [34, 30], "facing": 270 },
+    { "name": "Flankers",      "side": 1, "fighter": "warrior", "count": 5, "formation": "line",       "position": [50, 30], "facing": 225 }
+  ],
+  "script": [
+    { "tick": 20, "order": "move", "squad": "Hird line",     "target": [14, 22] },
+    { "tick": 20, "order": "move", "squad": "Raider column", "target": [44, 4] },
+    { "tick": 40, "order": "move", "squad": "Shield wall",   "target": [30, 10], "facing": 0 },
+    { "tick": 60, "order": "move", "squad": "Raider line",   "target": [22, 30], "facing": 270 },
+    { "tick": 80, "order": "move", "squad": "Flankers",      "target": [42, 22], "facing": 135 }
+  ]
+}

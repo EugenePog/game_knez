@@ -47,7 +47,7 @@ Steps — one change each, each ending with build/tests/purity green and a `sim-
    ✅ 2026-11-20: ADR-0004; `content/scenarios/formations.json` (5 squads, 35 fighters); 232 tests (Debug), golden
    hashes re-recorded on purpose (state format grew). `sim-reviewer`: no blockers or majors, 5 minor findings + nits —
    all fixed except two deferred on purpose (full def catalogue → before step 7; `ToWorld` overload with a precomputed
-   forward vector → step 3).
+   forward vector → step 8, when the bench says speed matters — 0.027 ms/tick for 35 fighters at step 3).
 2. Frames and the replay viewer: CLI `--frames`, `tools/replay-viewer/` (circles, facing, squad colours, anchors), so
    every later step is checked by eye.
    ✅ 2026-11-20: `knez-frames` v1 (battle-sim.md §17), crash-safe and streamed; vanilla canvas viewer with playback,
@@ -56,6 +56,13 @@ Steps — one change each, each ending with build/tests/purity green and a `sim-
    file) + minors — all fixed.
 3. Moving a squad: `MoveSquad` command, the anchor walks straight to the target and turns, fighters seek and arrive at
    their slots, facing follows movement (`Atan2`). No collisions yet.
+   Agreed 2026-11-20: walk 1.4 / run 3.5 m/s; turn rate column 90, line 45, shield wall 30 °/s; turn in place until
+   within 30°, then march; no facing given → face the march direction.
+   ✅ 2026-11-20: `Atan2`, `MoveSquad` (+ `off-map`), squad orders, slot following with the slot's own motion, facing
+   rules; scenario `script` for timed orders (added here: the CLI takes no commands and the S2–S4 benches need it);
+   `content/scenarios/march.json`; orders drawn in the viewer. 308 tests, a march golden. `sim-reviewer`: 1 major
+   (outer fighters of a turning squad faced backwards) + minors — all fixed. Known look: squads pivot around the
+   front-rank centre, so a column's tail swings wide in an about-turn → revisit with wheeling in step 7.
 4. Crowding: spatial index, separation steering, circle–circle collision relaxation; overlap metric.
 5. Terrain: walkable grid, circle–grid clamping, wall avoidance (decide the cell size).
 6. Pathfinding: A* for squad anchors with a per-tick budget, path following.

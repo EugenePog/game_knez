@@ -44,6 +44,28 @@ namespace Knez.Sim.Numerics
         /// <summary>Unit vector pointing along this angle.</summary>
         public FixVec2 Forward => new FixVec2(FixMath.Cos(this), FixMath.Sin(this));
 
+        /// <summary>
+        /// The shortest signed turn from this angle to <paramref name="target"/>, in units: −32768..32767, positive =
+        /// counter-clockwise. Exactly half a turn comes out as −32768 (clockwise), so the choice is deterministic.
+        /// </summary>
+        public int DeltaTo(Angle target) => unchecked((short)(target.Raw - Raw));
+
+        /// <summary>This angle turned toward <paramref name="target"/> by at most <paramref name="maxStep"/> units the short way.</summary>
+        public Angle TurnToward(Angle target, int maxStep)
+        {
+            int delta = DeltaTo(target);
+            if (delta > maxStep)
+            {
+                delta = maxStep;
+            }
+            else if (delta < -maxStep)
+            {
+                delta = -maxStep;
+            }
+
+            return FromRaw(Raw + delta);
+        }
+
         /// <summary>Sum, wrapped.</summary>
         public static Angle operator +(Angle a, Angle b) => FromRaw(a.Raw + b.Raw);
 

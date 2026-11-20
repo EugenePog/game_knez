@@ -71,6 +71,67 @@ public class FixTrigTests
         }
     }
 
+    [TestCase(1, 0, 0)]
+    [TestCase(0, 1, 16384)]
+    [TestCase(-1, 0, 32768)]
+    [TestCase(0, -1, 49152)]
+    [TestCase(1, 1, 8192)]
+    [TestCase(-1, 1, 24576)]
+    [TestCase(-1, -1, 40960)]
+    [TestCase(1, -1, 57344)]
+    [TestCase(0, 0, 0)]
+    public void Atan2_AxesAndDiagonals_Exact(int x, int y, int expectedRaw)
+    {
+        Assert.That(FixMath.Atan2(Fix.FromInt(y), Fix.FromInt(x)).Raw, Is.EqualTo(expectedRaw));
+    }
+
+    [Test]
+    public void Atan2_ManyDirections_WithinOneUnitOfTheTrueAngle()
+    {
+        long worst = 0;
+        for (int i = 0; i < 4000; i++)
+        {
+            // Vectors of very different lengths, from 1 mm to 1 km, in every direction.
+            double angle = i * 2 * Math.PI / 4000 + 0.0001;
+            double length = Math.Pow(10, -3 + 6.0 * (i % 97) / 96);
+            var x = Fix.FromRaw((long)Math.Round(Math.Cos(angle) * length * 65536));
+            var y = Fix.FromRaw((long)Math.Round(Math.Sin(angle) * length * 65536));
+            long expected = (long)Math.Round(Math.Atan2(y.Raw, x.Raw) * 65536 / (2 * Math.PI));
+            long actual = FixMath.Atan2(y, x).Raw;
+            long error = Math.Abs(((actual - expected) % 65536 + 65536 + 32768) % 65536 - 32768);
+            worst = Math.Max(worst, error);
+        }
+
+        Assert.That(worst, Is.LessThanOrEqualTo(1));
+    }
+
+    [Test]
+    public void Atan2_IsExactlyMirrorSymmetric()
+    {
+        for (int i = 1; i < 300; i++)
+        {
+            var x = Fix.FromRaw(i * 977 % 50000 + 1);
+            var y = Fix.FromRaw(i * 613 % 70000 + 1);
+            var a = FixMath.Atan2(y, x);
+            Assert.Multiple(() =>
+            {
+                Assert.That(FixMath.Atan2(-y, x), Is.EqualTo(-a), $"x-axis mirror, i={i}");
+                Assert.That(FixMath.Atan2(y, -x), Is.EqualTo(Angle.FromDegrees(180) - a), $"y-axis mirror, i={i}");
+            });
+        }
+    }
+
+    [Test]
+    public void Atan2_OfSinAndCos_GivesTheAngleBack()
+    {
+        for (int raw = 0; raw < 65536; raw += 37)
+        {
+            var a = Angle.FromRaw(raw);
+            var back = FixMath.Atan2(FixMath.Sin(a) * 100, FixMath.Cos(a) * 100);
+            Assert.That(Math.Abs(a.DeltaTo(back)), Is.LessThanOrEqualTo(1), $"raw {raw}");
+        }
+    }
+
     [Test]
     public void Table_MatchesTheGeneratorFormula()
     {

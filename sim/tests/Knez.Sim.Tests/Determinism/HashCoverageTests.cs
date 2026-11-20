@@ -1,4 +1,5 @@
 using Knez.Sim.Numerics;
+using Knez.Sim.Orders;
 using Knez.Sim.Tests.Support;
 
 namespace Knez.Sim.Tests.Determinism;
@@ -22,11 +23,17 @@ public class HashCoverageTests
         yield return Case("FighterSquadId", "Fighters", s => s.FighterList[0].SquadId = EntityId.None);
         yield return Case("FighterSlot", "Fighters", s => s.FighterList[0].SlotIndex = 7);
         yield return Case("FighterAlive", "Fighters", s => s.FighterList[0].IsAlive = false);
+        yield return Case("FighterVelocityX", "Fighters", s => s.FighterList[0].Velocity += new FixVec2(Fix.FromRaw(1), Fix.Zero));
+        yield return Case("FighterVelocityY", "Fighters", s => s.FighterList[0].Velocity += new FixVec2(Fix.Zero, Fix.FromRaw(1)));
         yield return Case("SquadAnchorX", "Squads", s => s.SquadList[0].Anchor += new FixVec2(Fix.FromRaw(1), Fix.Zero));
         yield return Case("SquadAnchorY", "Squads", s => s.SquadList[0].Anchor += new FixVec2(Fix.Zero, Fix.FromRaw(1)));
         yield return Case("SquadFacing", "Squads", s => s.SquadList[0].Facing += Angle.FromRaw(1));
         yield return Case("SquadFormation", "Squads", s => s.SquadList[0].Formation = TestDefs.Column);
         yield return Case("SquadMembers", "Squads", s => s.SquadList[0].MemberList.RemoveAt(0));
+        yield return Case("SquadVelocityX", "Squads", s => s.SquadList[0].Velocity += new FixVec2(Fix.FromRaw(1), Fix.Zero));
+        yield return Case("SquadVelocityY", "Squads", s => s.SquadList[0].Velocity += new FixVec2(Fix.Zero, Fix.FromRaw(1)));
+        yield return Case("SquadSpin", "Squads", s => s.SquadList[0].Spin = 3);
+        yield return Case("SquadOrderKind", "Squads", s => s.SquadList[0].Order = SquadOrder.Move(FixVec2.Zero, Angle.Zero));
         yield return Case("Rng", "Rng", s => s.Rng(RngStream.Misc).NextUInt());
         yield return Case("IdCounter", "Core", s => s.AllocateId());
     }
@@ -41,6 +48,34 @@ public class HashCoverageTests
 
         var changed = before.Keys.Where(k => before[k] != after[k]).ToArray();
         Assert.That(changed, Is.EqualTo(new[] { section }));
+    }
+
+    [Test]
+    public void SquadOrder_EachFieldMovesTheSquadsHashOnly()
+    {
+        StateHash With(SquadOrder order)
+        {
+            var state = BattleSetup.Create(TestDefs.TwoSquads(), seed: 3);
+            state.SquadList[0].Order = order;
+            return StateHasher.Compute(state);
+        }
+
+        var baseline = With(SquadOrder.Move(FixVec2.FromInts(5, 5), Angle.Zero));
+        StateHash[] variants =
+        [
+            With(SquadOrder.Move(new FixVec2(Fix.FromInt(5) + Fix.FromRaw(1), Fix.FromInt(5)), Angle.Zero)),
+            With(SquadOrder.Move(new FixVec2(Fix.FromInt(5), Fix.FromInt(5) + Fix.FromRaw(1)), Angle.Zero)),
+            With(SquadOrder.Move(FixVec2.FromInts(5, 5), Angle.FromRaw(1))),
+        ];
+        foreach (var variant in variants)
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.That(variant.Squads, Is.Not.EqualTo(baseline.Squads));
+                Assert.That(variant.Fighters, Is.EqualTo(baseline.Fighters));
+                Assert.That(variant.Core, Is.EqualTo(baseline.Core));
+            });
+        }
     }
 
     [Test]

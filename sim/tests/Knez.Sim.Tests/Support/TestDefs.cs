@@ -6,13 +6,17 @@ namespace Knez.Sim.Tests.Support;
 /// <summary>Defs built in code, independent of the repo's content files (those are covered by RepoContentTests).</summary>
 public static class TestDefs
 {
-    public static readonly FighterDef Warrior = new("test-warrior", Fix.Ratio(3, 10));
+    /// <summary>Walks 1.4 m/s, runs 3.5 m/s, turns 360°/s (the agreed content values).</summary>
+    public static readonly FighterDef Warrior = Fighter("test-warrior", walkTenths: 14);
 
-    /// <summary>Two ranks, 1 m apart sideways, 1.5 m between ranks: round numbers for exact assertions.</summary>
-    public static readonly FormationDef Line = new("test-line", Fix.One, Fix.Ratio(3, 2), ranks: 2, width: 0);
+    /// <summary>Two ranks, 1 m apart sideways, 1.5 m between ranks, turns 45°/s: round numbers for exact assertions.</summary>
+    public static readonly FormationDef Line = new("test-line", Fix.One, Fix.Ratio(3, 2), ranks: 2, width: 0, turnRate: Fix.FromInt(45));
 
-    /// <summary>Two files wide, ranks follow from the squad size.</summary>
-    public static readonly FormationDef Column = new("test-column", Fix.One, Fix.Ratio(3, 2), ranks: 0, width: 2);
+    /// <summary>Two files wide, ranks follow from the squad size; turns 90°/s.</summary>
+    public static readonly FormationDef Column = new("test-column", Fix.One, Fix.Ratio(3, 2), ranks: 0, width: 2, turnRate: Fix.FromInt(90));
+
+    public static FighterDef Fighter(string id, int walkTenths, int radiusHundredths = 30) =>
+        new(id, Fix.Ratio(radiusHundredths, 100), Fix.Ratio(walkTenths, 10), Fix.Ratio(35, 10), Fix.FromInt(360));
 
     public static readonly MapDef Map = new(Fix.FromInt(60), Fix.FromInt(40));
 
@@ -29,6 +33,24 @@ public static class TestDefs
     [
         Squad("Blue", 0, 2, FixVec2.FromInts(10, 10), 100),
         Squad("Red", 1, 2, FixVec2.FromInts(10, 20), 280),
+    ]);
+
+    /// <summary>One line of 8 at (20, 10) facing north on the 60 × 40 map, with an optional script.</summary>
+    public static ScenarioDef OneLine(params ScriptedOrderDef[] script) =>
+        new("test-one-line", "test", Map, [Squad("Line", 0, 8, FixVec2.FromInts(20, 10), 90)], script);
+
+    /// <summary>
+    /// The determinism-test march: a line advances and then turns east, a column turns about and marches back. Covers
+    /// marching, turning in place, arrival facing and slot following with interpolated sines (odd angles).
+    /// </summary>
+    public static ScenarioDef March() => new("test-march", "test", Map,
+    [
+        Squad("Line", 0, 8, FixVec2.FromInts(15, 8), 90),
+        Squad("Column", 1, 6, FixVec2.FromInts(40, 12), 100, Column),
+    ],
+    [
+        new ScriptedOrderDef(1, "Line", FixVec2.FromInts(19, 21), Angle.FromDegrees(0)),
+        new ScriptedOrderDef(1, "Column", FixVec2.FromInts(37, 30), null),
     ]);
 
     /// <summary>A player line facing north and an enemy column facing south.</summary>

@@ -12,8 +12,9 @@ namespace Knez.Sim.Defs
     {
         /// <summary>Creates a def; exactly one of <paramref name="ranks"/> and <paramref name="width"/> is positive (at most
         /// <see cref="SquadSpawnDef.MaxCount"/>), the other 0.</summary>
-        public FormationDef(string id, Fix spacing, Fix rankSpacing, int ranks, int width)
+        public FormationDef(string id, Fix spacing, Fix rankSpacing, int ranks, int width, Fix turnRate)
         {
+            TurnRate = DefChecks.Positive(turnRate, FighterDef.MaxTurnRate, "°/s", nameof(turnRate));
             Id = DefChecks.Id(id, nameof(id));
             Spacing = DefChecks.PositiveMetres(spacing, MaxSpacingMetres, nameof(spacing));
             RankSpacing = DefChecks.PositiveMetres(rankSpacing, MaxSpacingMetres, nameof(rankSpacing));
@@ -43,6 +44,12 @@ namespace Knez.Sim.Defs
         /// <summary>Fixed number of files (fighters per rank), or 0 when <see cref="Ranks"/> fixes the shape.</summary>
         public int Width { get; }
 
+        /// <summary>How fast a squad in this formation turns its front, degrees per second.</summary>
+        public Fix TurnRate { get; }
+
+        /// <summary><see cref="TurnRate"/> as <see cref="Angle"/> units per tick (at least 1).</summary>
+        public int TurnPerTick => DefChecks.TurnUnitsPerTick(TurnRate);
+
         internal void AddTo(ref Fnv1a64 hash)
         {
             hash.Add(Id);
@@ -50,6 +57,7 @@ namespace Knez.Sim.Defs
             hash.Add(RankSpacing.Raw);
             hash.Add(Ranks);
             hash.Add(Width);
+            hash.Add(TurnRate.Raw);
         }
     }
 }

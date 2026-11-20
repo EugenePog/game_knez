@@ -17,7 +17,8 @@ namespace Knez.Sim.Defs
         /// to defs by id), every fighter's starting slot on the map. Throws <see cref="ArgumentException"/>; messages
         /// name the squad as <c>squads[i]</c>.
         /// </summary>
-        public ScenarioDef(string id, string description, MapDef map, IReadOnlyList<SquadSpawnDef> squads)
+        public ScenarioDef(string id, string description, MapDef map, IReadOnlyList<SquadSpawnDef> squads,
+            IReadOnlyList<ScriptedOrderDef>? script = null)
         {
             Id = DefChecks.Id(id, nameof(id));
             Description = description ?? string.Empty;
@@ -55,6 +56,7 @@ namespace Knez.Sim.Defs
             }
 
             Squads = new ReadOnlyCollection<SquadSpawnDef>(copy);
+            Script = new ReadOnlyCollection<ScriptedOrderDef>(CheckScript(script ?? Array.Empty<ScriptedOrderDef>(), copy, map));
             Fingerprint = ComputeFingerprint();
         }
 
@@ -73,6 +75,9 @@ namespace Knez.Sim.Defs
 
         /// <summary>Starting squads in spawn order (ids are allocated in this order).</summary>
         public IReadOnlyList<SquadSpawnDef> Squads { get; }
+
+        /// <summary>Orders the scenario gives by itself, sorted by tick (file order within a tick).</summary>
+        public IReadOnlyList<ScriptedOrderDef> Script { get; }
 
         /// <summary>
         /// FNV-1a hash of everything that affects the battle (map, squads and the defs they use), in a canonical order.
@@ -93,6 +98,39 @@ namespace Knez.Sim.Defs
             }
         }
 
+        private static ScriptedOrderDef[] CheckScript(IReadOnlyList<ScriptedOrderDef> script, SquadSpawnDef[] squads, MapDef map)
+        {
+            var copy = new ScriptedOrderDef[script.Count];
+            for (int i = 0; i < copy.Length; i++)
+            {
+                ScriptedOrderDef entry = script[i] ?? throw new ArgumentNullException(nameof(script), $"script[{i}] is null.");
+                if (i > 0 && entry.Tick < copy[i - 1].Tick)
+                {
+                    throw new ArgumentException($"script[{i}]: tick {entry.Tick} comes before the previous entry's tick {copy[i - 1].Tick}; keep the script in tick order.");
+                }
+
+                bool known = false;
+                for (int s = 0; s < squads.Length && !known; s++)
+                {
+                    known = string.Equals(squads[s].Name, entry.SquadName, StringComparison.Ordinal);
+                }
+
+                if (!known)
+                {
+                    throw new ArgumentException($"script[{i}]: no squad is named '{entry.SquadName}'.");
+                }
+
+                if (!map.Contains(entry.Target))
+                {
+                    throw new ArgumentException($"script[{i}]: target {entry.Target} is off the {map} map.");
+                }
+
+                copy[i] = entry;
+            }
+
+            return copy;
+        }
+
         private ulong ComputeFingerprint()
         {
             var hash = Fnv1a64.Start();
@@ -102,6 +140,12 @@ namespace Knez.Sim.Defs
             for (int i = 0; i < Squads.Count; i++)
             {
                 Squads[i].AddTo(ref hash);
+            }
+
+            hash.Add(Script.Count);
+            for (int i = 0; i < Script.Count; i++)
+            {
+                Script[i].AddTo(ref hash);
             }
 
             return hash.Value;

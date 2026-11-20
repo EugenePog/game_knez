@@ -1,6 +1,6 @@
 {
-  "description": "Fighter types. radius: collision circle in metres. Placeholder values, tuned on the M1 bench.",
+  "description": "Fighter types. radius: collision circle (m); walkSpeed: marching pace (m/s), a squad marches at its slowest member's; runSpeed: top speed (m/s), for now only to catch up with the formation slot; turnRate: how fast a fighter turns (degrees/s). Speeds agreed 2026-11-20; radius and turnRate are placeholders, tuned on the M1 bench.",
   "fighters": [
-    { "id": "warrior", "radius": 0.3 }
+    { "id": "warrior", "radius": 0.3, "walkSpeed": 1.4, "runSpeed": 3.5, "turnRate": 360 }
   ]
 }

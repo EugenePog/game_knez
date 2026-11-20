@@ -1,6 +1,6 @@
 # Battle simulation — technical design
 
-Status: **draft v0.2** (2026-11-20, M1 step 1). Owner: Eugene. Scope: phase 1 skirmish; the same sim later drives the 3D view
+Status: **draft v0.3** (2026-11-20, M1 step 3). Owner: Eugene. Scope: phase 1 skirmish; the same sim later drives the 3D view
 and campaign battles. Code names follow the glossary in [AGENTS.md](../AGENTS.md#glossary-russian-design-term--code-name).
 
 When code and this document disagree, fix one of them in the same change.
@@ -84,8 +84,9 @@ Assemblies:
   (+Y).** Degrees convert by rounding to the nearest unit, ties away from zero (`FromDegrees(30)` = 5461 units).
 - `FixMath`: integer `Sqrt`; `Sin/Cos` from a committed 257-entry quarter-wave table
   (`Numerics/SineTable.cs`, generated once by `tools/gen_sine_table.py`) with linear interpolation — within 2/65536 of
-  the true value, exact at multiples of 90°, exactly odd and mirror-symmetric; `Atan2` by integer approximation (M1
-  step 3), `Clamp`, `Lerp`. Tables are committed integer arrays — never computed with `double` at runtime.
+  the true value, exact at multiples of 90°, exactly odd and mirror-symmetric; `Atan2` by binary search on the same
+  table (exact on the axes and diagonals, exactly mirror-symmetric, within one unit elsewhere; (0, 0) → 0), `Clamp`.
+  `FixVec2.WithLength`/`ClampLength` scale with 64-bit products instead of a rounded ratio, so a march step is exact. Tables are committed integer arrays — never computed with `double` at runtime.
 - Percentages and probabilities: integers in permille (‰, 0..1000) or `Fix`.
 - Content parses decimal text (`"1.25"`) into `Fix` with integer arithmetic, never via `double`: the nearest 1/65536,
   ties away from zero (`"0.1"` → raw 6554, `"-0.1"` → −6554); at most 9 decimals; exponents are rejected.
@@ -111,9 +112,11 @@ Assemblies:
   Systems iterate `state.FighterList` with `for` loops. Removed entities are marked dead and compacted at end of
   tick, preserving order.
 - Fighter data groups: transform (position, velocity, facing), body (HP, wounds, fatigue), morale, combat
-  (current action, cooldowns, target), squad membership and slot, def reference. M1 step 1 has id, def, side,
-  position, facing, squad id, slot index and alive.
-- `Squad`: id, side, name, formation def, anchor (centre of the front rank), facing, member ids (sorted). Build the
+  (current action, cooldowns, target), squad membership and slot, def reference. Now (M1 step 3): id, def, side,
+  position, velocity (m per tick), facing, squad id, slot index, alive.
+- `Squad`: id, side, name, formation def, anchor (centre of the front rank), facing, order (`SquadOrder`: kind,
+  target, arrival facing), velocity and spin (how far the anchor moved and the front turned this tick — they give each
+  slot's own motion), member ids (sorted). Build the
   starting state with `BattleSetup.Create(scenario, seed)`: squads in scenario order, each followed by its fighters in
   slot order, every fighter on its slot facing with its squad.
 
@@ -127,10 +130,19 @@ def gets the fields its systems need when they arrive; M1 step 1 has:
 
 | Def | Fields |
 |---|---|
-| `FighterDef` | `id`, `radius` (m) |
-| `FormationDef` | `id`, `spacing` (m between neighbours), `rankSpacing` (m between ranks), `ranks` *or* `width` |
+| `FighterDef` | `id`, `radius` (m), `walkSpeed`, `runSpeed` (m/s), `turnRate` (°/s) |
+| `FormationDef` | `id`, `spacing` (m between neighbours), `rankSpacing` (m between ranks), `ranks` *or* `width`, `turnRate` (°/s) |
 | `MapDef` | `width`, `height` (m) |
-| `ScenarioDef` | `id`, `description`, `map`, `squads[]`: `name`, `side`, `fighter`, `count`, `formation`, `position` `[x, y]`, `facing` (degrees) |
+| `ScenarioDef` | `id`, `description`, `map`, `squads[]`: `name`, `side`, `fighter`, `count`, `formation`, `position` `[x, y]`, `facing` (degrees); optional `script[]`: `tick`, `order` (`"move"`), `squad` (name), `target` `[x, y]`, optional `facing` |
+
+Agreed values (2026-11-20): walk 1.4 m/s, run 3.5 m/s; squad turn rate column 90°/s, line 45°/s, shield wall 30°/s.
+Placeholders until the M1 bench: radius 0.3 m, fighter turn 360°/s, the formation spacings.
+
+The **scenario script** is orders the scenario gives by itself at fixed ticks (benchmarks, tests, set pieces). In
+tick order; each entry goes through the same validation as a player's `MoveSquad` at the start of its tick, before
+queued commands, issued as the squad's own side, but is not written to the command log — the scenario (and its
+fingerprint) already holds it. It exists because the CLI takes no commands and the S2–S4 benches need timed orders.
+Sanity bounds also cover speeds (0.1..20 m/s) and turn rates (0..3600 °/s).
 
 A scenario uses one def object per id (state hashes name defs by id); the fingerprint covers the defs its spawn
 entries use. **Before M1 step 7** (`SetFormation`, later heroes), `ScenarioDef` must carry the battle's whole def
@@ -159,6 +171,9 @@ rank; an incomplete rank is the rearmost and is centred. Width = `width`, or ⌈
   with the reason code (`unknown-entity`, `wrong-side`, … — stable strings for the UI) and changes nothing. Each
   command checks the issuing side's ownership itself.
 - The command log + scenario + seed is the replay.
+- `MoveSquad(side, squad, target, facing?)` (M1 step 3): rejected as `unknown-entity`, `wrong-side`, `not-alive` (no
+  living member) or `off-map` (target outside the map). Applying it replaces the squad's order; without a facing the
+  squad will end facing the direction from its anchor to the target (its current facing if the target is the anchor).
 
 ## 9. Tick pipeline (fixed order)
 
@@ -186,6 +201,23 @@ their milestone. Scratch buffers live in `TickContext`, never in system fields.
 
 - A squad has an **anchor** (position + facing) that follows the A* path; the formation defines **slots**
   relative to the anchor. Fighters steer to their slots.
+- **Move order (step 3, straight line until A* in step 6).** `OrderSystem` turns the squad's front toward the target at
+  the formation's turn rate, in place, until the target is within 30° of the front (a fixed rule agreed 2026-11-20, not
+  per formation); then the anchor marches straight
+  at the walk speed of the slowest living member while the front finishes turning. Within 1 cm of the target the anchor
+  stops there and turns to the order's facing; then the order is cleared (the squad holds). The squad pivots around its
+  anchor, so a column's tail swings wide in an about-turn — revisit with wheeling in step 7.
+- **Following the slot.** `SteeringSystem`: velocity = the slot's own motion this tick (from the anchor's velocity
+  and spin) + a tenth of the lag the fighter had before (a 10-tick time constant; 1 m of lag closes to 2 cm in ~37
+  ticks), capped at run speed. On a straight march a member never leaves its slot; a displaced one runs back. When the
+  squad stands still and a member is within 2 cm of its slot, it steps exactly onto it, so formations settle instead of
+  creeping. `MovementSystem` applies the velocity and turns the fighter at its turn rate: toward the squad's front while
+  in formation — also when shuffling sideways or swinging round with a turning squad, whose outer slots move faster than
+  walking — and toward its movement only when it moves faster than walking pace *relative to its own slot* (running to
+  catch up). Both systems share the slot motion (`Movement/SlotTracking.cs`). Solver settings live in
+  `Movement/MovementRules.cs`, not in content — tune them on the bench.
+- A `MoveSquad` target within the 1 cm arrival distance keeps the squad's facing (a sub-centimetre offset has no
+  meaningful direction).
 - Slot assignment is stable (keep last assignment); after losses, reassign with a deterministic greedy
   min-distance pass in id order. Ranks fill from the back.
 - Steering: arrive-at-slot + separation from neighbours + wall avoidance; engaged fighters are held in place
@@ -249,15 +281,19 @@ Utility + FSM, no neural nets, inside the sim and deterministic:
   with SplitMix64, so a change in AI randomness doesn't shift combat rolls in A/B runs. RNG state is part of
   `BattleState`.
 - `StateHasher`: FNV-1a 64 over fields in a canonical order, with per-section sub-hashes so a desync can be
-  localised to a section. Sections now: `Core` (tick, seed, id counter, scenario fingerprint), `Rng`, `Squads`,
-  `Fighters`; morale and others join when that state appears. Strings are hashed ordinally (length + UTF-16 units).
+  localised to a section. Sections now: `Core` (tick, seed, id counter, scenario fingerprint), `Rng`, `Squads` (id,
+  side, name, formation id, anchor, facing, order kind/target/facing, velocity, spin, members), `Fighters` (id, def id,
+  side, alive, position, velocity, facing, squad, slot); morale and others join when that state appears. Strings are
+  hashed ordinally (length + UTF-16 units). Velocities and spin are recomputed every tick (stages 3 and 5) but hashed
+  anyway: anything that reads them earlier in a tick (AI in M4, the view) sees last tick's values, so they are state, and
+  they help localise a desync. `HashCoverageTests` checks that each field moves its own section.
 - `Snapshot`: deep copy of `BattleState` — used for the view double buffer, restore-and-continue tests and
   later saves. Snapshot → restore → continue must produce the same hashes as an uninterrupted run.
 - Replay file (JSON): `{ format, simVersion, scenario, seed, commands: [...], checkpoints: [{tick, hash}] }`.
   Golden replays live in `sim/tests/Golden/`; a rule change that alters outcomes regenerates them on purpose.
   Until replay files exist, the golden checks are `GoldenFinalHash` in `DeterminismTests` (seed 42, 300 ticks; its
-  squads face between sine-table entries) and `ContentGoldenTests` (a test-owned JSON fixture: fingerprint and spawned
-  state). `HashCoverageTests` checks that every state field moves its own hash section.
+  squads face between sine-table entries), `GoldenMarchHash` (a scripted march with an about-turn and an arrival
+  facing, 400 ticks) and `ContentGoldenTests` (a test-owned JSON fixture: fingerprint and spawned state). `HashCoverageTests` checks that every state field moves its own hash section.
 
 ## 16. Events and the view contract
 
@@ -290,7 +326,7 @@ Utility + FSM, no neural nets, inside the sim and deterministic:
     "map": { "width", "height" },
     "squads":   [ { "id", "name", "side", "formation" } ],
     "fighters": [ { "id", "squad", "slot", "side", "def", "radius" } ],
-    "frames":   [ { "tick", "hash", "squads": [[id, anchorX, anchorY, facing°]],
+    "frames":   [ { "tick", "hash", "squads": [[id, anchorX, anchorY, facing°, ordered 1|0, targetX, targetY, targetFacing°]],
                     "fighters": [[id, x, y, facing°, alive 1|0]], "events": [{ "type", … }] } ],
     "faulted":  { "tick", "error" } }   // only when the simulation threw
   ```
@@ -311,8 +347,8 @@ Utility + FSM, no neural nets, inside the sim and deterministic:
   interpolation between ticks, a red note for a faulted run. URL:
   `?frames=<url>&tick=N&speed=2&play=1&labels=0&anchors=0&grid=0&ids=1`; a file can also be picked or dropped.
   `window.knezViewer` (`tick`, `seekTick(n)` — renders at once, `loaded`, `error`) lets agents drive it from the
-  console. Pausing always lands on a whole tick. Order arrows, morale bars and event markers on the map arrive with
-  their mechanics; at ×2/×4 the events panel shows only the tick on screen (collect skipped ticks when markers come).
+  console. Pausing always lands on a whole tick. Move orders are drawn as a dashed line from the anchor to a ring at
+  the target with a tick for the arrival facing; morale bars and event markers on the map arrive with their mechanics; at ×2/×4 the events panel shows only the tick on screen (collect skipped ticks when markers come).
 
 ## 18. Testing
 
