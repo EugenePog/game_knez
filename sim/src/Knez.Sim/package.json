@@ -1,0 +1,7 @@
+{
+  "name": "com.knez.sim",
+  "version": "0.1.0",
+  "displayName": "Knez Sim",
+  "description": "Deterministic battle simulation for Game_knez. Pure C#, no Unity references.",
+  "unity": "6000.0"
+}

@@ -17,6 +17,8 @@ don't start the next one until it passes. Update the "Current" marker when a mil
    `BattleSimulation.Step()` with the empty systems of the tick pipeline, `StateHasher`, `Snapshot`.
    Tests: RNG known-answer, `Fix` arithmetic, determinism (same seed + commands twice ⇒ same hash sequence;
    snapshot/restore ⇒ same continuation).
+   ✅ 2026-11-20: 63 tests green (Debug; 62 in Release), golden final hash recorded; `Fighter` is minimal (id, side,
+   position, alive). First `sim-reviewer` pass found 13 issues (1 major: public state write surface) — all fixed.
 3. CI: GitHub Actions running build, tests and the purity check on every push.
 4. CLI skeleton: `run` on an empty scenario prints tick count and final hash.
 

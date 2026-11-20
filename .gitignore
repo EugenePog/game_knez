@@ -1,55 +1,60 @@
-# Prerequisites
-*.d
+# ---- Project Python venv (tools/bootstrap.sh) ----------------------------
+.venv/
 
-# Object files
-*.o
-*.ko
-*.obj
-*.elf
+# ---- Build output, replays, reports -------------------------------------
+artifacts/
+[Bb]in/
+[Oo]bj/
+TestResults/
+*.trx
+BenchmarkDotNet.Artifacts/
+*.user
+*.suo
 
-# Linker output
-*.ilk
-*.map
-*.exp
+# ---- Unity project (game/) ------------------------------------------------
+/game/[Ll]ibrary/
+/game/[Tt]emp/
+/game/[Oo]bj/
+/game/[Bb]uild/
+/game/[Bb]uilds/
+/game/[Ll]ogs/
+/game/[Uu]ser[Ss]ettings/
+/game/[Mm]emoryCaptures/
+/game/[Rr]ecordings/
+/game/Assets/Plugins/Editor/JetBrains*
+/game/Assets/StreamingAssets/aa*
+# Unity generates these; the real projects live in sim/
+/game/*.csproj
+/game/*.sln
+/game/*.slnx
+/game/*.unityproj
+/game/*.pidb
+/game/*.booproj
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+sysinfo.txt
+crashlytics-build.properties
+*.apk
+*.aab
+*.unitypackage
 
-# Precompiled Headers
-*.gch
-*.pch
+# ---- IDEs -----------------------------------------------------------------
+.vs/
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+*.swp
 
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
+# ---- OS -------------------------------------------------------------------
+.DS_Store
+Thumbs.db
 
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
+# ---- Python (tools/) ------------------------------------------------------
+__pycache__/
+*.pyc
 
-# Executables
-*.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
-
-# Debug files
-*.dSYM/
-*.su
-*.idb
-*.pdb
-
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
-
-# debug information files
-*.dwo
+# ---- Claude Code: personal overrides stay local ---------------------------
+.claude/settings.local.json
+.claude/worktrees/

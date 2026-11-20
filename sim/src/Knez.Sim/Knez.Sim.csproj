@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The battle simulation. Must compile under Unity 6: netstandard2.1, C# 9, no Unity references (ADR-0001).
+       The same folder is a Unity local package (package.json + Knez.Sim.asmdef). -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>Knez.Sim</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!-- Debug (tests, CLI debugging): integer overflow throws, so out-of-range Fix math fails loudly.
+       Release and Unity stay unchecked; intended wraparound is marked `unchecked` in code. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Only tests and tools may write state directly; the view gets read-only access. -->
+    <InternalsVisibleTo Include="Knez.Sim.Tests" />
+  </ItemGroup>
+
+</Project>

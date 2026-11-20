@@ -71,7 +71,14 @@ Assemblies:
 ## 5. Numbers
 
 - `Fix`: `readonly struct` over `long Raw`, 16 fractional bits (Q48.16, resolution ≈ 0.015 mm).
-  Plain `long` multiplication is safe for game-range values (|a|,|b| < ~45 000); document any wider use.
+  Plain `long` multiplication is safe for game-range values (|a|,|b| < ~46 000); document any wider use.
+- **Rounding:** `*` and `/` both truncate toward zero, so results are symmetric around zero — mirrored scenarios give
+  mirrored numbers, and damped negative values decay to 0 like positive ones. (Decided 2026-11-20 before any
+  movement code; changing it later changes every golden hash.)
+- **Errors fail loudly:** division by zero always throws (explicit check — IL2CPP doesn't check integer division);
+  Debug builds of `Knez.Sim` compile with overflow checking, so out-of-range math throws in tests; `FixMath.Sqrt`
+  rejects values ≥ 2^32. Intended wraparound (RNG, hashing) is marked `unchecked`.
+- `FixVec2.Length` works on the raw squares (full precision), so sub-millimetre vectors keep a non-zero length.
 - `FixVec2` for positions/velocities (metres). `Angle` = 16-bit binary angle (0..65535 ↔ 0..360°), wraps
   naturally.
 - `FixMath`: integer `Sqrt`, `Sin/Cos` by lookup table, `Atan2` by integer approximation, `Clamp`, `Lerp`.
@@ -88,9 +95,14 @@ Assemblies:
   - `Map`: grid (cell size 0.5 m — to confirm in M1) with walkable, height level, cover and line-of-sight blockers;
   - `Sides` (player, enemy; later more), `Squads`, `Fighters` (heroes are fighters with a `HeroData` part);
   - spatial index for neighbour queries (rebuilt each tick, deterministic order);
-  - per-tick `Events` buffer; scratch buffers reused across ticks.
-- Storage: lists sorted by `EntityId`, plus an id → index map used **only for lookup**. Removed entities are
-  marked dead and compacted at end of tick, preserving order.
+  - per-tick `Events` buffer;
+  - from M1: an immutable reference to content defs and the map, shared (not copied) by `Clone`, with a content
+    fingerprint hashed in the `Core` section.
+- Scratch buffers live in `TickContext` (one per simulation), never in `BattleState` or system fields: they are not
+  cloned or hashed, so two restored simulations can't share one.
+- Storage: lists sorted by `EntityId`; lookup by binary search (an id → index map only if profiling asks for it).
+  Systems iterate `state.FighterList` with `for` loops. Removed entities are marked dead and compacted at end of
+  tick, preserving order.
 - Fighter data groups: transform (position, velocity, facing), body (HP, wounds, fatigue), morale, combat
   (current action, cooldowns, target), squad membership and slot, def reference.
 
@@ -103,20 +115,24 @@ spawn positions, victory conditions, seed defaults). Balance numbers live here, 
 
 ## 8. Commands
 
-- `ICommand` with `Tick`, `SideId`, and a type-specific payload. Phase 1 commands:
+- `ICommand` with `SideId` and a type-specific payload; the tick and enqueue order live in `ScheduledCommand`.
+  Phase 1 commands:
   `MoveSquad(squad, target, facing?)`, `SetFormation(squad, formation)`, `SetStance(squad, Hold|Advance|Pursue)`,
   `AttachHero(hero, squad|none)`, `HeroMove(hero, target)`, `HeroAttack(hero, target)`,
   `HeroUseAbility(hero, ability, target)`.
 - A command enqueued while the state is at tick T is applied at the start of tick T+1. Ordering within a tick:
   enqueue sequence number.
-- Commands are validated when applied; an invalid one produces a `CommandRejected` event and changes nothing.
+- At its tick a command is first checked with `Validate(state)`, which gets no `TickContext` (no random draws, no
+  events) and returns a `RejectReason`. Only a valid command is `Apply`-ed. An invalid one emits `CommandRejected`
+  with the reason code (`unknown-entity`, `wrong-side`, … — stable strings for the UI) and changes nothing. Each
+  command checks the issuing side's ownership itself.
 - The command log + scenario + seed is the replay.
 
 ## 9. Tick pipeline (fixed order)
 
 | # | System | Does |
 |---|---|---|
-| 0 | `BeginTick` | clear events, advance tick counter |
+| 0 | `BattleSimulation.Step()` | advance tick counter, clear events (not a system) |
 | 1 | `CommandSystem` | apply this tick's commands |
 | 2 | `AiSystem` | side → squad → fighter decisions; squads evaluated staggered (every 5 ticks, offset by id) |
 | 3 | `OrderSystem` | squad orders → anchor goal, facing, formation slots, slot assignment |
@@ -129,9 +145,10 @@ spawn positions, victory conditions, seed defaults). Balance numbers live here, 
 | 10 | `MoraleSystem` | morale deltas, state transitions, rout and rally |
 | 11 | `FatigueSystem` | fatigue gain/recovery from movement, combat, stance |
 | 12 | `CleanupSystem` | compact dead, squad bookkeeping, victory check, end-of-tick events |
-| 13 | `HashSystem` | state hash (every tick in tests/debug, every N ticks otherwise) |
+| 13 | `BattleSimulation.ComputeHash()` | state hash, called by tests and tools after a step (not a system) |
 
-M0 ships these as empty systems so the order exists from day one.
+Systems 1–12 exist from M0 in `BattleSimulation.CreateDefaultSystems()`; all but `CommandSystem` are empty until
+their milestone. Scratch buffers live in `TickContext`, never in system fields.
 
 ## 10. Movement and formations — the main risk (M1)
 
@@ -205,12 +222,18 @@ Utility + FSM, no neural nets, inside the sim and deterministic:
   later saves. Snapshot → restore → continue must produce the same hashes as an uninterrupted run.
 - Replay file (JSON): `{ format, simVersion, scenario, seed, commands: [...], checkpoints: [{tick, hash}] }`.
   Golden replays live in `sim/tests/Golden/`; a rule change that alters outcomes regenerates them on purpose.
+  Until replay files exist, the golden check is `GoldenFinalHash` in `DeterminismTests` (seed 42, 300 ticks).
 
 ## 16. Events and the view contract
 
 - Systems append `SimEvent`s (hit landed, fighter died, wound, morale state changed, command rejected, ability
   used, squad broke, battle ended) to the per-tick buffer; the view consumes them for VFX, sound, UI and log.
-- The view reads `IReadOnlyBattleState` (or a snapshot), never calls systems and never writes state.
+- The view reads `BattleState` through its public surface, which is read-only for state: fighter setters, the RNG
+  streams and id allocation are `internal` (tests get them through `InternalsVisibleTo`). The view never calls
+  systems and never writes state.
+- Events hold one tick only: a view stepping several times per frame reads them after every `Step()`.
+- If a command or system throws, the simulation is *faulted* (`IsFaulted`) and refuses further steps — its state no
+  longer matches any replay. Restore a snapshot or restart.
 - Input → `ICommand` → `CommandQueue`. Selection, camera and UI state are view-only.
 
 ## 17. Tools

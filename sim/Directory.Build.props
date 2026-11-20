@@ -1,0 +1,13 @@
+<Project>
+  <!-- Shared settings for every project in sim/. -->
+  <PropertyGroup>
+    <!-- All bin/obj output goes to sim/artifacts/ (gitignored), never into src/Knez.Sim,
+         which Unity also imports as a local package. -->
+    <UseArtifactsOutput>true</UseArtifactsOutput>
+    <ArtifactsPath>$(MSBuildThisFileDirectory)artifacts</ArtifactsPath>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+</Project>
