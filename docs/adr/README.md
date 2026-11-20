@@ -8,6 +8,7 @@ supersede it with a new one and link both ways.
 | [0001](0001-pure-csharp-sim.md) | Battle simulation is pure C# outside Unity | Accepted |
 | [0002](0002-fixed-point-math.md) | Fixed-point math in the simulation | Accepted |
 | [0003](0003-tick-and-command-model.md) | Fixed tick and tick-stamped commands | Accepted |
+| [0004](0004-content-json-reader.md) | Content JSON is read by our own small reader | Accepted |
 
 ## Template
 

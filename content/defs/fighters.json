@@ -1,0 +1,6 @@
+{
+  "description": "Fighter types. radius: collision circle in metres. Placeholder values, tuned on the M1 bench.",
+  "fighters": [
+    { "id": "warrior", "radius": 0.3 }
+  ]
+}

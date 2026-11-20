@@ -29,9 +29,35 @@ don't start the next one until it passes. Update the "Current" marker when a mil
 spec to merged commit using the `sim-feature` playbook and `sim-reviewer` without manual fixes. This checks how
 the "you + LLM agents" loop works — write down what went wrong in `docs/playtests/` or the ADR log.
 
+Checkpoint log (M1 step 1 as the feature, 2026-11-20): the playbook loop worked — test first, purity hook, reviewer,
+fixes by the same agent, no manual fixes needed so far. What went wrong: hand-computed expectations in new tests (error
+columns) were off and had to be corrected from real output; the reviewer caught real gaps the tests didn't (hash
+sections not checked field by field, interpolated sine values not pinned, CoreCLR-only message trimming); and the
+"M0 steps 3 and 4" commit left `.github/` out, so CI has **not run on GitHub yet** — "green on a clean clone" is
+still open until the workflow is pushed and passes.
+
 ### M1. Movement and formations — main technical risk (weeks 2–4)
 Grid map, A*, squad anchor + formation slots (Line, ShieldWall, Column), slot assignment, steering, separation,
 collision resolution; benchmark scenarios S1–S5; CLI `--frames` + HTML replay viewer; `bench` command.
+
+Steps — one change each, each ending with build/tests/purity green and a `sim-reviewer` pass:
+1. Scenarios and squads: `Knez.Sim.Content` (own JSON reader, exact decimal → `Fix`), fighter/formation/map/scenario
+   defs, `Angle` + sine table, squads spawned in their formation slots, content fingerprint in the hash,
+   CLI `run <scenario>`. Doubles as the M0 checkpoint feature.
+   ✅ 2026-11-20: ADR-0004; `content/scenarios/formations.json` (5 squads, 35 fighters); 232 tests (Debug), golden
+   hashes re-recorded on purpose (state format grew). `sim-reviewer`: no blockers or majors, 5 minor findings + nits —
+   all fixed except two deferred on purpose (full def catalogue → before step 7; `ToWorld` overload with a precomputed
+   forward vector → step 3).
+2. Frames and the replay viewer: CLI `--frames`, `tools/replay-viewer/` (circles, facing, squad colours, anchors), so
+   every later step is checked by eye.
+3. Moving a squad: `MoveSquad` command, the anchor walks straight to the target and turns, fighters seek and arrive at
+   their slots, facing follows movement (`Atan2`). No collisions yet.
+4. Crowding: spatial index, separation steering, circle–circle collision relaxation; overlap metric.
+5. Terrain: walkable grid, circle–grid clamping, wall avoidance (decide the cell size).
+6. Pathfinding: A* for squad anchors with a per-tick budget, path following.
+7. Formations in motion: `SetFormation` (Line, ShieldWall, Column), wheeling, slot reassignment after losses.
+   First: `ScenarioDef` carries and fingerprints the whole def catalogue (battle-sim.md §7).
+8. Bench: scenarios S1–S5, metrics, `bench` and `batch`; tune; decide steering vs ORCA; check the exit criteria.
 
 **Checkpoint:** M1 exit criteria in `battle-sim.md` §10 (no stuck > 2 s, overlap < 1 %, p99 < 2 ms for 50 fighters,
 looks right in the viewer). If it fails, fix movement before anything else.

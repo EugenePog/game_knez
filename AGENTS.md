@@ -38,6 +38,7 @@ docs/                 concept snapshot, battle-sim spec, roadmap, ADRs, playtest
 sim/                  pure C# simulation (no UnityEngine) — the heart of the game
   Knez.Sim.sln
   src/Knez.Sim/       core sim library: netstandard2.1, C# 9, also a Unity local package
+  src/Knez.Sim.Content/   JSON text → defs and scenarios (own strict reader, ADR-0004); also a Unity package
   tests/Knez.Sim.Tests/   NUnit tests, run with `dotnet test` (no Unity needed)
   tools/Knez.Sim.Cli/     headless battle runner: run / batch / bench / replay verify
 content/              data: fighter/weapon/formation defs, battle scenarios (JSON)
@@ -59,7 +60,7 @@ Folders appear as milestones reach them; `sim/` arrives in M0, `game/` in M2.
    - no wall clock (`DateTime`, `Stopwatch`), threads, tasks, `async`, I/O, `Guid.NewGuid`, `GetHashCode()` of runtime objects;
    - never iterate `Dictionary`/`HashSet` for logic — iterate lists sorted by `EntityId`; ties broken by id;
    - no mutable `static` state.
-   `tools/check_sim_purity.py` enforces most of this (it also runs as a Claude Code hook and in CI).
+   `tools/check_sim_purity.py` enforces most of this in all of `sim/src` (it also runs as a Claude Code hook and in CI).
 3. **All battle state lives in `BattleState`.** Systems are stateless; GameObjects and view code hold no game
    state, only caches keyed by `EntityId`.
 4. **Input enters only as commands** (`ICommand` stamped with a tick) through the command queue. AI writes orders
@@ -84,7 +85,7 @@ dotnet build sim/Knez.Sim.sln
 dotnet test sim/Knez.Sim.sln
 dotnet test sim/Knez.Sim.sln --filter Category=Determinism
 python3 tools/check_sim_purity.py
-dotnet run --project sim/tools/Knez.Sim.Cli -c Release -- run --seed 1   # scenario files from M1
+dotnet run --project sim/tools/Knez.Sim.Cli -c Release -- run content/scenarios/formations.json --seed 1
 ```
 
 A change to `sim/` is done only when the build is warning-free, all tests pass, and the purity check is clean.

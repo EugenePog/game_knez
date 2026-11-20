@@ -1,0 +1,14 @@
+{
+  "name": "Knez.Sim.Content",
+  "rootNamespace": "Knez.Sim.Content",
+  "references": ["Knez.Sim"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": true
+}

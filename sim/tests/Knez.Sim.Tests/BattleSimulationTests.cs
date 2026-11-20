@@ -56,6 +56,7 @@ public class BattleSimulationTests
         Assert.Multiple(() =>
         {
             Assert.That(after.Fighters, Is.EqualTo(before.Fighters));
+            Assert.That(after.Squads, Is.EqualTo(before.Squads));
             Assert.That(after.Rng, Is.EqualTo(before.Rng));
             Assert.That(after.Core, Is.Not.EqualTo(before.Core));
         });

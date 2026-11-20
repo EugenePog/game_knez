@@ -1,0 +1,55 @@
+using System;
+using Knez.Sim.Numerics;
+
+namespace Knez.Sim.Defs
+{
+    /// <summary>
+    /// Immutable formation (строй) from content: a grid of slots behind the squad anchor (battle-sim.md §10).
+    /// The shape is fixed either by the number of <see cref="Ranks"/> (the width follows from the squad size) or by
+    /// the <see cref="Width"/> (the ranks follow). <see cref="Formations.FormationLayout"/> turns it into slot offsets.
+    /// </summary>
+    public sealed class FormationDef
+    {
+        /// <summary>Creates a def; exactly one of <paramref name="ranks"/> and <paramref name="width"/> is positive (at most
+        /// <see cref="SquadSpawnDef.MaxCount"/>), the other 0.</summary>
+        public FormationDef(string id, Fix spacing, Fix rankSpacing, int ranks, int width)
+        {
+            Id = DefChecks.Id(id, nameof(id));
+            Spacing = DefChecks.PositiveMetres(spacing, MaxSpacingMetres, nameof(spacing));
+            RankSpacing = DefChecks.PositiveMetres(rankSpacing, MaxSpacingMetres, nameof(rankSpacing));
+            Ranks = DefChecks.Range(ranks, 0, SquadSpawnDef.MaxCount, nameof(ranks));
+            Width = DefChecks.Range(width, 0, SquadSpawnDef.MaxCount, nameof(width));
+            if ((ranks > 0) == (width > 0))
+            {
+                throw new ArgumentException($"set exactly one of ranks and width (got ranks {ranks}, width {width}).");
+            }
+        }
+
+        /// <summary>Sanity bound for spacings, not a balance number.</summary>
+        public const int MaxSpacingMetres = 10;
+
+        /// <summary>Content id, e.g. "line".</summary>
+        public string Id { get; }
+
+        /// <summary>Distance between neighbours in a rank, metres.</summary>
+        public Fix Spacing { get; }
+
+        /// <summary>Distance between ranks, metres.</summary>
+        public Fix RankSpacing { get; }
+
+        /// <summary>Fixed number of ranks, or 0 when <see cref="Width"/> fixes the shape.</summary>
+        public int Ranks { get; }
+
+        /// <summary>Fixed number of files (fighters per rank), or 0 when <see cref="Ranks"/> fixes the shape.</summary>
+        public int Width { get; }
+
+        internal void AddTo(ref Fnv1a64 hash)
+        {
+            hash.Add(Id);
+            hash.Add(Spacing.Raw);
+            hash.Add(RankSpacing.Raw);
+            hash.Add(Ranks);
+            hash.Add(Width);
+        }
+    }
+}

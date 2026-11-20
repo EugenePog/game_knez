@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Knez.Sim\Knez.Sim.csproj" />
+    <ProjectReference Include="..\..\src\Knez.Sim.Content\Knez.Sim.Content.csproj" />
     <ProjectReference Include="..\..\tools\Knez.Sim.Cli\Knez.Sim.Cli.csproj" />
   </ItemGroup>
 

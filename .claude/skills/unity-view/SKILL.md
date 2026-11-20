@@ -11,7 +11,8 @@ Unity renders the battle and turns input into commands. It never owns game state
 
 ```
 game/
-  Packages/manifest.json        "com.knez.sim": "file:../../sim/src/Knez.Sim"
+  Packages/manifest.json        "com.knez.sim": "file:../../sim/src/Knez.Sim",
+                                "com.knez.sim.content": "file:../../sim/src/Knez.Sim.Content"
   Assets/Knez/
     View/   Knez.Game.View.asmdef      → references Knez.Sim
     Input/  Knez.Game.Input.asmdef     → references Knez.Sim, Knez.Game.View
@@ -19,7 +20,9 @@ game/
 ```
 
 `sim/src/Knez.Sim` carries `package.json` and `Knez.Sim.asmdef` (`"noEngineReferences": true`) so Unity compiles
-the same sources, plus `csc.rsp` (`-nullable:enable`). On first import, confirm Unity honours that file — no CS8632
+the same sources, plus `csc.rsp` (`-nullable:enable`); `sim/src/Knez.Sim.Content` is a second package the same way
+(depends on `com.knez.sim`). The view loads content text itself (e.g. `TextAsset`/StreamingAssets) and passes it to
+`DefLibrary.Parse` / `ScenarioLoader.Parse` — content code never opens files. On first import, confirm Unity honours that file — no CS8632
 nullable warnings from Knez.Sim; if it doesn't, add `#nullable enable` to the files instead. Unity can't see
 `internal` members of Knez.Sim: the view uses only the public, read-only surface. Unity writes `.meta` files into that folder — commit them. Build output of `dotnet` must not land
 inside the package folder (`Directory.Build.props` redirects it to `sim/artifacts/`).

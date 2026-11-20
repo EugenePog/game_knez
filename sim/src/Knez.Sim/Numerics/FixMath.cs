@@ -32,6 +32,23 @@ namespace Knez.Sim.Numerics
             return Fix.FromRaw((long)IntegerSqrt((ulong)value.Raw << Fix.FractionBits));
         }
 
+        /// <summary>
+        /// Sine from the committed quarter-wave table with linear interpolation; within 2/65536 of the true value,
+        /// exact at multiples of 90°, and exactly odd and mirror-symmetric (battle-sim.md §5).
+        /// </summary>
+        public static Fix Sin(Angle angle)
+        {
+            int quadrant = angle.Raw >> 14;
+            int within = angle.Raw & (SineTable.QuarterTurn - 1);
+            int magnitude = (quadrant & 1) == 0
+                ? SineTable.QuarterSin(within)
+                : SineTable.QuarterSin(SineTable.QuarterTurn - within);
+            return Fix.FromRaw(quadrant < 2 ? magnitude : -magnitude);
+        }
+
+        /// <summary>Cosine: the sine a quarter turn later.</summary>
+        public static Fix Cos(Angle angle) => Sin(Angle.FromRaw(angle.Raw + SineTable.QuarterTurn));
+
         /// <summary>Integer square root of a 64-bit value, rounded down (bit-by-bit method).</summary>
         public static ulong IntegerSqrt(ulong n)
         {

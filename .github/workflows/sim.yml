@@ -1,0 +1,74 @@
+# Battle simulation CI: purity check, build, tests (Debug + Release), CLI smoke test.
+# content/ is included because the tests load every scenario in it (RepoContentTests).
+# Runs on Linux x64 while development happens on an ARM64 Mac, so the golden-hash test in DeterminismTests
+# doubles as a cross-architecture determinism check (ADR-0002): a mismatch here is a determinism bug.
+name: sim
+
+on:
+  push:
+    paths:
+      - 'sim/**'
+      - 'content/**'
+      - 'tools/check_sim_purity.py'
+      - 'global.json'
+      - 'nuget.config'
+      - '.github/workflows/sim.yml'
+  pull_request:
+    paths:
+      - 'sim/**'
+      - 'content/**'
+      - 'tools/check_sim_purity.py'
+      - 'global.json'
+      - 'nuget.config'
+      - '.github/workflows/sim.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sim-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  sim:
+    name: build and test (linux-x64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: SDK selected by global.json
+        run: dotnet --version
+
+      - name: Purity check (no Unity, floating point or hidden nondeterminism in sim/src)
+        run: python3 tools/check_sim_purity.py
+
+      - name: Build (Debug; warnings are errors)
+        run: dotnet build sim/Knez.Sim.sln -c Debug
+
+      - name: Test (Debug; integer overflow checks on)
+        run: dotnet test sim/Knez.Sim.sln -c Debug --no-build
+
+      - name: Test (Release; what Unity and the CLI run)
+        run: dotnet test sim/Knez.Sim.sln -c Release
+
+      - name: CLI smoke test (two processes must print the same hash)
+        run: |
+          run_cli() {
+            dotnet run --project sim/tools/Knez.Sim.Cli -c Release --no-build -- \
+              run content/scenarios/formations.json --seed 42 --ticks 300 --json
+          }
+          first=$(run_cli)
+          second=$(run_cli)
+          echo "$first"
+          hash_of() { python3 -c 'import json, sys; print(json.loads(sys.argv[1])["finalHash"])' "$1"; }
+          test "$(hash_of "$first")" = "$(hash_of "$second")"

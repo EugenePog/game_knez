@@ -25,7 +25,8 @@ Read `AGENTS.md` hard rules once per session; this playbook is the working loop.
 | Data that changes during a battle | `BattleState` (or a part of it, e.g. `FighterMorale`) | the only mutable state |
 | Rules that change data | a system in `sim/src/Knez.Sim/<Area>/<Name>System.cs` | stateless; reads/writes `BattleState` |
 | External input | `sim/src/Knez.Sim/Commands/<Name>Command.cs` | `Validate(state)` → `RejectReason` (no RNG, no writes); `Apply(state, context)` only if valid |
-| Tunable numbers | content defs (`FighterDef`, `WeaponDef`, `FormationDef`, …) | no magic numbers in systems |
+| Tunable numbers | content defs in `sim/src/Knez.Sim/Defs/` (`FighterDef`, `FormationDef`, …), values in `content/defs/*.json` | no magic numbers in systems |
+| Reading content | `sim/src/Knez.Sim.Content/` (`DefLibrary`, `ScenarioLoader`, `JsonObjectReader`) | text in, defs out; no files, no `double` |
 | Things the view must react to | `SimEvent` subtype, emitted with `context.Emit(…)` | carry ids and reason codes |
 | Scratch buffers | `TickContext` (internal properties) | never fields on systems or `BattleState` |
 | Math | `Fix`, `FixVec2`, `Angle`, `FixMath` | no float/double anywhere in `sim/src` |
@@ -93,6 +94,13 @@ For every field you add to `BattleState` or its parts:
 - [ ] exposed read-only to the view if the view needs it
 
 A field that isn't hashed is a desync nobody will catch.
+
+For a new **def** field (defs are immutable and shared by every clone, so they are not part of the checklist above):
+
+- [ ] get-only property set in the constructor, validated there (`ArgumentException`; the loader locates it)
+- [ ] added to the def's `AddTo` (the scenario fingerprint) — otherwise two different contents share a hash
+- [ ] read by the loader in `Knez.Sim.Content` and added to its allowed-members list; documented in battle-sim.md §7
+- [ ] set in `content/defs/*.json` (a design number: propose a value with a reason and ask)
 
 ## 5. Verify
 

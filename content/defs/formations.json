@@ -1,0 +1,8 @@
+{
+  "description": "Formations (battle-sim.md §10). spacing: metres between neighbours in a rank; rankSpacing: metres between ranks; set either ranks (width follows the squad size) or width (ranks follow). Placeholder values, tuned on the M1 bench.",
+  "formations": [
+    { "id": "line", "spacing": 1.0, "rankSpacing": 1.2, "ranks": 2 },
+    { "id": "shieldwall", "spacing": 0.75, "rankSpacing": 1.0, "ranks": 2 },
+    { "id": "column", "spacing": 1.0, "rankSpacing": 1.2, "width": 2 }
+  ]
+}

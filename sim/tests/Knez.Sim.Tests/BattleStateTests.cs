@@ -48,8 +48,10 @@ public class BattleStateTests
 
         var before = StateHasher.Compute(original);
         clone.Fighters[0].Position = FixVec2.FromInts(50, 50);
+        clone.Squads[0].Anchor = FixVec2.FromInts(40, 40);
+        clone.Squads[0].MemberList.RemoveAt(0);
         clone.Rng(RngStream.Combat).NextUInt();
-        clone.AddFighter(1, FixVec2.Zero);
+        clone.AddFighter(TestDefs.Warrior, 1, FixVec2.Zero, Angle.Zero);
 
         Assert.That(StateHasher.Compute(original), Is.EqualTo(before));
     }

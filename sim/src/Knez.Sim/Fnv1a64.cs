@@ -34,5 +34,22 @@ namespace Knez.Sim
         public void Add(int value) => Add(unchecked((ulong)(long)value));
 
         public void Add(bool value) => Add(value ? 1UL : 0UL);
+
+        /// <summary>Length, then each UTF-16 code unit as two little-endian bytes (ordinal: no culture, no normalisation).</summary>
+        public void Add(string value)
+        {
+            Add(value.Length);
+            unchecked
+            {
+                for (int i = 0; i < value.Length; i++)
+                {
+                    char c = value[i];
+                    _hash ^= (byte)c;
+                    _hash *= Prime;
+                    _hash ^= (byte)(c >> 8);
+                    _hash *= Prime;
+                }
+            }
+        }
     }
 }

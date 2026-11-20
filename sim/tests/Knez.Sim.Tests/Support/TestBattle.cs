@@ -1,20 +1,11 @@
 using Knez.Sim.Commands;
-using Knez.Sim.Numerics;
 
 namespace Knez.Sim.Tests.Support;
 
-/// <summary>Small battles for tests: four fighters, two per side, at fixed positions.</summary>
+/// <summary>Small battles for tests: <see cref="TestDefs.SmallBattle"/> — two squads of two, sides 0 and 1.</summary>
 public static class TestBattle
 {
-    public static BattleState CreateState(ulong seed)
-    {
-        var state = new BattleState(seed);
-        state.AddFighter(0, FixVec2.FromInts(0, 0));
-        state.AddFighter(0, FixVec2.FromInts(2, 0));
-        state.AddFighter(1, FixVec2.FromInts(0, 10));
-        state.AddFighter(1, FixVec2.FromInts(2, 10));
-        return state;
-    }
+    public static BattleState CreateState(ulong seed) => BattleSetup.Create(TestDefs.SmallBattle(), seed);
 
     /// <summary>The standard pipeline plus <see cref="WanderSystem"/>, so state changes every tick.</summary>
     public static ISimSystem[] SystemsWithWander() => [.. BattleSimulation.CreateDefaultSystems(), new WanderSystem()];

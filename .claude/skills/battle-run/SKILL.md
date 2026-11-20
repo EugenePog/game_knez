@@ -8,6 +8,13 @@ description: Run battles headless and look at them — a single scenario with a 
 The Unity build can't be played by an agent. The CLI and the replay viewer are how you see the battle.
 Contract: `docs/battle-sim.md` §17. If a command or flag doesn't exist yet, say so and offer to add it.
 
+**Status (M1 step 1):** only `run <scenario> [--seed N] [--ticks N] [--json]` exists: it loads the scenario and
+the defs from the nearest `defs/` folder above it, and prints forces per side, tick count and final hash (exit codes
+0 / 1 sim error / 2 bad args or content — content errors are located as `file:line:col: json.path: message`). Nothing
+moves yet. `--out`/`--frames`, `batch`, `bench`, `replay verify` and the replay viewer arrive in later M1 steps
+(roadmap) — the sections below describe that target. CLI code lives in `sim/tools/Knez.Sim.Cli/` (`CliApp.cs`,
+`ScenarioFiles.cs`); its tests in `sim/tests/Knez.Sim.Tests/Cli/`.
+
 ## Single run
 
 ```bash
@@ -59,4 +66,6 @@ in `docs/roadmap.md` or the last report, not against a guess.
 ## Scenarios
 
 `content/scenarios/*.json` — playable skirmishes; `content/scenarios/bench/` — the S1–S5 movement benchmarks
-(battle-sim.md §10). A new mechanic usually deserves a small focused scenario; name it after what it tests.
+(battle-sim.md §10). A new mechanic usually deserves a small focused scenario; name it after what it tests. The file
+format is in battle-sim.md §7; a scenario's `id` must equal its file name, and `RepoContentTests` loads every
+scenario in the repo, so a broken one fails the tests.

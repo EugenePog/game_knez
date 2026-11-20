@@ -16,6 +16,7 @@ namespace Knez.Sim
             core.Add(state.Tick);
             core.Add(state.Seed);
             core.Add(state.NextEntityIdValue);
+            core.Add(state.Scenario.Fingerprint); // the immutable content: map, squads, defs
 
             var rng = Fnv1a64.Start();
             for (int i = 0; i < RngStreams.Count; i++)
@@ -25,6 +26,27 @@ namespace Knez.Sim
                 rng.Add(stream.Increment);
             }
 
+            var squads = Fnv1a64.Start();
+            List<Squad> squadList = state.SquadList;
+            squads.Add(squadList.Count);
+            for (int i = 0; i < squadList.Count; i++)
+            {
+                Squad squad = squadList[i];
+                squads.Add(squad.Id.Value);
+                squads.Add(squad.SideId);
+                squads.Add(squad.Name);
+                squads.Add(squad.Formation.Id); // def contents are in the scenario fingerprint
+                squads.Add(squad.Anchor.X.Raw);
+                squads.Add(squad.Anchor.Y.Raw);
+                squads.Add((int)squad.Facing.Raw);
+                List<EntityId> members = squad.MemberList;
+                squads.Add(members.Count);
+                for (int m = 0; m < members.Count; m++)
+                {
+                    squads.Add(members[m].Value);
+                }
+            }
+
             var fighters = Fnv1a64.Start();
             List<Fighter> list = state.FighterList;
             fighters.Add(list.Count);
@@ -32,13 +54,17 @@ namespace Knez.Sim
             {
                 Fighter fighter = list[i];
                 fighters.Add(fighter.Id.Value);
+                fighters.Add(fighter.Def.Id);
                 fighters.Add(fighter.SideId);
                 fighters.Add(fighter.IsAlive);
                 fighters.Add(fighter.Position.X.Raw);
                 fighters.Add(fighter.Position.Y.Raw);
+                fighters.Add((int)fighter.Facing.Raw);
+                fighters.Add(fighter.SquadId.Value);
+                fighters.Add(fighter.SlotIndex);
             }
 
-            return new StateHash(core.Value, rng.Value, fighters.Value);
+            return new StateHash(core.Value, rng.Value, squads.Value, fighters.Value);
         }
     }
 }
