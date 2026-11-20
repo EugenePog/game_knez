@@ -30,5 +30,8 @@ namespace Knez.Sim
         internal CommandQueue Commands { get; }
 
         internal List<ScheduledCommand> DueCommands { get; } = new List<ScheduledCommand>();
+
+        /// <summary>Per-fighter push weights for this tick (index = fighter list index), rebuilt by the systems that use it.</summary>
+        internal List<int> FighterWeights { get; } = new List<int>();
     }
 }

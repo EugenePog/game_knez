@@ -11,7 +11,7 @@
   <!--
     Plays a frames file written by `knez-sim run <scenario> --frames FILE` (battle-sim.md §17).
     Open with ?frames=<url> through a local server (see the battle-run skill), or pick/drop a file.
-    URL options: tick=N (start there), speed=0.25|0.5|1|2|4, play=1, labels=0, anchors=0, grid=0, ids=1.
+    URL options: tick=N (start there), speed=0.25|0.5|1|2|4, play=1, labels=0, anchors=0, grid=0, ids=1, overlaps=0.
     No dependencies, no build step: plain HTML, CSS and one classic script.
   -->
   <header class="bar">
@@ -71,6 +71,7 @@
     <label><input id="anchors" type="checkbox" checked> Anchors</label>
     <label><input id="grid" type="checkbox" checked> Grid</label>
     <label><input id="ids" type="checkbox"> Ids</label>
+    <label title="Red ring: pressed more than 5 cm into someone (the M1 overlap metric)"><input id="overlaps" type="checkbox" checked> Overlaps</label>
     <button id="fit" title="Fit the map (F)">Fit</button>
   </footer>
 

@@ -19,8 +19,8 @@ public class ContentGoldenTests
             { "id": "veteran", "radius": 0.325, "walkSpeed": 1.35, "runSpeed": 3.25, "turnRate": 300.5 }
           ],
           "formations": [
-            { "id": "line", "spacing": 1.1, "rankSpacing": 1.25, "ranks": 2, "turnRate": 45 },
-            { "id": "column", "spacing": 0.9, "rankSpacing": 1.3, "width": 2, "turnRate": 87.5 }
+            { "id": "line", "spacing": 1.1, "rankSpacing": 1.25, "ranks": 2, "turnRate": 45, "holdWeight": 3 },
+            { "id": "column", "spacing": 0.9, "rankSpacing": 1.3, "width": 2, "turnRate": 87.5, "holdWeight": 4 }
           ]
         }
         """;
@@ -42,9 +42,9 @@ public class ContentGoldenTests
         """;
 
     /// <summary>A change means content parsing, def hashing or slot placement changed: on purpose → re-record and say why.</summary>
-    private const ulong GoldenFingerprint = 0xc529c228a7bd555fUL;
+    private const ulong GoldenFingerprint = 0x3bcdc0fd253949f8UL;
 
-    private const ulong GoldenSpawnHash = 0xb656959b03f1c68eUL;
+    private const ulong GoldenSpawnHash = 0x3bd6fc98f7551148UL;
 
     [Test]
     public void Fixture_FingerprintAndSpawnedState_MatchRecordedValues()

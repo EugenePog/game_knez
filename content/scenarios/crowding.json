@@ -1,0 +1,18 @@
+{
+  "id": "crowding",
+  "description": "M1 step 4: bodies are solid. Two friendly squads cross at 90 degrees and jostle through each other; an enemy column marches straight through an enemy line that holds its ground (holders give way less, 3:1); the flankers march to the east edge, where the map stops them.",
+  "map": { "width": 60, "height": 40 },
+  "squads": [
+    { "name": "Hird line",     "side": 0, "fighter": "warrior", "count": 8, "formation": "line",       "position": [8, 14],  "facing": 0 },
+    { "name": "Shield wall",   "side": 0, "fighter": "warrior", "count": 8, "formation": "shieldwall", "position": [22, 4],  "facing": 90 },
+    { "name": "Raider line",   "side": 1, "fighter": "warrior", "count": 8, "formation": "line",       "position": [44, 26], "facing": 270 },
+    { "name": "Raider column", "side": 1, "fighter": "warrior", "count": 6, "formation": "column",     "position": [44, 8],  "facing": 90 },
+    { "name": "Flankers",      "side": 1, "fighter": "warrior", "count": 5, "formation": "line",       "position": [52, 34], "facing": 0 }
+  ],
+  "script": [
+    { "tick": 10, "order": "move", "squad": "Hird line",     "target": [40, 14] },
+    { "tick": 10, "order": "move", "squad": "Shield wall",   "target": [22, 26] },
+    { "tick": 10, "order": "move", "squad": "Raider column", "target": [44, 36] },
+    { "tick": 10, "order": "move", "squad": "Flankers",      "target": [59, 34], "facing": 90 }
+  ]
+}

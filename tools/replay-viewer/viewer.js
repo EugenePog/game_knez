@@ -30,7 +30,8 @@
   let lastTime = null;
   let hoverId = null;
   const view = { scale: 10, ox: 0, oy: 0, fitted: true };
-  const show = { labels: true, anchors: true, grid: true, ids: false };
+  const show = { labels: true, anchors: true, grid: true, ids: false, overlaps: true };
+  const OVERLAP_TOLERANCE = 0.05; // metres; the sim's MovementMetrics.OverlapTolerance
   let drag = null;
 
   // ---------- loading ----------
@@ -326,7 +327,27 @@
     }
   }
 
+  /** Ids of living fighters pressed more than 5 cm into another living one (same rule as the sim's metric). */
+  function overlapping(fighters) {
+    const hit = new Set();
+    const living = fighters.filter((r) => r[4]);
+    for (let i = 0; i < living.length; i++) {
+      const a = living[i];
+      const ra = (fighterInfo.get(a[0]) || { radius: 0.3 }).radius;
+      for (let j = i + 1; j < living.length; j++) {
+        const b = living[j];
+        const rb = (fighterInfo.get(b[0]) || { radius: 0.3 }).radius;
+        if (Math.hypot(a[1] - b[1], a[2] - b[2]) < ra + rb - OVERLAP_TOLERANCE) {
+          hit.add(a[0]);
+          hit.add(b[0]);
+        }
+      }
+    }
+    return hit;
+  }
+
   function drawFighters(fighters) {
+    const pressed = show.overlaps ? overlapping(fighters) : new Set();
     // The dead first, so they never cover the living.
     const ordered = fighters.filter((r) => !r[4]).concat(fighters.filter((r) => r[4]));
     for (const [id, x, y, facing, alive] of ordered) {
@@ -365,6 +386,14 @@
         ctx.stroke();
       }
       ctx.globalAlpha = 1;
+
+      if (pressed.has(id)) {
+        ctx.beginPath();
+        ctx.arc(px, py, r + 2.5, 0, Math.PI * 2);
+        ctx.strokeStyle = '#d0021b';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
 
       if (id === hoverId) {
         ctx.beginPath();
@@ -582,7 +611,7 @@
   $('speed').addEventListener('change', (e) => { speed = Number(e.target.value); });
   $('fit').addEventListener('click', () => { view.fitted = true; fit(); });
 
-  for (const key of ['labels', 'anchors', 'grid', 'ids']) {
+  for (const key of ['labels', 'anchors', 'grid', 'ids', 'overlaps']) {
     const box = $(key);
     if (params.has(key)) box.checked = params.get(key) !== '0';
     show[key] = box.checked;

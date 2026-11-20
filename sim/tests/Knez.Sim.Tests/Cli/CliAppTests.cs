@@ -22,6 +22,7 @@ public class CliAppTests
             Assert.That(stdout, Does.Contain("scenario:   formations ("));
             Assert.That(stdout, Does.Contain("forces:     side 0: 2 squads, 16 fighters; side 1: 3 squads, 19 fighters"));
             Assert.That(stdout, Does.Contain("ticks:      300 (15.0 s of battle)"));
+            Assert.That(stdout, Does.Contain("crowding:   0.00% of fighter-ticks overlap > 5 cm (worst tick: 0 fighters)"));
             Assert.That(stdout, Does.Contain($"final hash: {sim.ComputeHash()}"));
         });
     }
@@ -43,6 +44,8 @@ public class CliAppTests
             Assert.That(root.GetProperty("fighters").GetInt32(), Is.EqualTo(35));
             Assert.That(root.GetProperty("finalHash").GetString(), Has.Length.EqualTo(16));
             Assert.That(root.GetProperty("sections").GetProperty("squads").GetString(), Has.Length.EqualTo(16));
+            Assert.That(root.GetProperty("overlap").GetProperty("ratio").GetDouble(), Is.Zero);
+            Assert.That(root.GetProperty("overlap").GetProperty("worstTickFighters").GetInt32(), Is.Zero);
         });
     }
 

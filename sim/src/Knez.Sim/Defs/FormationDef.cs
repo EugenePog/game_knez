@@ -12,9 +12,10 @@ namespace Knez.Sim.Defs
     {
         /// <summary>Creates a def; exactly one of <paramref name="ranks"/> and <paramref name="width"/> is positive (at most
         /// <see cref="SquadSpawnDef.MaxCount"/>), the other 0.</summary>
-        public FormationDef(string id, Fix spacing, Fix rankSpacing, int ranks, int width, Fix turnRate)
+        public FormationDef(string id, Fix spacing, Fix rankSpacing, int ranks, int width, Fix turnRate, int holdWeight)
         {
             TurnRate = DefChecks.Positive(turnRate, FighterDef.MaxTurnRate, "°/s", nameof(turnRate));
+            HoldWeight = DefChecks.Range(holdWeight, 1, MaxHoldWeight, nameof(holdWeight));
             Id = DefChecks.Id(id, nameof(id));
             Spacing = DefChecks.PositiveMetres(spacing, MaxSpacingMetres, nameof(spacing));
             RankSpacing = DefChecks.PositiveMetres(rankSpacing, MaxSpacingMetres, nameof(rankSpacing));
@@ -50,6 +51,15 @@ namespace Knez.Sim.Defs
         /// <summary><see cref="TurnRate"/> as <see cref="Angle"/> units per tick (at least 1).</summary>
         public int TurnPerTick => DefChecks.TurnUnitsPerTick(TurnRate);
 
+        /// <summary>
+        /// How much harder members of a squad holding its ground (no order) are to push than men on the move, who weigh 1
+        /// (battle-sim.md §10). With 3, a holding man takes a quarter of a push against a moving one.
+        /// </summary>
+        public int HoldWeight { get; }
+
+        /// <summary>Sanity bound for <see cref="HoldWeight"/>, not a balance number.</summary>
+        public const int MaxHoldWeight = 100;
+
         internal void AddTo(ref Fnv1a64 hash)
         {
             hash.Add(Id);
@@ -58,6 +68,7 @@ namespace Knez.Sim.Defs
             hash.Add(Ranks);
             hash.Add(Width);
             hash.Add(TurnRate.Raw);
+            hash.Add(HoldWeight);
         }
     }
 }

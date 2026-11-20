@@ -7,8 +7,9 @@ namespace Knez.Sim.Movement
     /// <summary>
     /// Tick stage 6: applies each fighter's velocity and turns it at its turn rate (battle-sim.md §10). A member in
     /// formation faces the squad's front, also while shuffling sideways or swinging round with a turning squad; one moving
-    /// faster than walking pace relative to its own slot (running to catch up) looks where it runs. Collision resolution
-    /// arrives in M1 step 4.
+    /// faster than walking pace relative to its own slot (running to catch up) looks where it runs. Then bodies that ended
+    /// up overlapping are pushed apart and kept on the map (<see cref="Crowding.Resolve"/>); facing follows the intended
+    /// velocity, not the shove.
     /// </summary>
     public sealed class MovementSystem : ISimSystem
     {
@@ -45,6 +46,10 @@ namespace Knez.Sim.Movement
 
                 fighter.Facing = fighter.Facing.TurnToward(look, fighter.Def.TurnPerTick);
             }
+
+            List<int> weights = context.FighterWeights;
+            Crowding.FillWeights(state, weights);
+            Crowding.Resolve(state, weights);
         }
 
         /// <summary>The fighter's slot motion this tick: outer slots of a turning squad move faster than its anchor.</summary>

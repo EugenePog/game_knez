@@ -1,6 +1,6 @@
 # Battle simulation — technical design
 
-Status: **draft v0.3** (2026-11-20, M1 step 3). Owner: Eugene. Scope: phase 1 skirmish; the same sim later drives the 3D view
+Status: **draft v0.4** (2026-11-20, M1 step 4). Owner: Eugene. Scope: phase 1 skirmish; the same sim later drives the 3D view
 and campaign battles. Code names follow the glossary in [AGENTS.md](../AGENTS.md#glossary-russian-design-term--code-name).
 
 When code and this document disagree, fix one of them in the same change.
@@ -100,7 +100,9 @@ Assemblies:
   - `Map`: grid (cell size 0.5 m — to confirm in M1) with walkable, height level, cover and line-of-sight blockers;
   - `Sides` (player, enemy; later more — for now just `SideId` ints on squads and fighters), `Squads`, `Fighters`
     (heroes are fighters with a `HeroData` part);
-  - spatial index for neighbour queries (rebuilt each tick, deterministic order);
+  - spatial index for neighbour queries (rebuilt each tick, deterministic order) — *not built yet*: phase 1 battles have
+    at most ~60 fighters, so crowding checks all pairs in id order (~0.15 ms/tick for 35); add the index if the M1 bench
+    asks for it;
   - per-tick `Events` buffer;
   - `Scenario`: an immutable reference to the `ScenarioDef` (map, starting squads, the defs they use), shared (not
     copied) by `Clone`; its `Fingerprint` (FNV-1a over everything battle-relevant, not the description) is hashed in the
@@ -131,12 +133,13 @@ def gets the fields its systems need when they arrive; M1 step 1 has:
 | Def | Fields |
 |---|---|
 | `FighterDef` | `id`, `radius` (m), `walkSpeed`, `runSpeed` (m/s), `turnRate` (°/s) |
-| `FormationDef` | `id`, `spacing` (m between neighbours), `rankSpacing` (m between ranks), `ranks` *or* `width`, `turnRate` (°/s) |
+| `FormationDef` | `id`, `spacing` (m between neighbours), `rankSpacing` (m between ranks), `ranks` *or* `width`, `turnRate` (°/s), `holdWeight` (how much harder men holding their ground are to push; moving men weigh 1) |
 | `MapDef` | `width`, `height` (m) |
 | `ScenarioDef` | `id`, `description`, `map`, `squads[]`: `name`, `side`, `fighter`, `count`, `formation`, `position` `[x, y]`, `facing` (degrees); optional `script[]`: `tick`, `order` (`"move"`), `squad` (name), `target` `[x, y]`, optional `facing` |
 
-Agreed values (2026-11-20): walk 1.4 m/s, run 3.5 m/s; squad turn rate column 90°/s, line 45°/s, shield wall 30°/s.
-Placeholders until the M1 bench: radius 0.3 m, fighter turn 360°/s, the formation spacings.
+Agreed values (2026-11-20): walk 1.4 m/s, run 3.5 m/s; squad turn rate column 90°/s, line 45°/s, shield wall 30°/s;
+a standing squad gives way less than one on the move. Placeholders until the M1 bench: radius 0.3 m, fighter turn
+360°/s, the formation spacings, `holdWeight` 3 (a holding man takes a quarter of a push against a moving one).
 
 The **scenario script** is orders the scenario gives by itself at fixed ticks (benchmarks, tests, set pieces). In
 tick order; each entry goes through the same validation as a player's `MoveSquad` at the start of its tick, before
@@ -218,11 +221,35 @@ their milestone. Scratch buffers live in `TickContext`, never in system fields.
   `Movement/MovementRules.cs`, not in content — tune them on the bench.
 - A `MoveSquad` target within the 1 cm arrival distance keeps the squad's facing (a sub-centimetre offset has no
   meaningful direction).
+- **Crowding (step 4).** Every living fighter is solid to every other, allies included (agreed 2026-11-20: crossing
+  squads jostle past each other). Squads march on: the anchor never waits for men who fall behind; they run to catch
+  up. In a push the share goes by weight — a man *holding his ground* weighs his formation's `holdWeight`, anyone on
+  the move weighs 1. He holds his ground only while his squad has no order and he stands within 1.5 m of his slot;
+  a man still trying to reach a distant slot is on the move (otherwise a squad whose anchor arrived while its men were
+  blocked short of their slots would shove an enemy line at full weight and bulldoze it). Three mechanisms, all over
+  all pairs in id order (`Movement/Crowding.cs`):
+  - *separation* (steering): inside 10 cm of personal space a man eases away by a fifth of the intrusion per tick,
+    the lighter man taking the larger share;
+  - *slide* (steering, after the run-speed cap): the part of his velocity heading into a neighbour inside personal
+    space is cut by that neighbour's weight share — half between equals (they jostle), three quarters for a mover
+    against a holder (he mostly slides along the line). Without it, sustained pressure left 5–8 cm overlaps;
+  - *collision relaxation* (movement): up to 6 passes push overlapping pairs apart by their overlap, shared by weight,
+    stopping early once nothing overlaps (a push travels one link per pass against id order; 3 passes left pushes four
+    men deep overlapping). Two bodies on exactly the same spot part along X, the lower id west. Both bodies of a pushed
+    pair are put back inside the map at once (clamping only at the end pushed men at the edge back into their
+    neighbours), and a slot past the map edge is aimed at the edge, so nobody leans into it.
+  Facing follows the intended velocity, not the shove. A marching squad that meets a holding line bends it (≈0.9 m
+  at weight 3) and stays blocked in front of it — a jam the M1 bench (stuck metric) and M3 combat (engaged fighters
+  hold) will address. `MovementMetrics.OverlappingFighters` is the overlap metric below.
+- **Known, for the bench (step 8):** a push several squads deep beats `holdWeight` — three lines marching through a
+  holding line shove it back ~12 m (design question: may a mass of movers drive a holding line back? default: yes until
+  M3's melee lock stops "march on" pushing); squads ordered onto clashing slots (two formations overlapping the same
+  ground) never settle — their men keep shuffling ~1 cm per tick.
 - Slot assignment is stable (keep last assignment); after losses, reassign with a deterministic greedy
   min-distance pass in id order. Ranks fill from the back.
 - Steering: arrive-at-slot + separation from neighbours + wall avoidance; engaged fighters are held in place
   (melee lock) and only shuffle to keep spacing.
-- Collision: 2–3 relaxation passes in id order, push apart overlapping circles, clamp to walkable cells.
+- Collision: relaxation passes in id order (6 since step 4), push apart overlapping circles, clamp to walkable cells.
 - If steering jams at 20 vs 30, upgrade to velocity obstacles (ORCA-like, fixed-point) — decide from the M1 bench.
 
 Benchmark scenarios (in `content/scenarios/bench/`):
@@ -236,7 +263,8 @@ Benchmark scenarios (in `content/scenarios/bench/`):
 | S5 | shield wall holds vs a charge | wall integrity, push-through |
 
 Metrics: *stuck fighter-ticks* (has a goal > 1 m away and speed < ε for > 2 s), mean slot error, overlap ratio
-(pairs closer than r1 + r2 − 5 cm), tick time p50/p99.
+(fighter-ticks in which a fighter is closer than r1 + r2 − 5 cm to another, `MovementMetrics.OverlappingFighters`),
+tick time p50/p99.
 M1 exit: no fighter stuck > 2 s in S1–S4, overlap < 1 % of fighter-ticks, p99 tick < 2 ms for 50 fighters on the
 dev Mac, and it looks right in the replay viewer.
 
@@ -293,7 +321,9 @@ Utility + FSM, no neural nets, inside the sim and deterministic:
   Golden replays live in `sim/tests/Golden/`; a rule change that alters outcomes regenerates them on purpose.
   Until replay files exist, the golden checks are `GoldenFinalHash` in `DeterminismTests` (seed 42, 300 ticks; its
   squads face between sine-table entries), `GoldenMarchHash` (a scripted march with an about-turn and an arrival
-  facing, 400 ticks) and `ContentGoldenTests` (a test-owned JSON fixture: fingerprint and spawned state). `HashCoverageTests` checks that every state field moves its own hash section.
+  facing, 400 ticks), `GoldenCrossingTrace` (every tick's hash of two lines jostling through each other, folded into one
+  value — the crossing settles exactly on its slots afterwards, so an end-state hash wouldn't notice a crowding change)
+  and `ContentGoldenTests` (a test-owned JSON fixture: fingerprint and spawned state). `HashCoverageTests` checks that every state field moves its own hash section.
 
 ## 16. Events and the view contract
 
@@ -314,7 +344,9 @@ Utility + FSM, no neural nets, inside the sim and deterministic:
   count and the final hash (JSON: `scenario`, `squads`, `fighters`, `finalHash` + section hashes, `frames`); exit codes
   0 ok, 1 simulation error, 2 bad arguments, bad content, or a frames file that can't be written (refused up front,
   including the scenario's own path, or failing mid-run). Recording is read-only: the final hash is the same with or
-  without `--frames` (tested tick by tick on a moving battle). The list below is the target contract, built through M1:
+  without `--frames` (tested tick by tick on a moving battle). `run` also reports the M1 overlap metric: the share of
+  fighter-ticks with a fighter pressed more than 5 cm into someone, and the worst tick (JSON `overlap.ratio`,
+  `overlap.worstTickFighters`). The list below is the target contract, built through M1:
   - `run <scenario> --seed N [--ticks N] [--out replay.json] [--frames frames.json]` → summary (winner, duration,
     casualties, morale breaks, final hash);
   - `batch <scenario> --seeds 1-200 [--json]` → aggregate metrics and win rate;
@@ -345,7 +377,8 @@ Utility + FSM, no neural nets, inside the sim and deterministic:
   5 m grid, fighters as circles in squad colours with a facing tick, squad anchors with facing arrows and names, dead
   fighters greyed, events of the current tick, hover details; play/pause/step/scrub, speed ×0.25–×4, zoom/pan,
   interpolation between ticks, a red note for a faulted run. URL:
-  `?frames=<url>&tick=N&speed=2&play=1&labels=0&anchors=0&grid=0&ids=1`; a file can also be picked or dropped.
+  `?frames=<url>&tick=N&speed=2&play=1&labels=0&anchors=0&grid=0&ids=1&overlaps=0`; a file can also be picked or
+  dropped. A red ring marks fighters pressed more than 5 cm into someone (the overlap metric, computed in the viewer).
   `window.knezViewer` (`tick`, `seekTick(n)` — renders at once, `loaded`, `error`) lets agents drive it from the
   console. Pausing always lands on a whole tick. Move orders are drawn as a dashed line from the anchor to a ring at
   the target with a tick for the arrival facing; morale bars and event markers on the map arrive with their mechanics; at ×2/×4 the events panel shows only the tick on screen (collect skipped ticks when markers come).

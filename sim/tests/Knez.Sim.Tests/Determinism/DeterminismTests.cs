@@ -16,7 +16,7 @@ public class DeterminismTests
     /// Final hash of <c>Run(TestBattle.Create(42), 300)</c>. A change here means outcomes changed: if that was intended
     /// (a rule change), update the constant and say why in the commit message; if not, it is a determinism bug.
     /// </summary>
-    private const ulong GoldenFinalHash = 0x657b7709bb113e60UL;
+    private const ulong GoldenFinalHash = 0xb9fe1f9be5a7be1bUL;
 
     [Test]
     public void TwinRun_SameSeedAndCommands_IdenticalHashEveryTick()
@@ -77,7 +77,7 @@ public class DeterminismTests
     /// Final hash of <see cref="TestDefs.March"/> after 400 ticks (seed 42): marching, turning in place, arrival facing
     /// and slot following. Same rule as <see cref="GoldenFinalHash"/>: a change means movement outcomes changed.
     /// </summary>
-    private const ulong GoldenMarchHash = 0x179a518c18f4d6b2UL;
+    private const ulong GoldenMarchHash = 0xdd993198d9d6f006UL;
 
     [Test]
     public void Golden_March_FinalHashMatchesRecordedValue()
@@ -87,6 +87,52 @@ public class DeterminismTests
         ulong actual = sim.ComputeHash().Total;
         Assert.That(actual, Is.EqualTo(GoldenMarchHash),
             $"March hash is 0x{actual:x16}. If movement changed on purpose, update GoldenMarchHash and say why in the commit.");
+    }
+
+    /// <summary>
+    /// Every tick's hash of <see cref="TestDefs.Crossing"/> (seed 42, 500 ticks) folded into one value: two friendly lines
+    /// jostling through each other. A trace, not the final hash — the crossing settles exactly on the slots afterwards, so
+    /// the end state alone didn't notice when separation or sliding changed. A change means crowding outcomes changed.
+    /// </summary>
+    private const ulong GoldenCrossingTrace = 0x22d5232aff4478b5UL;
+
+    [Test]
+    public void Golden_Crossing_EveryTickMatchesTheRecordedTrace()
+    {
+        var sim = new BattleSimulation(BattleSetup.Create(TestDefs.Crossing(), 42));
+        ulong trace = 14695981039346656037UL; // FNV-1a over the per-tick totals
+        for (int i = 0; i < 500; i++)
+        {
+            sim.Step();
+            trace = unchecked((trace ^ sim.ComputeHash().Total) * 1099511628211UL);
+        }
+
+        Assert.That(trace, Is.EqualTo(GoldenCrossingTrace),
+            $"Crossing trace is 0x{trace:x16}. If crowding changed on purpose, update GoldenCrossingTrace and say why in the commit.");
+    }
+
+    [Test]
+    public void SnapshotRestore_MidCrossing_ContinuesExactlyLikeTheUninterruptedRun()
+    {
+        var whole = new BattleSimulation(BattleSetup.Create(TestDefs.Crossing(), 9));
+        var expected = new List<StateHash>();
+        for (int i = 0; i < 500; i++)
+        {
+            whole.Step();
+            expected.Add(whole.ComputeHash());
+        }
+
+        var first = new BattleSimulation(BattleSetup.Create(TestDefs.Crossing(), 9));
+        first.StepTicks(230); // the two lines are pushing through each other
+        var restored = BattleSimulation.Restore(first.TakeSnapshot());
+        var continued = new List<StateHash>();
+        for (int i = 230; i < 500; i++)
+        {
+            restored.Step();
+            continued.Add(restored.ComputeHash());
+        }
+
+        Assert.That(continued, Is.EqualTo(expected.Skip(230)));
     }
 
     [Test]

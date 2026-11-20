@@ -64,6 +64,16 @@ Steps — one change each, each ending with build/tests/purity green and a `sim-
    (outer fighters of a turning squad faced backwards) + minors — all fixed. Known look: squads pivot around the
    front-rank centre, so a column's tail swings wide in an about-turn → revisit with wheeling in step 7.
 4. Crowding: spatial index, separation steering, circle–circle collision relaxation; overlap metric.
+   Agreed 2026-11-20: everyone is solid (allies jostle past); squads march on (no waiting for stragglers); a standing
+   squad gives way less (`holdWeight`, placeholder 3).
+   ✅ 2026-11-20: separation, slide along bodies, relaxation by weight (6 passes), map edge (per pair, slots aimed at
+   the edge), overlap metric in the CLI and viewer; `content/scenarios/crowding.json` and the test scenarios (crossing,
+   a push four men deep, bodies against the edge) at 0 % overlap. No spatial index yet (all pairs; ~60 fighters max in
+   phase 1) — revisit at step 8. Found while building: the slide must come after the run-speed cap, and "holding" must
+   mean the man is near his slot, not just that his squad has no order. `sim-reviewer`: 3 majors (deep pushes, the map
+   edge, a golden that only saw the settled end) — fixed. For the bench / M3: marchers stay blocked in front of a
+   holding line; a push several squads deep beats `holdWeight` (~12 m); squads ordered onto clashing slots shuffle
+   ~1 cm/tick forever.
 5. Terrain: walkable grid, circle–grid clamping, wall avoidance (decide the cell size).
 6. Pathfinding: A* for squad anchors with a per-tick budget, path following.
 7. Formations in motion: `SetFormation` (Line, ShieldWall, Column), wheeling, slot reassignment after losses.

@@ -37,7 +37,7 @@ public class StateCoverageTests
         [typeof(FighterDef)] = ["<Id>k__BackingField", "<Radius>k__BackingField", "<RunSpeed>k__BackingField",
             "<TurnRate>k__BackingField", "<WalkSpeed>k__BackingField"],
         [typeof(FormationDef)] = ["<Id>k__BackingField", "<RankSpacing>k__BackingField", "<Ranks>k__BackingField",
-            "<Spacing>k__BackingField", "<TurnRate>k__BackingField", "<Width>k__BackingField"],
+            "<HoldWeight>k__BackingField", "<Spacing>k__BackingField", "<TurnRate>k__BackingField", "<Width>k__BackingField"],
         [typeof(ScriptedOrderDef)] = ["<Facing>k__BackingField", "<SquadName>k__BackingField", "<Target>k__BackingField",
             "<Tick>k__BackingField"],
         [typeof(MapDef)] = ["<Height>k__BackingField", "<Width>k__BackingField"],

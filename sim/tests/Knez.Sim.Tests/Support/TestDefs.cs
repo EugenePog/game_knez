@@ -10,10 +10,10 @@ public static class TestDefs
     public static readonly FighterDef Warrior = Fighter("test-warrior", walkTenths: 14);
 
     /// <summary>Two ranks, 1 m apart sideways, 1.5 m between ranks, turns 45°/s: round numbers for exact assertions.</summary>
-    public static readonly FormationDef Line = new("test-line", Fix.One, Fix.Ratio(3, 2), ranks: 2, width: 0, turnRate: Fix.FromInt(45));
+    public static readonly FormationDef Line = new("test-line", Fix.One, Fix.Ratio(3, 2), ranks: 2, width: 0, turnRate: Fix.FromInt(45), holdWeight: 3);
 
     /// <summary>Two files wide, ranks follow from the squad size; turns 90°/s.</summary>
-    public static readonly FormationDef Column = new("test-column", Fix.One, Fix.Ratio(3, 2), ranks: 0, width: 2, turnRate: Fix.FromInt(90));
+    public static readonly FormationDef Column = new("test-column", Fix.One, Fix.Ratio(3, 2), ranks: 0, width: 2, turnRate: Fix.FromInt(90), holdWeight: 3);
 
     public static FighterDef Fighter(string id, int walkTenths, int radiusHundredths = 30) =>
         new(id, Fix.Ratio(radiusHundredths, 100), Fix.Ratio(walkTenths, 10), Fix.Ratio(35, 10), Fix.FromInt(360));
@@ -51,6 +51,61 @@ public static class TestDefs
     [
         new ScriptedOrderDef(1, "Line", FixVec2.FromInts(19, 21), Angle.FromDegrees(0)),
         new ScriptedOrderDef(1, "Column", FixVec2.FromInts(37, 30), null),
+    ]);
+
+    /// <summary>
+    /// Benchmark S3 in miniature: two friendly lines of 8 cross at 90° — one marching east, one north — both 16 m from
+    /// the crossing point, so they reach it together and their men have to jostle past each other.
+    /// </summary>
+    public static ScenarioDef Crossing() => new("test-crossing", "test", Map,
+    [
+        Squad("East", 0, 8, FixVec2.FromInts(14, 20), 0),
+        Squad("North", 0, 8, FixVec2.FromInts(30, 4), 90),
+    ],
+    [
+        new ScriptedOrderDef(1, "East", FixVec2.FromInts(46, 20), null),
+        new ScriptedOrderDef(1, "North", FixVec2.FromInts(30, 36), null),
+    ]);
+
+    /// <summary>A line of 8 marches north straight through the spot where an enemy line of 8 holds its ground.</summary>
+    public static ScenarioDef IntoAHoldingLine() => new("test-into-holding", "test", Map,
+    [
+        Squad("Holders", 1, 8, FixVec2.FromInts(30, 20), 270),
+        Squad("Movers", 0, 8, FixVec2.FromInts(30, 8), 90),
+    ],
+    [
+        new ScriptedOrderDef(1, "Movers", FixVec2.FromInts(30, 32), null),
+    ]);
+
+    /// <summary>Three lines of 8 march one behind another through a holding line of 8: a push four men deep.</summary>
+    public static ScenarioDef DeepPush() => new("test-deep-push", "test", Map,
+    [
+        Squad("Holders", 1, 8, FixVec2.FromInts(30, 20), 270),
+        Squad("M1", 0, 8, FixVec2.FromInts(30, 9), 90),
+        Squad("M2", 0, 8, FixVec2.FromInts(30, 6), 90),
+        Squad("M3", 0, 8, FixVec2.FromInts(30, 3), 90),
+    ],
+    [
+        new ScriptedOrderDef(1, "M1", FixVec2.FromInts(30, 32), null),
+        new ScriptedOrderDef(1, "M2", FixVec2.FromInts(30, 29), null),
+        new ScriptedOrderDef(1, "M3", FixVec2.FromInts(30, 26), null),
+    ]);
+
+    /// <summary>
+    /// Two lines ordered to stand against the east edge with their outer files past it, one just ahead of the other (their
+    /// ranks touch, their slots don't clash), plus a column marching into the north edge: bodies pressed together against
+    /// the map edge.
+    /// </summary>
+    public static ScenarioDef AgainstTheEdge() => new("test-edge", "test", Map,
+    [
+        Squad("L", 0, 8, FixVec2.FromInts(30, 20), 90),
+        Squad("L2", 0, 8, FixVec2.FromInts(30, 10), 90),
+        Squad("C", 1, 6, FixVec2.FromInts(10, 10), 90, Column),
+    ],
+    [
+        new ScriptedOrderDef(1, "L", new FixVec2(Fix.Ratio(599, 10), Fix.FromInt(20)), Angle.FromDegrees(90)),
+        new ScriptedOrderDef(1, "L2", new FixVec2(Fix.Ratio(599, 10), Fix.Ratio(225, 10)), Angle.FromDegrees(90)),
+        new ScriptedOrderDef(1, "C", new FixVec2(Fix.FromInt(10), Fix.Ratio(399, 10)), null),
     ]);
 
     /// <summary>A player line facing north and an enemy column facing south.</summary>

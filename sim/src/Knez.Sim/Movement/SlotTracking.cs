@@ -18,6 +18,10 @@ namespace Knez.Sim.Movement
         /// <summary>The slot's world position now.</summary>
         public static FixVec2 Position(Squad squad, FixVec2 offset) => FormationLayout.ToWorld(squad.Anchor, squad.Facing, offset);
 
+        /// <summary>Where the slot was a tick ago (before this tick's anchor move and turn).</summary>
+        public static FixVec2 PreviousPosition(Squad squad, FixVec2 offset) =>
+            FormationLayout.ToWorld(squad.Anchor - squad.Velocity, squad.Facing - Angle.FromRaw(squad.Spin), offset);
+
         /// <summary>How far the slot moved this tick, from the anchor's velocity and the front's spin.</summary>
         public static FixVec2 Motion(Squad squad, FixVec2 offset, FixVec2 slotNow)
         {
