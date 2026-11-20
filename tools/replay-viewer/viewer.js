@@ -327,6 +327,18 @@
     }
   }
 
+  /**
+   * Allies passing through each other's ranks (allowed, decided 2026-11-21): same side, different squads, one holding his
+   * ground (fighter row column 5) and the other passing through (column 6, the sim's own flag). Older files lack them.
+   */
+  function passThrough(a, b) {
+    const ia = fighterInfo.get(a[0]) || {};
+    const ib = fighterInfo.get(b[0]) || {};
+    if (a[6] === undefined || b[6] === undefined || !ia.squad || !ib.squad) return false;
+    if (ia.side !== ib.side || ia.squad === ib.squad) return false;
+    return (a[5] === 1 && b[6] === 1) || (b[5] === 1 && a[6] === 1);
+  }
+
   /** Ids of living fighters pressed more than 5 cm into another living one (same rule as the sim's metric). */
   function overlapping(fighters) {
     const hit = new Set();
@@ -337,6 +349,7 @@
       for (let j = i + 1; j < living.length; j++) {
         const b = living[j];
         const rb = (fighterInfo.get(b[0]) || { radius: 0.3 }).radius;
+        if (passThrough(a, b)) continue;
         if (Math.hypot(a[1] - b[1], a[2] - b[2]) < ra + rb - OVERLAP_TOLERANCE) {
           hit.add(a[0]);
           hit.add(b[0]);
@@ -514,7 +527,7 @@
       squad ? `Squad ${squad.name} (#${squad.id}), slot ${info.slot}` : 'No squad',
       `Position ${row[1].toFixed(3)}, ${row[2].toFixed(3)} m`,
       `Facing ${row[3].toFixed(2)}°, radius ${info.radius} m`,
-      row[4] ? 'Alive' : 'Dead',
+      row[4] ? (row[5] === 1 ? 'Alive, holding his ground' : row[6] === 1 ? 'Alive, passing through allied ranks' : 'Alive') : 'Dead',
     ];
     for (const text of lines) {
       const div = document.createElement('div');

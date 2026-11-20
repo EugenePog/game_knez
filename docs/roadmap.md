@@ -74,6 +74,16 @@ Steps — one change each, each ending with build/tests/purity green and a `sim-
    edge, a golden that only saw the settled end) — fixed. For the bench / M3: marchers stay blocked in front of a
    holding line; a push several squads deep beats `holdWeight` (~12 m); squads ordered onto clashing slots shuffle
    ~1 cm/tick forever.
+   Decided 2026-11-21 after watching the replay: **allies open ranks** — a holding squad lets other squads of its side
+   that are on orders pass through at 1/3 of walking speed (`allyPassSpeed`); enemies stay solid (they stack; fighting
+   starts in M3). Follow-up decision after review: only men on orders pass, and a move order ends only when the squad is
+   formed up (every man within 30 cm of his slot), so arriving squads finish passing and men shoved by enemies stay
+   solid against allied reserves. A second review pass found the remaining holes, now closed: passing is remembered
+   per man (`PassingThrough`, starts only when he means to walk into an allied holder, so a line shoved back into its
+   reserve stays solid), the gentle parting of deep allied overlaps is limited to different squads (a deep push no
+   longer collapses a squad's own ranks), and orders aimed so the formation would hang off the map are moved inward
+   so they can end. Checked on 19 edge scenarios; `run` now also prints the share of fighter-ticks spent passing
+   through allied ranks. This removes the blocked-marchers jam between allies; against enemies it stays until M3.
 5. Terrain: walkable grid, circle–grid clamping, wall avoidance (decide the cell size).
 6. Pathfinding: A* for squad anchors with a per-tick budget, path following.
 7. Formations in motion: `SetFormation` (Line, ShieldWall, Column), wheeling, slot reassignment after losses.

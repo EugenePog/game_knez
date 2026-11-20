@@ -61,6 +61,22 @@ public class MoveSquadCommandTests
     }
 
     [Test]
+    public void Apply_TargetWouldPutTheFormationOffTheMap_TargetMovesInSoItFits()
+    {
+        // A line of 8 (4 files, 1 m apart) facing north at x = 0.8 would put two files past the west edge; the target
+        // moves east until the leftmost file stands one radius (0.3 m) inside: x = 1.8. Otherwise slots get pulled onto
+        // the same edge spot and the order never ends.
+        var state = State();
+        var line = state.Squads[0];
+        new MoveSquadCommand(0, line.Id, new FixVec2(Fix.Ratio(8, 10), Fix.FromInt(20)), Angle.FromDegrees(90)).Apply(state, null!);
+        Assert.Multiple(() =>
+        {
+            Assert.That(line.Order.Target.X.Raw, Is.EqualTo(Fix.Ratio(18, 10).Raw).Within(2));
+            Assert.That(line.Order.Target.Y, Is.EqualTo(Fix.FromInt(20)));
+        });
+    }
+
+    [Test]
     public void Enqueued_BadCommand_IsRejectedWithAnEventAndChangesNothing()
     {
         var sim = new BattleSimulation(State());

@@ -16,7 +16,7 @@ public class DeterminismTests
     /// Final hash of <c>Run(TestBattle.Create(42), 300)</c>. A change here means outcomes changed: if that was intended
     /// (a rule change), update the constant and say why in the commit message; if not, it is a determinism bug.
     /// </summary>
-    private const ulong GoldenFinalHash = 0xb9fe1f9be5a7be1bUL;
+    private const ulong GoldenFinalHash = 0x2373f769ccc5ee5bUL;
 
     [Test]
     public void TwinRun_SameSeedAndCommands_IdenticalHashEveryTick()
@@ -77,7 +77,7 @@ public class DeterminismTests
     /// Final hash of <see cref="TestDefs.March"/> after 400 ticks (seed 42): marching, turning in place, arrival facing
     /// and slot following. Same rule as <see cref="GoldenFinalHash"/>: a change means movement outcomes changed.
     /// </summary>
-    private const ulong GoldenMarchHash = 0xdd993198d9d6f006UL;
+    private const ulong GoldenMarchHash = 0xfa3174519d9199dbUL;
 
     [Test]
     public void Golden_March_FinalHashMatchesRecordedValue()
@@ -94,7 +94,7 @@ public class DeterminismTests
     /// jostling through each other. A trace, not the final hash — the crossing settles exactly on the slots afterwards, so
     /// the end state alone didn't notice when separation or sliding changed. A change means crowding outcomes changed.
     /// </summary>
-    private const ulong GoldenCrossingTrace = 0x22d5232aff4478b5UL;
+    private const ulong GoldenCrossingTrace = 0xddb1e3e957cc98d2UL;
 
     [Test]
     public void Golden_Crossing_EveryTickMatchesTheRecordedTrace()
@@ -109,6 +109,27 @@ public class DeterminismTests
 
         Assert.That(trace, Is.EqualTo(GoldenCrossingTrace),
             $"Crossing trace is 0x{trace:x16}. If crowding changed on purpose, update GoldenCrossingTrace and say why in the commit.");
+    }
+
+    /// <summary>
+    /// Every tick's hash of <see cref="TestDefs.AlliesThroughAHoldingLine"/> (seed 42, 700 ticks) folded into one value:
+    /// a line squeezing through the ranks of an allied line that holds its ground (decided 2026-11-21).
+    /// </summary>
+    private const ulong GoldenAlliesThroughTrace = 0x5c078cfe29564638UL;
+
+    [Test]
+    public void Golden_AlliesThrough_EveryTickMatchesTheRecordedTrace()
+    {
+        var sim = new BattleSimulation(BattleSetup.Create(TestDefs.AlliesThroughAHoldingLine(), 42));
+        ulong trace = 14695981039346656037UL;
+        for (int i = 0; i < 700; i++)
+        {
+            sim.Step();
+            trace = unchecked((trace ^ sim.ComputeHash().Total) * 1099511628211UL);
+        }
+
+        Assert.That(trace, Is.EqualTo(GoldenAlliesThroughTrace),
+            $"Allies-through trace is 0x{trace:x16}. If crowding changed on purpose, update GoldenAlliesThroughTrace and say why in the commit.");
     }
 
     [Test]

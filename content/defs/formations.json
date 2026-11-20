@@ -1,8 +1,8 @@
 {
-  "description": "Formations (battle-sim.md §10). spacing: metres between neighbours in a rank; rankSpacing: metres between ranks; set either ranks (width follows the squad size) or width (ranks follow); turnRate: how fast the squad turns its front (degrees/s, agreed 2026-11-20); holdWeight: how much harder members of a squad holding its ground are to push than men on the move (agreed: standing gives way less; 3 is a placeholder). Spacings are placeholders, tuned on the M1 bench.",
+  "description": "Formations (battle-sim.md §10). spacing: metres between neighbours in a rank; rankSpacing: metres between ranks; set either ranks (width follows the squad size) or width (ranks follow); turnRate: how fast the squad turns its front (degrees/s, agreed 2026-11-20); holdWeight: how much harder members of a squad holding its ground are to push than men on the move (agreed: standing gives way less; 3 is a placeholder); allyPassSpeed: a holding squad opens its ranks to its own side — an allied man on the move passes through at this fraction of his walking speed (decided 2026-11-21: 1/3). Enemies stay solid. Spacings are placeholders, tuned on the M1 bench.",
   "formations": [
-    { "id": "line", "spacing": 1.0, "rankSpacing": 1.2, "ranks": 2, "turnRate": 45, "holdWeight": 3 },
-    { "id": "shieldwall", "spacing": 0.75, "rankSpacing": 1.0, "ranks": 2, "turnRate": 30, "holdWeight": 3 },
-    { "id": "column", "spacing": 1.0, "rankSpacing": 1.2, "width": 2, "turnRate": 90, "holdWeight": 3 }
+    { "id": "line", "spacing": 1.0, "rankSpacing": 1.2, "ranks": 2, "turnRate": 45, "holdWeight": 3, "allyPassSpeed": 0.333333333 },
+    { "id": "shieldwall", "spacing": 0.75, "rankSpacing": 1.0, "ranks": 2, "turnRate": 30, "holdWeight": 3, "allyPassSpeed": 0.333333333 },
+    { "id": "column", "spacing": 1.0, "rankSpacing": 1.2, "width": 2, "turnRate": 90, "holdWeight": 3, "allyPassSpeed": 0.333333333 }
   ]
 }

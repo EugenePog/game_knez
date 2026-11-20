@@ -148,6 +148,7 @@ public static class CliApp
             var clock = new Stopwatch(); // only stepping is timed; writing frames is not part of the sim's cost
             long fighterTicks = 0;
             long overlappingTicks = 0;
+            long passingTicks = 0;
             int worstOverlap = 0;
             try
             {
@@ -165,6 +166,7 @@ public static class CliApp
                     int overlapping = MovementMetrics.OverlappingFighters(sim.State);
                     overlappingTicks += overlapping;
                     worstOverlap = Math.Max(worstOverlap, overlapping);
+                    passingTicks += MovementMetrics.PassingFighters(sim.State);
                     fighterTicks += sim.State.Fighters.Count(f => f.IsAlive);
                 }
 
@@ -191,6 +193,7 @@ public static class CliApp
             double elapsedMs = clock.Elapsed.TotalMilliseconds;
             var state = sim.State;
             double overlapRatio = fighterTicks == 0 ? 0 : (double)overlappingTicks / fighterTicks;
+            double passingRatio = fighterTicks == 0 ? 0 : (double)passingTicks / fighterTicks;
 
             if (json)
             {
@@ -204,7 +207,7 @@ public static class CliApp
                     fighters = state.Fighters.Count,
                     finalHash = Hex(hash.Total),
                     sections = new { core = Hex(hash.Core), rng = Hex(hash.Rng), squads = Hex(hash.Squads), fighters = Hex(hash.Fighters) },
-                    overlap = new { ratio = Math.Round(overlapRatio, 6), worstTickFighters = worstOverlap },
+                    overlap = new { ratio = Math.Round(overlapRatio, 6), worstTickFighters = worstOverlap, passingRatio = Math.Round(passingRatio, 6) },
                     frames = recorder == null ? null : new { file = framesPath, count = recorder.FrameCount },
                     elapsedMs = Math.Round(elapsedMs, 3),
                 }));
@@ -216,7 +219,7 @@ public static class CliApp
                 stdout.WriteLine($"forces:     {Forces(state)}");
                 stdout.WriteLine($"seed:       {seed}");
                 stdout.WriteLine(string.Format(inv, "ticks:      {0} ({1:0.0} s of battle)", state.Tick, state.Tick / (double)BattleState.TicksPerSecond));
-                stdout.WriteLine(string.Format(inv, "crowding:   {0:0.00}% of fighter-ticks overlap > 5 cm (worst tick: {1} fighters)", overlapRatio * 100, worstOverlap));
+                stdout.WriteLine(string.Format(inv, "crowding:   {0:0.00}% of fighter-ticks overlap > 5 cm (worst tick: {1} fighters); {2:0.00}% passing through allied ranks", overlapRatio * 100, worstOverlap, passingRatio * 100));
                 stdout.WriteLine($"final hash: {hash}");
                 stdout.WriteLine(string.Format(inv, "elapsed:    {0:0.###} ms ({1:0.####} ms/tick)", elapsedMs, elapsedMs / state.Tick));
                 if (recorder != null)

@@ -33,5 +33,11 @@ namespace Knez.Sim
 
         /// <summary>Per-fighter push weights for this tick (index = fighter list index), rebuilt by the systems that use it.</summary>
         internal List<int> FighterWeights { get; } = new List<int>();
+
+        /// <summary>Per-fighter intent for this tick: where formation-following alone would take him (before crowding).</summary>
+        internal List<Numerics.FixVec2> FighterIntents { get; } = new List<Numerics.FixVec2>();
+
+        /// <summary>Per-fighter crowding roles for this tick, filled with <see cref="FighterWeights"/>.</summary>
+        internal List<Movement.CrowdRole> FighterRoles { get; } = new List<Movement.CrowdRole>();
     }
 }

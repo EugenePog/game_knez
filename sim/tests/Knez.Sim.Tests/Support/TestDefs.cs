@@ -10,10 +10,10 @@ public static class TestDefs
     public static readonly FighterDef Warrior = Fighter("test-warrior", walkTenths: 14);
 
     /// <summary>Two ranks, 1 m apart sideways, 1.5 m between ranks, turns 45°/s: round numbers for exact assertions.</summary>
-    public static readonly FormationDef Line = new("test-line", Fix.One, Fix.Ratio(3, 2), ranks: 2, width: 0, turnRate: Fix.FromInt(45), holdWeight: 3);
+    public static readonly FormationDef Line = new("test-line", Fix.One, Fix.Ratio(3, 2), ranks: 2, width: 0, turnRate: Fix.FromInt(45), holdWeight: 3, allyPassSpeed: Fix.Ratio(1, 3));
 
     /// <summary>Two files wide, ranks follow from the squad size; turns 90°/s.</summary>
-    public static readonly FormationDef Column = new("test-column", Fix.One, Fix.Ratio(3, 2), ranks: 0, width: 2, turnRate: Fix.FromInt(90), holdWeight: 3);
+    public static readonly FormationDef Column = new("test-column", Fix.One, Fix.Ratio(3, 2), ranks: 0, width: 2, turnRate: Fix.FromInt(90), holdWeight: 3, allyPassSpeed: Fix.Ratio(1, 3));
 
     public static FighterDef Fighter(string id, int walkTenths, int radiusHundredths = 30) =>
         new(id, Fix.Ratio(radiusHundredths, 100), Fix.Ratio(walkTenths, 10), Fix.Ratio(35, 10), Fix.FromInt(360));
@@ -68,13 +68,50 @@ public static class TestDefs
     ]);
 
     /// <summary>A line of 8 marches north straight through the spot where an enemy line of 8 holds its ground.</summary>
-    public static ScenarioDef IntoAHoldingLine() => new("test-into-holding", "test", Map,
+    public static ScenarioDef IntoAHoldingLine() => ThroughAHoldingLine("test-into-holding", moversSide: 0);
+
+    /// <summary>The same march, but the holding line is on the movers' own side: it opens its ranks to them.</summary>
+    public static ScenarioDef AlliesThroughAHoldingLine() => ThroughAHoldingLine("test-allies-through", moversSide: 1);
+
+    /// <summary>
+    /// Allies march through a holding allied line and stop just beyond it: their rear rank's slots are 1 m clear of the
+    /// holders' rear rank, but when the anchor arrives that rank is still inside the line.
+    /// </summary>
+    public static ScenarioDef AlliesStopJustBeyondAHoldingLine() => ThroughAHoldingLine("test-allies-stop", moversSide: 1, targetY: 24);
+
+    /// <summary>
+    /// A holding Front line with an allied Reserve 4 m behind it; three enemy lines march into the Front, which is ordered
+    /// half a metre forward into them at contact — so it stays on orders while being shoved back toward its reserve.
+    /// </summary>
+    public static ScenarioDef OrderedLineShovedIntoItsReserve() => new("test-shoved", "test", Map,
     [
-        Squad("Holders", 1, 8, FixVec2.FromInts(30, 20), 270),
-        Squad("Movers", 0, 8, FixVec2.FromInts(30, 8), 90),
+        Squad("Front", 0, 8, FixVec2.FromInts(30, 20), 270),
+        Squad("Reserve", 0, 8, FixVec2.FromInts(30, 24), 270),
+        Squad("E1", 1, 8, FixVec2.FromInts(30, 10), 90),
+        Squad("E2", 1, 8, FixVec2.FromInts(30, 7), 90),
+        Squad("E3", 1, 8, FixVec2.FromInts(30, 4), 90),
     ],
     [
-        new ScriptedOrderDef(1, "Movers", FixVec2.FromInts(30, 32), null),
+        new ScriptedOrderDef(1, "E1", FixVec2.FromInts(30, 34), null),
+        new ScriptedOrderDef(1, "E2", FixVec2.FromInts(30, 31), null),
+        new ScriptedOrderDef(1, "E3", FixVec2.FromInts(30, 28), null),
+        new ScriptedOrderDef(140, "Front", new FixVec2(Fix.FromInt(30), Fix.Ratio(39, 2)), Angle.FromDegrees(270)),
+    ]);
+
+    /// <summary>Two allied lines side by side, both holding: "Front" at (20, 10) and "Rear" at (40, 10), facing north.</summary>
+    public static ScenarioDef TwoAlliedLines() => new("test-two-allied", "test", Map,
+    [
+        Squad("Front", 0, 8, FixVec2.FromInts(20, 10), 90),
+        Squad("Rear", 0, 8, FixVec2.FromInts(40, 10), 90),
+    ]);
+
+    private static ScenarioDef ThroughAHoldingLine(string id, int moversSide, int targetY = 32) => new(id, "test", Map,
+    [
+        Squad("Holders", 1, 8, FixVec2.FromInts(30, 20), 270),
+        Squad("Movers", moversSide, 8, FixVec2.FromInts(30, 8), 90),
+    ],
+    [
+        new ScriptedOrderDef(1, "Movers", FixVec2.FromInts(30, targetY), null),
     ]);
 
     /// <summary>Three lines of 8 march one behind another through a holding line of 8: a push four men deep.</summary>

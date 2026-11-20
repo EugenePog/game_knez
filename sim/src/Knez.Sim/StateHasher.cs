@@ -71,6 +71,7 @@ namespace Knez.Sim
                 fighters.Add((int)fighter.Facing.Raw);
                 fighters.Add(fighter.SquadId.Value);
                 fighters.Add(fighter.SlotIndex);
+                fighters.Add(fighter.PassingThrough);
             }
 
             return new StateHash(core.Value, rng.Value, squads.Value, fighters.Value);

@@ -48,8 +48,9 @@ namespace Knez.Sim.Movement
             }
 
             List<int> weights = context.FighterWeights;
-            Crowding.FillWeights(state, weights);
-            Crowding.Resolve(state, weights);
+            List<CrowdRole> roles = context.FighterRoles;
+            Crowding.Fill(state, weights, roles);
+            Crowding.Resolve(state, weights, roles);
         }
 
         /// <summary>The fighter's slot motion this tick: outer slots of a turning squad move faster than its anchor.</summary>

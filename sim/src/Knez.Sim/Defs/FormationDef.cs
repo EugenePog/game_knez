@@ -12,10 +12,12 @@ namespace Knez.Sim.Defs
     {
         /// <summary>Creates a def; exactly one of <paramref name="ranks"/> and <paramref name="width"/> is positive (at most
         /// <see cref="SquadSpawnDef.MaxCount"/>), the other 0.</summary>
-        public FormationDef(string id, Fix spacing, Fix rankSpacing, int ranks, int width, Fix turnRate, int holdWeight)
+        public FormationDef(string id, Fix spacing, Fix rankSpacing, int ranks, int width, Fix turnRate, int holdWeight,
+            Fix allyPassSpeed)
         {
             TurnRate = DefChecks.Positive(turnRate, FighterDef.MaxTurnRate, "°/s", nameof(turnRate));
             HoldWeight = DefChecks.Range(holdWeight, 1, MaxHoldWeight, nameof(holdWeight));
+            AllyPassSpeed = DefChecks.Fraction(allyPassSpeed, nameof(allyPassSpeed));
             Id = DefChecks.Id(id, nameof(id));
             Spacing = DefChecks.PositiveMetres(spacing, MaxSpacingMetres, nameof(spacing));
             RankSpacing = DefChecks.PositiveMetres(rankSpacing, MaxSpacingMetres, nameof(rankSpacing));
@@ -60,6 +62,12 @@ namespace Knez.Sim.Defs
         /// <summary>Sanity bound for <see cref="HoldWeight"/>, not a balance number.</summary>
         public const int MaxHoldWeight = 100;
 
+        /// <summary>
+        /// A squad in this formation holding its ground opens its ranks to its own side (battle-sim.md §10, decided
+        /// 2026-11-21): an allied man on the move passes through it, at most this fraction of his walking speed (1/3).
+        /// </summary>
+        public Fix AllyPassSpeed { get; }
+
         internal void AddTo(ref Fnv1a64 hash)
         {
             hash.Add(Id);
@@ -69,6 +77,7 @@ namespace Knez.Sim.Defs
             hash.Add(Width);
             hash.Add(TurnRate.Raw);
             hash.Add(HoldWeight);
+            hash.Add(AllyPassSpeed.Raw);
         }
     }
 }

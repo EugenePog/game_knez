@@ -47,8 +47,9 @@ public class ScenarioDefTests
     public void Fingerprint_AnyBattleRelevantChange_ChangesIt()
     {
         ulong baseline = TestDefs.TwoSquads().Fingerprint;
-        var widerSpacing = new FormationDef("test-line", Fix.Ratio(11, 10), Fix.Ratio(3, 2), 2, 0, Fix.FromInt(45), 3);
-        var heavierHold = new FormationDef("test-line", Fix.One, Fix.Ratio(3, 2), 2, 0, Fix.FromInt(45), 4);
+        var widerSpacing = new FormationDef("test-line", Fix.Ratio(11, 10), Fix.Ratio(3, 2), 2, 0, Fix.FromInt(45), 3, Fix.Ratio(1, 3));
+        var heavierHold = new FormationDef("test-line", Fix.One, Fix.Ratio(3, 2), 2, 0, Fix.FromInt(45), 4, Fix.Ratio(1, 3));
+        var easierPassage = new FormationDef("test-line", Fix.One, Fix.Ratio(3, 2), 2, 0, Fix.FromInt(45), 3, Fix.Ratio(1, 2));
         var biggerFighter = TestDefs.Fighter("test-warrior", walkTenths: 14, radiusHundredths: 35);
 
         ulong[] variants =
@@ -58,6 +59,7 @@ public class ScenarioDefTests
             Scenario(squad0: TestDefs.Squad("Line", 0, 7, FixVec2.FromInts(20, 10), 90)),                // count
             Scenario(squad0: TestDefs.Squad("Line", 0, 8, FixVec2.FromInts(20, 10), 90, widerSpacing)),  // formation def number
             Scenario(squad0: TestDefs.Squad("Line", 0, 8, FixVec2.FromInts(20, 10), 90, heavierHold)),   // hold weight
+            Scenario(squad0: TestDefs.Squad("Line", 0, 8, FixVec2.FromInts(20, 10), 90, easierPassage)), // ally pass speed
             new ScenarioDef("test-two-squads", "test", TestDefs.Map,                                         // fighter def number
             [
                 new SquadSpawnDef("Line", 0, biggerFighter, 8, TestDefs.Line, FixVec2.FromInts(20, 10), Angle.FromDegrees(90)),
@@ -82,7 +84,7 @@ public class ScenarioDefTests
     public void Constructor_TwoDifferentDefsWithOneId_Throws()
     {
         // State hashes name defs by id, so one id must mean one set of numbers.
-        var otherLine = new FormationDef("test-line", Fix.FromInt(2), Fix.FromInt(2), ranks: 2, width: 0, turnRate: Fix.FromInt(45), holdWeight: 3);
+        var otherLine = new FormationDef("test-line", Fix.FromInt(2), Fix.FromInt(2), ranks: 2, width: 0, turnRate: Fix.FromInt(45), holdWeight: 3, allyPassSpeed: Fix.Ratio(1, 3));
         var ex = Assert.Throws<ArgumentException>(() => new ScenarioDef("s", "", TestDefs.Map,
         [
             TestDefs.Squad("A", 0, 4, FixVec2.FromInts(10, 10), 90),
@@ -97,14 +99,16 @@ public class ScenarioDefTests
         Assert.Multiple(() =>
         {
             var turn = Fix.FromInt(45);
-            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: 2, width: 2, turn, 3));
-            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: 0, width: 0, turn, 3));
-            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.Zero, Fix.One, ranks: 2, width: 0, turn, 3));
-            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: int.MaxValue, width: 0, turn, 3));
-            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: 0, width: SquadSpawnDef.MaxCount + 1, turn, 3));
-            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: 2, width: 0, Fix.Zero, 3));
-            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: 2, width: 0, turn, 0), "hold weight 0 would divide by zero");
-            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: 2, width: 0, turn, FormationDef.MaxHoldWeight + 1));
+            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: 2, width: 2, turn, 3, Fix.Ratio(1, 3)));
+            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: 0, width: 0, turn, 3, Fix.Ratio(1, 3)));
+            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.Zero, Fix.One, ranks: 2, width: 0, turn, 3, Fix.Ratio(1, 3)));
+            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: int.MaxValue, width: 0, turn, 3, Fix.Ratio(1, 3)));
+            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: 0, width: SquadSpawnDef.MaxCount + 1, turn, 3, Fix.Ratio(1, 3)));
+            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: 2, width: 0, turn, 3, Fix.Zero), "allies must be able to pass");
+            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: 2, width: 0, turn, 3, Fix.Ratio(3, 2)), "not faster than walking");
+            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: 2, width: 0, Fix.Zero, 3, Fix.Ratio(1, 3)));
+            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: 2, width: 0, turn, 0, Fix.Ratio(1, 3)), "hold weight 0 would divide by zero");
+            Assert.Throws<ArgumentException>(() => new FormationDef("f", Fix.One, Fix.One, ranks: 2, width: 0, turn, FormationDef.MaxHoldWeight + 1, Fix.Ratio(1, 3)));
         });
     }
 

@@ -49,6 +49,17 @@ namespace Knez.Sim.Defs
             return perTick < 1 ? 1 : (int)perTick;
         }
 
+        /// <summary>A fraction in (0, 1].</summary>
+        public static Fix Fraction(Fix value, string parameter)
+        {
+            if (value <= Fix.Zero || value > Fix.One)
+            {
+                throw new ArgumentException($"{parameter} must be > 0 and <= 1 (got {value}).");
+            }
+
+            return value;
+        }
+
         public static int Range(int value, int min, int max, string parameter)
         {
             if (value < min || value > max)

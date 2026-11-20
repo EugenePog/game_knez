@@ -23,6 +23,7 @@ public class HashCoverageTests
         yield return Case("FighterSquadId", "Fighters", s => s.FighterList[0].SquadId = EntityId.None);
         yield return Case("FighterSlot", "Fighters", s => s.FighterList[0].SlotIndex = 7);
         yield return Case("FighterAlive", "Fighters", s => s.FighterList[0].IsAlive = false);
+        yield return Case("FighterPassingThrough", "Fighters", s => s.FighterList[0].PassingThrough = true);
         yield return Case("FighterVelocityX", "Fighters", s => s.FighterList[0].Velocity += new FixVec2(Fix.FromRaw(1), Fix.Zero));
         yield return Case("FighterVelocityY", "Fighters", s => s.FighterList[0].Velocity += new FixVec2(Fix.Zero, Fix.FromRaw(1)));
         yield return Case("SquadAnchorX", "Squads", s => s.SquadList[0].Anchor += new FixVec2(Fix.FromRaw(1), Fix.Zero));

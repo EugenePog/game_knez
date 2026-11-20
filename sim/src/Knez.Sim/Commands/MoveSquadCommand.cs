@@ -1,3 +1,4 @@
+using Knez.Sim.Formations;
 using Knez.Sim.Movement;
 using Knez.Sim.Numerics;
 using Knez.Sim.Orders;
@@ -62,11 +63,51 @@ namespace Knez.Sim.Commands
             // A target within arrival distance is no march: keep the facing rather than turn toward a sub-centimetre
             // offset, whose direction is noise (view clicks converted from float land there).
             Angle facing = Facing ?? (delta.Length <= MovementRules.ArriveDistance ? squad.Facing : FixMath.Atan2(delta.Y, delta.X));
-            squad.Order = SquadOrder.Move(Target, facing);
+            squad.Order = SquadOrder.Move(FitInside(state, squad, Target, facing), facing);
         }
 
         /// <inheritdoc/>
         public override string ToString() => $"MoveSquad {SquadId} to {Target}" + (Facing.HasValue ? $" facing {Facing.Value}" : string.Empty);
+
+        /// <summary>
+        /// <paramref name="target"/> moved inward just enough that the formation, facing <paramref name="facing"/> there,
+        /// stands wholly on the map with room for its bodies. Without it, slots past an edge get pulled onto the same edge
+        /// spot, the men can't all reach them, and the order never ends. A formation wider than the map is centred.
+        /// </summary>
+        private static FixVec2 FitInside(BattleState state, Squad squad, FixVec2 target, Angle facing)
+        {
+            int count = squad.MemberList.Count;
+            Fighter? any = state.FindFighter(squad.MemberList[0]);
+            Fix r = any != null ? any.Radius : Fix.Zero;
+            Fix minX = Fix.MaxValue, maxX = Fix.MinValue, minY = Fix.MaxValue, maxY = Fix.MinValue;
+            for (int slot = 0; slot < count; slot++)
+            {
+                FixVec2 p = FormationLayout.SlotPosition(squad.Formation, count, slot, target, facing);
+                minX = FixMath.Min(minX, p.X);
+                maxX = FixMath.Max(maxX, p.X);
+                minY = FixMath.Min(minY, p.Y);
+                maxY = FixMath.Max(maxY, p.Y);
+            }
+
+            Defs.MapDef map = state.Scenario.Map;
+            return new FixVec2(target.X + Shift(minX, maxX, r, map.Width), target.Y + Shift(minY, maxY, r, map.Height));
+        }
+
+        /// <summary>How far to move a span [lo, hi] so it lies within [r, size − r] (centred when it can't fit).</summary>
+        private static Fix Shift(Fix lo, Fix hi, Fix r, Fix size)
+        {
+            if (hi - lo > size - r - r)
+            {
+                return (size - (lo + hi)) / 2;
+            }
+
+            if (lo < r)
+            {
+                return r - lo;
+            }
+
+            return hi > size - r ? size - r - hi : Fix.Zero;
+        }
 
         private static bool HasLivingMember(BattleState state, Squad squad)
         {

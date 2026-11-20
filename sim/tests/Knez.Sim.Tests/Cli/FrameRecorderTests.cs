@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Knez.Sim.Cli;
 using Knez.Sim.Events;
+using Knez.Sim.Movement;
 using Knez.Sim.Numerics;
 using Knez.Sim.Tests.Support;
 
@@ -53,7 +54,7 @@ public class FrameRecorderTests
     {
         var stream = new MemoryStream();
         var sim = TestBattle.Create(5); // wandering fighters: positions change every tick
-        var expected = new List<(int Tick, string Hash, double X, double Y, double Facing)>();
+        var expected = new List<(int Tick, string Hash, double X, double Y, double Facing, int Holds)>();
         using (var recorder = new FrameRecorder(stream, sim.State))
         {
             for (int i = 0; i <= 10; i++)
@@ -66,7 +67,8 @@ public class FrameRecorderTests
                 recorder.Capture(sim.State);
                 var f = sim.State.Fighters[1];
                 expected.Add((sim.State.Tick, sim.ComputeHash().Total.ToString("x16"),
-                    f.Position.X.Raw / 65536.0, f.Position.Y.Raw / 65536.0, f.Facing.Raw * 360.0 / 65536));
+                    f.Position.X.Raw / 65536.0, f.Position.Y.Raw / 65536.0, f.Facing.Raw * 360.0 / 65536,
+                    MovementMetrics.HoldsGround(sim.State, f) ? 1 : 0));
             }
 
             recorder.Complete();
@@ -87,6 +89,7 @@ public class FrameRecorderTests
                 Assert.That(fighter[2].GetDouble(), Is.EqualTo(expected[i].Y).Within(0.00005));
                 Assert.That(fighter[3].GetDouble(), Is.EqualTo(expected[i].Facing).Within(0.005));
                 Assert.That(fighter[4].GetInt32(), Is.EqualTo(1));
+                Assert.That(fighter[5].GetInt32(), Is.EqualTo(expected[i].Holds), "holds his ground, as of that tick");
             });
         }
     }
@@ -172,8 +175,10 @@ public class FrameRecorderTests
 
         using var doc = JsonDocument.Parse(stream.ToArray());
         var row = doc.RootElement.GetProperty("frames")[0].GetProperty("squads")[0];
+        var fighterRow = doc.RootElement.GetProperty("frames")[0].GetProperty("fighters")[0];
         Assert.Multiple(() =>
         {
+            Assert.That(fighterRow[5].GetInt32(), Is.EqualTo(0), "his squad has a move order: not holding his ground");
             Assert.That(row.GetArrayLength(), Is.EqualTo(8));
             Assert.That(row[4].GetInt32(), Is.EqualTo(1));
             Assert.That(row[5].GetDouble(), Is.EqualTo(30.0));

@@ -48,6 +48,13 @@ namespace Knez.Sim.Units
         /// <summary>Formation slot within the squad (0 = front-left), or <see cref="NoSlot"/>.</summary>
         public int SlotIndex { get; internal set; }
 
+        /// <summary>
+        /// True while he passes through the ranks of an allied squad holding its ground (battle-sim.md §10): set when, on
+        /// orders, he walks into an allied holder who stands between him and his slot; kept while his body still overlaps
+        /// such holders. Being shoved backwards into allies never sets it.
+        /// </summary>
+        public bool PassingThrough { get; internal set; }
+
         /// <summary>False once the fighter has died; dead fighters stay in the list until cleanup.</summary>
         public bool IsAlive { get; internal set; }
 

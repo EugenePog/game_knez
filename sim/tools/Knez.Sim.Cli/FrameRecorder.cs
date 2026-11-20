@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using Knez.Sim.Events;
+using Knez.Sim.Movement;
 using Knez.Sim.Numerics;
 using Knez.Sim.Orders;
 using Knez.Sim.Units;
@@ -120,6 +121,8 @@ public sealed class FrameRecorder : IDisposable
             _json.WriteNumberValue(Metres(fighter.Position.Y));
             _json.WriteNumberValue(Degrees(fighter.Facing));
             _json.WriteNumberValue(fighter.IsAlive ? 1 : 0);
+            _json.WriteNumberValue(MovementMetrics.HoldsGround(state, fighter) ? 1 : 0);
+            _json.WriteNumberValue(fighter.PassingThrough ? 1 : 0);
             _json.WriteEndArray();
         }
 

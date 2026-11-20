@@ -10,7 +10,8 @@ namespace Knez.Sim.Movement
     /// it moves with the slot's own motion this tick (from the anchor's move and turn) plus a tenth of the lag it had
     /// before (a 10-tick time constant); anyone inside another man's personal space also eases away from him
     /// (<see cref="Crowding.Separation"/>). That is capped at run speed, and then the part heading into a neighbour is cut
-    /// (<see cref="Crowding.Slide"/>): men slide along bodies instead of walking into them. When the squad stands still, nobody crowds the
+    /// (<see cref="Crowding.Slide"/>): men slide along bodies instead of walking into them. Passing through allied ranks
+    /// is slow (<see cref="Crowding.Squeeze"/>). When the squad stands still, nobody crowds the
     /// member and its gap is under 2 cm, it steps exactly onto the slot.
     /// </summary>
     public sealed class SteeringSystem : ISimSystem
@@ -20,7 +21,18 @@ namespace Knez.Sim.Movement
         {
             List<Fighter> fighters = state.FighterList;
             List<int> weights = context.FighterWeights;
-            Crowding.FillWeights(state, weights);
+            List<CrowdRole> roles = context.FighterRoles;
+            Crowding.Fill(state, weights, roles);
+
+            // Where each man means to go (formation-following alone) decides whether he walks into allied ranks.
+            List<FixVec2> intents = context.FighterIntents;
+            intents.Clear();
+            for (int i = 0; i < fighters.Count; i++)
+            {
+                intents.Add(fighters[i].IsAlive ? Follow(state, fighters[i], FixVec2.Zero) : FixVec2.Zero);
+            }
+
+            Crowding.UpdatePassing(state, roles, intents);
             for (int i = 0; i < fighters.Count; i++)
             {
                 Fighter fighter = fighters[i];
@@ -32,9 +44,10 @@ namespace Knez.Sim.Movement
 
                 // Cap first, then slide: the slide only removes speed, and cutting an uncapped request (a man 10 m behind
                 // his slot asks for ~1 m/tick) would still leave more than run speed, straight into the body in front.
-                FixVec2 separation = Crowding.Separation(state, weights, i);
+                FixVec2 separation = Crowding.Separation(state, weights, roles, i);
                 FixVec2 desired = Follow(state, fighter, separation).ClampLength(fighter.Def.RunPerTick);
-                fighter.Velocity = Crowding.Slide(state, weights, i, desired);
+                FixVec2 slid = Crowding.Slide(state, weights, roles, i, desired);
+                fighter.Velocity = Crowding.Squeeze(state, roles, i, slid);
             }
         }
 

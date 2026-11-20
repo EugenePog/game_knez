@@ -7,30 +7,118 @@ using Knez.Sim.Units;
 namespace Knez.Sim.Movement
 {
     /// <summary>
-    /// Bodies don't overlap (battle-sim.md §10). Every living fighter is solid to every other, allies included. When two
-    /// press into each other they share the push by weight: a man holding his ground — squad without orders, him within
-    /// <see cref="MovementRules.HoldingReach"/> of his slot — weighs his formation's hold weight, anyone on the move weighs
-    /// 1 (agreed 2026-11-20: standing gives way less). Pairs are visited in id order
-    /// — all pairs, no spatial index: phase 1 battles have at most ~60 fighters, a few thousand checks per tick.
+    /// Bodies don't overlap (battle-sim.md §10). Every living fighter is solid to every other — enemies always, allies
+    /// too, with one exception (decided 2026-11-21): a man holding his ground opens his ranks to a man of another allied
+    /// squad who is passing through on orders (<see cref="Fighter.PassingThrough"/>). That pair ignores each other — no
+    /// separation, no slide, no collision — and while their bodies overlap the passing man squeezes through at most at the
+    /// holder formation's <see cref="FormationDef.AllyPassSpeed"/> of his walking pace. Passing starts only when he walks
+    /// into a holder who stands between him and his slot, so men shoved backwards, or off their slots without orders,
+    /// stay solid. Otherwise, when two press into each other they share the push by weight: a man holding his ground weighs
+    /// his formation's hold weight, anyone else weighs 1 (agreed 2026-11-20: standing gives way less). Men of different
+    /// allied squads more than 25 cm inside each other (they were passing through until an order changed) drift apart
+    /// ~10 cm a tick instead of jumping. Pairs are visited in id order — all pairs, no spatial index: phase
+    /// 1 battles have at most ~60 fighters, a few thousand checks per tick.
     /// </summary>
     internal static class Crowding
     {
-        /// <summary>How hard <paramref name="fighter"/> is to push this tick.</summary>
-        public static int Weight(BattleState state, Fighter fighter)
+        /// <summary>
+        /// <paramref name="fighter"/>'s crowding role this tick: <see cref="CrowdRole.Ordered"/> while his squad has a move
+        /// order; <see cref="CrowdRole.Holding"/> when it has none and he stands within
+        /// <see cref="MovementRules.HoldingReach"/> of his slot; otherwise <see cref="CrowdRole.Loose"/>.
+        /// </summary>
+        public static CrowdRole Role(BattleState state, Fighter fighter)
         {
             if (!fighter.IsAlive)
             {
-                return 1; // never pushed, and a dead man's slot may no longer exist once squads are compacted (M3)
+                return CrowdRole.Loose; // never pushed, and a dead man's slot may no longer exist once squads are compacted (M3)
             }
 
             Squad? squad = fighter.SquadId.IsNone || fighter.SlotIndex < 0 ? null : state.FindSquad(fighter.SquadId);
-            if (squad == null || squad.Order.Kind != SquadOrderKind.None)
+            if (squad == null)
             {
-                return 1;
+                return CrowdRole.Loose;
             }
 
+            if (squad.Order.Kind != SquadOrderKind.None)
+            {
+                return CrowdRole.Ordered;
+            }
+
+            return DistanceToSlot(state, squad, fighter) <= MovementRules.HoldingReach ? CrowdRole.Holding : CrowdRole.Loose;
+        }
+
+        /// <summary>True when <paramref name="fighter"/> holds his ground this tick (see <see cref="Role"/>).</summary>
+        public static bool Holding(BattleState state, Fighter fighter) => Role(state, fighter) == CrowdRole.Holding;
+
+        /// <summary>How far <paramref name="fighter"/> stands from his slot (the slot moved inside the map).</summary>
+        public static Fix DistanceToSlot(BattleState state, Squad squad, Fighter fighter)
+        {
             FixVec2 slot = Inside(state.Scenario.Map, SlotTracking.Position(squad, SlotTracking.Offset(squad, fighter)), fighter.Radius);
-            return (slot - fighter.Position).Length <= MovementRules.HoldingReach ? squad.Formation.HoldWeight : 1;
+            return (slot - fighter.Position).Length;
+        }
+
+        /// <summary>
+        /// True when fighters <paramref name="i"/> and <paramref name="j"/> pass through each other: same side, different
+        /// squads, one holding his ground and the other on orders and passing through (<see cref="Fighter.PassingThrough"/>).
+        /// Enemies never do; neither do men of one squad, men without orders, or ordered men shoved backwards into allies.
+        /// </summary>
+        public static bool PassThrough(List<Fighter> fighters, List<CrowdRole> roles, int i, int j)
+        {
+            CrowdRole a = roles[i];
+            CrowdRole b = roles[j];
+            bool pair = (a == CrowdRole.Holding && b == CrowdRole.Ordered && fighters[j].PassingThrough)
+                || (a == CrowdRole.Ordered && b == CrowdRole.Holding && fighters[i].PassingThrough);
+            return pair && AlliedOtherSquad(fighters[i], fighters[j]);
+        }
+
+        private static bool AlliedOtherSquad(Fighter a, Fighter b) => a.SideId == b.SideId && a.SquadId != b.SquadId;
+
+        /// <summary>
+        /// Starts, keeps or ends each fighter's <see cref="Fighter.PassingThrough"/> for this tick, before steering uses it.
+        /// An ordered man starts passing when he is within personal space of an allied holder (another squad) and his
+        /// <paramref name="intents"/> — where following his slot would take him this tick — heads into that holder: he
+        /// walks into him on purpose. He keeps passing while his body overlaps any allied holder or he walks into another
+        /// one; otherwise, and for anyone not on orders, it ends. A man shoved backwards into allies is trying to walk the
+        /// other way, so it never starts.
+        /// </summary>
+        public static void UpdatePassing(BattleState state, List<CrowdRole> roles, List<FixVec2> intents)
+        {
+            List<Fighter> fighters = state.FighterList;
+            for (int i = 0; i < fighters.Count; i++)
+            {
+                Fighter self = fighters[i];
+                if (roles[i] != CrowdRole.Ordered)
+                {
+                    self.PassingThrough = false;
+                    continue;
+                }
+
+                FixVec2 intent = intents[i];
+                bool inside = false;
+                bool walkingInto = false;
+                for (int j = 0; j < fighters.Count && !(inside && walkingInto); j++)
+                {
+                    Fighter other = fighters[j];
+                    if (j == i || roles[j] != CrowdRole.Holding || !AlliedOtherSquad(self, other))
+                    {
+                        continue;
+                    }
+
+                    Fix touching = self.Radius + other.Radius;
+                    Fix reach = touching + MovementRules.PersonalSpace;
+                    FixVec2 toOther = other.Position - self.Position;
+                    if (FixMath.Abs(toOther.X) >= reach || FixMath.Abs(toOther.Y) >= reach)
+                    {
+                        continue;
+                    }
+
+                    Fix distance = toOther.Length;
+                    inside |= distance < touching;
+                    walkingInto |= distance < reach && FixVec2.Dot(intent, toOther) > Fix.Zero;
+                }
+
+                self.PassingThrough = walkingInto || (self.PassingThrough && inside);
+            }
         }
 
         /// <summary>
@@ -40,14 +128,17 @@ namespace Knez.Sim.Movement
         public static FixVec2 Inside(MapDef map, FixVec2 point, Fix radius) =>
             new FixVec2(FixMath.Clamp(point.X, radius, map.Width - radius), FixMath.Clamp(point.Y, radius, map.Height - radius));
 
-        /// <summary>Fills <paramref name="weights"/> (reused) with each fighter's weight, by list index.</summary>
-        public static void FillWeights(BattleState state, List<int> weights)
+        /// <summary>Fills <paramref name="weights"/> and <paramref name="roles"/> (both reused) per fighter, by list index.</summary>
+        public static void Fill(BattleState state, List<int> weights, List<CrowdRole> roles)
         {
             weights.Clear();
+            roles.Clear();
             List<Fighter> fighters = state.FighterList;
             for (int i = 0; i < fighters.Count; i++)
             {
-                weights.Add(Weight(state, fighters[i]));
+                CrowdRole role = Role(state, fighters[i]);
+                roles.Add(role);
+                weights.Add(role == CrowdRole.Holding ? state.FindSquad(fighters[i].SquadId)!.Formation.HoldWeight : 1);
             }
         }
 
@@ -55,7 +146,7 @@ namespace Knez.Sim.Movement
         /// Steering away from neighbours inside personal space: per neighbour, a share of the intrusion over
         /// <see cref="MovementRules.SeparationTicks"/>; the lighter (moving) man takes the larger share.
         /// </summary>
-        public static FixVec2 Separation(BattleState state, List<int> weights, int index)
+        public static FixVec2 Separation(BattleState state, List<int> weights, List<CrowdRole> roles, int index)
         {
             List<Fighter> fighters = state.FighterList;
             Fighter self = fighters[index];
@@ -63,7 +154,7 @@ namespace Knez.Sim.Movement
             for (int j = 0; j < fighters.Count; j++)
             {
                 Fighter other = fighters[j];
-                if (j == index || !other.IsAlive)
+                if (j == index || !other.IsAlive || PassThrough(fighters, roles, index, j))
                 {
                     continue;
                 }
@@ -81,6 +172,11 @@ namespace Knez.Sim.Movement
                     continue;
                 }
 
+                if (self.Radius + other.Radius - distance > DeepAllyOverlap && AlliedOtherSquad(self, other))
+                {
+                    continue; // allied squads that deep inside each other are parted gently by Resolve; don't shove
+                }
+
                 // Equal weights → a full share (2·w/2w = 1); holding 3 vs moving 1 → ½ for the holder, 1½ for the mover.
                 int total = weights[index] + weights[j];
                 Fix push = (reach - distance) * (2 * weights[j]) / (total * MovementRules.SeparationTicks);
@@ -96,14 +192,14 @@ namespace Knez.Sim.Movement
         /// jostle), three quarters for a mover against a holder (he mostly slides along the line, pushing with a quarter).
         /// Without this, sustained pressure leaves bodies pressed together that relaxation can't fully part.
         /// </summary>
-        public static FixVec2 Slide(BattleState state, List<int> weights, int index, FixVec2 velocity)
+        public static FixVec2 Slide(BattleState state, List<int> weights, List<CrowdRole> roles, int index, FixVec2 velocity)
         {
             List<Fighter> fighters = state.FighterList;
             Fighter self = fighters[index];
             for (int j = 0; j < fighters.Count; j++)
             {
                 Fighter other = fighters[j];
-                if (j == index || !other.IsAlive)
+                if (j == index || !other.IsAlive || PassThrough(fighters, roles, index, j))
                 {
                     continue;
                 }
@@ -135,11 +231,50 @@ namespace Knez.Sim.Movement
         }
 
         /// <summary>
+        /// A man on orders squeezing through the ranks of an allied squad that holds its ground: while his body overlaps
+        /// any of theirs, his own stride is capped at that holder formation's <see cref="FormationDef.AllyPassSpeed"/> of
+        /// his walking pace (the slowest such cap wins). Walking alongside without touching costs nothing; holders are
+        /// unaffected. It caps his velocity, not pushes: his own solid rank behind him can still carry him a little faster.
+        /// </summary>
+        public static FixVec2 Squeeze(BattleState state, List<CrowdRole> roles, int index, FixVec2 velocity)
+        {
+            if (roles[index] != CrowdRole.Ordered)
+            {
+                return velocity;
+            }
+
+            List<Fighter> fighters = state.FighterList;
+            Fighter self = fighters[index];
+            Fix cap = Fix.MaxValue;
+            for (int j = 0; j < fighters.Count; j++)
+            {
+                Fighter other = fighters[j];
+                if (j == index || !other.IsAlive || !PassThrough(fighters, roles, index, j))
+                {
+                    continue;
+                }
+
+                Fix reach = self.Radius + other.Radius; // bodies overlap: he is inside their ranks
+                FixVec2 apart = other.Position - self.Position;
+                if (FixMath.Abs(apart.X) >= reach || FixMath.Abs(apart.Y) >= reach || apart.Length >= reach)
+                {
+                    continue;
+                }
+
+                // A holder always has a squad (see Holding).
+                Fix holderCap = self.Def.WalkPerTick * state.FindSquad(other.SquadId)!.Formation.AllyPassSpeed;
+                cap = FixMath.Min(cap, holderCap);
+            }
+
+            return cap == Fix.MaxValue ? velocity : velocity.ClampLength(cap);
+        }
+
+        /// <summary>
         /// Pushes overlapping living fighters apart until no pair overlaps (up to <see cref="MovementRules.CollisionPasses"/>
         /// passes over all pairs in id order). Both bodies of a pushed pair are put back inside the map at once — clamping
         /// only at the end would push men at the edge back into their neighbours — and finally every body is.
         /// </summary>
-        public static void Resolve(BattleState state, List<int> weights)
+        public static void Resolve(BattleState state, List<int> weights, List<CrowdRole> roles)
         {
             MapDef map = state.Scenario.Map;
             List<Fighter> fighters = state.FighterList;
@@ -157,7 +292,7 @@ namespace Knez.Sim.Movement
                     for (int j = i + 1; j < fighters.Count; j++)
                     {
                         Fighter b = fighters[j];
-                        if (b.IsAlive && Separate(map, a, b, weights[i], weights[j]))
+                        if (b.IsAlive && !PassThrough(fighters, roles, i, j) && Separate(map, a, b, weights[i], weights[j]))
                         {
                             moved = true;
                         }
@@ -200,6 +335,17 @@ namespace Knez.Sim.Movement
             }
 
             Fix overlap = minimum - distance;
+            if (overlap > DeepAllyOverlap && AlliedOtherSquad(a, b))
+            {
+                // Men of different allied squads this deep inside each other were passing through until now (an order
+                // given or finished mid-squeeze): they drift apart ~10 cm a tick instead of jumping. Ordinary overlaps
+                // between allied squads (crossings, pushes: ≤ ~7 cm measured) stay below the threshold and are cleared at
+                // once; capping them too breaks crossings. Men of one squad never pass through each other, so any overlap
+                // between them is a push and is cleared at once. Known: once a deep pair gets under the threshold, the
+                // rest clears in one tick (≤ ~0.3 m measured) — bench item.
+                overlap = AllyCorrectionPerPass;
+            }
+
             Fix shareA = overlap * weightB / (weightA + weightB); // the heavier one moves less
             Fix shareB = overlap - shareA;
             // On the same spot Apart gives +X; the -= sends a (the lower id) west and the += sends b east.
@@ -207,6 +353,12 @@ namespace Knez.Sim.Movement
             b.Position = Inside(map, b.Position + Apart(apart, distance, shareB, negativeX: false), b.Radius);
             return true;
         }
+
+        /// <summary>Between different allied squads, an overlap deeper than this (25 cm) comes from men who were passing through.</summary>
+        private static readonly Fix DeepAllyOverlap = Fix.Ratio(1, 4);
+
+        /// <summary>How far such a deep allied pair is pushed apart per pass: personal space spread over all passes (~1.7 cm).</summary>
+        private static readonly Fix AllyCorrectionPerPass = MovementRules.PersonalSpace / MovementRules.CollisionPasses;
 
         /// <summary>
         /// <paramref name="direction"/> scaled to <paramref name="length"/>. Two bodies on exactly the same spot have no

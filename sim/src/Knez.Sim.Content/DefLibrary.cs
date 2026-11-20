@@ -15,7 +15,7 @@ namespace Knez.Sim.Content
     {
         private const string FileMembers = "description, fighters, formations";
         private const string FighterMembers = "id, radius, walkSpeed, runSpeed, turnRate";
-        private const string FormationMembers = "id, spacing, rankSpacing, ranks, width, turnRate, holdWeight";
+        private const string FormationMembers = "id, spacing, rankSpacing, ranks, width, turnRate, holdWeight, allyPassSpeed";
 
         private readonly Dictionary<string, FighterDef> _fighters;
         private readonly Dictionary<string, FormationDef> _formations;
@@ -83,10 +83,11 @@ namespace Knez.Sim.Content
                     int width = item.OptionalInt("width", 0);
                     var formationTurnRate = item.RequireFix("turnRate");
                     int holdWeight = item.RequireInt("holdWeight");
+                    var allyPassSpeed = item.RequireFix("allyPassSpeed");
                     item.RejectUnknownMembers(FormationMembers);
                     Claim(seen, "formation", id, item, formationItems[i], file.Name);
                     formations.Add(Build(item, formationItems[i],
-                        () => new FormationDef(id, spacing, rankSpacing, ranks, width, formationTurnRate, holdWeight)));
+                        () => new FormationDef(id, spacing, rankSpacing, ranks, width, formationTurnRate, holdWeight, allyPassSpeed)));
                 }
 
                 root.RejectUnknownMembers(FileMembers);

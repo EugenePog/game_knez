@@ -47,6 +47,13 @@ namespace Knez.Sim.Movement
         public static readonly Fix HoldingReach = Fix.Ratio(3, 2);
 
         /// <summary>
+        /// A move order ends only when every living member stands within this of his slot (about 30 cm), besides the anchor
+        /// being at the target and facing the order's way (decided 2026-11-21: orders end when formed up). Until then the
+        /// squad is on the move: it may pass through allied ranks and weighs 1 in pushes.
+        /// </summary>
+        public static readonly Fix FormedUpReach = Fix.Ratio(3, 10);
+
+        /// <summary>
         /// Most collision relaxation passes per tick, each over all pairs in id order; passes stop early once nothing
         /// overlaps. A push travels one link per pass against id order, so 3 passes left pushes 4+ men deep overlapping
         /// (7 % of fighter-ticks in a three-lines-deep test); 6 clears it at the same cost.

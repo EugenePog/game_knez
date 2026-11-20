@@ -124,7 +124,7 @@ public class MarchTests
                 sim.Step(); // the order arrives in the first tick and turning starts in that same tick
                 ticks++;
             }
-            while (squad.Order.Kind != SquadOrderKind.None && ticks < 1000);
+            while (squad.Facing != Angle.FromDegrees(0) && ticks < 1000); // the front's turn; the order ends once formed up
 
             return ticks;
         }
@@ -286,6 +286,22 @@ public class MarchTests
             Assert.That(Line(sim).Order, Is.EqualTo(SquadOrder.None));
             Assert.That(Line(sim).Anchor, Is.EqualTo(anchor));
             Assert.That(Line(sim).Velocity, Is.EqualTo(FixVec2.Zero));
+        });
+    }
+
+    [Test]
+    public void Order_EndsOnlyWhenFormedUp_EveryManWithin30CmOfHisSlot()
+    {
+        var sim = OneLine();
+        sim.State.FighterList[0].Position += FixVec2.FromInts(-3, 0); // 3 m out of place
+        Order(sim, 20, 10, facingDegrees: 90); // stay where you are, same facing: only the straggler is missing
+        sim.Step();
+        Assert.That(Line(sim).Order.Kind, Is.EqualTo(SquadOrderKind.Move), "anchor and facing are there, but a man isn't");
+        sim.StepTicks(80);
+        Assert.Multiple(() =>
+        {
+            Assert.That(Line(sim).Order, Is.EqualTo(SquadOrder.None), "formed up: the order is done");
+            Assert.That(WorstSlotError(sim.State), Is.LessThan(0.3));
         });
     }
 }
