@@ -1,0 +1,2 @@
+# Python packages for repository tools, installed into .venv by tools/bootstrap.sh.
+# None yet: tools/check_sim_purity.py uses only the standard library.
