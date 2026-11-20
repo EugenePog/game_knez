@@ -84,10 +84,12 @@ dotnet build sim/Knez.Sim.sln
 dotnet test sim/Knez.Sim.sln
 dotnet test sim/Knez.Sim.sln --filter Category=Determinism
 python3 tools/check_sim_purity.py
-dotnet run --project sim/tools/Knez.Sim.Cli -c Release -- run content/scenarios/<name>.json --seed 1
+dotnet run --project sim/tools/Knez.Sim.Cli -c Release -- run --seed 1   # scenario files from M1
 ```
 
 A change to `sim/` is done only when the build is warning-free, all tests pass, and the purity check is clean.
+GitHub Actions (`.github/workflows/sim.yml`) runs the same checks on Linux x64 for every push touching `sim/`; a
+failing golden hash there but not locally is a cross-platform determinism bug.
 
 ## C# conventions
 

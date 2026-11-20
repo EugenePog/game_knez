@@ -238,7 +238,9 @@ Utility + FSM, no neural nets, inside the sim and deterministic:
 
 ## 17. Tools
 
-- `Knez.Sim.Cli`:
+- `Knez.Sim.Cli` (`sim/tools/Knez.Sim.Cli`). **M0 skeleton:** `run [--seed N] [--ticks N] [--json]` simulates the
+  empty battle and prints the tick count and final hash (JSON: `finalHash` + section hashes); exit codes 0 ok,
+  1 simulation error, 2 bad arguments. The list below is the target contract, built from M1:
   - `run <scenario> --seed N [--ticks N] [--out replay.json] [--frames frames.json]` → summary (winner, duration,
     casualties, morale breaks, final hash);
   - `batch <scenario> --seeds 1-200 [--json]` → aggregate metrics and win rate;

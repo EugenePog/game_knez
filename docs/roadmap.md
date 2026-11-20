@@ -20,7 +20,10 @@ don't start the next one until it passes. Update the "Current" marker when a mil
    ✅ 2026-11-20: 63 tests green (Debug; 62 in Release), golden final hash recorded; `Fighter` is minimal (id, side,
    position, alive). First `sim-reviewer` pass found 13 issues (1 major: public state write surface) — all fixed.
 3. CI: GitHub Actions running build, tests and the purity check on every push.
+   ✅ 2026-11-20: `.github/workflows/sim.yml` — Linux x64, Debug + Release tests, purity check, CLI smoke test.
+   Doubles as the cross-architecture determinism check (golden hash recorded on ARM64 macOS).
 4. CLI skeleton: `run` on an empty scenario prints tick count and final hash.
+   ✅ 2026-11-20: `run [--seed N] [--ticks N] [--json]`, exit codes 0/1/2, 9 tests.
 
 **Checkpoint:** `dotnet test` green on a clean clone; purity check clean; an agent took one small sim feature from
 spec to merged commit using the `sim-feature` playbook and `sim-reviewer` without manual fixes. This checks how
