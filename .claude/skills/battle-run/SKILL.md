@@ -8,32 +8,40 @@ description: Run battles headless and look at them — a single scenario with a 
 The Unity build can't be played by an agent. The CLI and the replay viewer are how you see the battle.
 Contract: `docs/battle-sim.md` §17. If a command or flag doesn't exist yet, say so and offer to add it.
 
-**Status (M1 step 1):** only `run <scenario> [--seed N] [--ticks N] [--json]` exists: it loads the scenario and
-the defs from the nearest `defs/` folder above it, and prints forces per side, tick count and final hash (exit codes
-0 / 1 sim error / 2 bad args or content — content errors are located as `file:line:col: json.path: message`). Nothing
-moves yet. `--out`/`--frames`, `batch`, `bench`, `replay verify` and the replay viewer arrive in later M1 steps
-(roadmap) — the sections below describe that target. CLI code lives in `sim/tools/Knez.Sim.Cli/` (`CliApp.cs`,
-`ScenarioFiles.cs`); its tests in `sim/tests/Knez.Sim.Tests/Cli/`.
+**Status (M1 step 2):** `run <scenario> [--seed N] [--ticks N] [--frames FILE] [--json]` and the replay viewer
+exist. `run` loads the scenario and the defs from the nearest `defs/` folder above it, and prints forces per side, tick
+count and final hash (exit codes 0 / 1 sim error / 2 bad args, content or frames path — content errors are located as
+`file:line:col: json.path: message`). Squads don't move until step 3. `--out` (replay files), `batch`, `bench` and
+`replay verify` arrive in later M1 steps — those sections below describe the target. CLI code lives in
+`sim/tools/Knez.Sim.Cli/` (`CliApp.cs`, `ScenarioFiles.cs`, `FrameRecorder.cs`); its tests in
+`sim/tests/Knez.Sim.Tests/Cli/`. Frames format and viewer options: battle-sim.md §17.
 
 ## Single run
 
 ```bash
 dotnet run --project sim/tools/Knez.Sim.Cli -c Release -- run content/scenarios/<name>.json --seed 1 \
-  --out artifacts/replays/<name>-s1.replay.json --frames artifacts/replays/<name>-s1.frames.json
+  --frames artifacts/replays/<name>-s1.frames.json          # --out <replay.json> arrives later in M1
 ```
 
 Prints winner, duration (ticks and seconds), casualties per side, morale breaks/routs, final hash.
 
 ## Watch it
 
-```bash
-python3 -m http.server 8765 --directory .    # run in the background
-```
+Serve the repo root on `127.0.0.1:8765`: `preview_start` with the `replay-viewer` config in `.claude/launch.json`.
+If that server stays "starting" (seen on macOS: the app-launched Python never binds, likely a pending folder-access
+prompt for ~/Documents), run `python3 -u -m http.server 8765 --bind 127.0.0.1` from the repo root as a background
+shell task instead, and open the page with `preview_start` + `url`.
 
-Open `http://localhost:8765/tools/replay-viewer/?frames=/artifacts/replays/<name>-s1.frames.json` in the browser
-pane. Use step/scrub to reach the interesting ticks; take screenshots at the moments that matter (first contact,
-a wheel, a choke, the first rout). Describe what you see in terms of the M1/M3 criteria; don't claim behaviour you
-didn't observe. Stop the server when done.
+Open `http://127.0.0.1:8765/tools/replay-viewer/?frames=/artifacts/replays/<name>-s1.frames.json&tick=120` in the
+browser pane (`tick=` jumps straight to a moment; `ids=1` labels fighters when zoomed in). Step with ←/→ (Shift = 20
+ticks), Space plays, the mouse wheel zooms, drag pans, F fits. From the console, `knezViewer.seekTick(n)` jumps and
+renders at once, `knezViewer.tick` reads the position, and `knezViewer.error` is set if loading failed (don't wait on
+`loaded` forever). A hidden browser pane runs no animation frames: playback stalls there, so seek instead of playing,
+and take a screenshot to see the canvas. A run that crashed still leaves a readable file — the viewer shows
+"Faulted in tick N" — so look at the ticks just before it. Hovering a fighter shows its id, squad, slot,
+position and facing in the side panel. Take screenshots at the moments that matter (first contact, a wheel, a choke,
+the first rout). Describe what you see in terms of the M1/M3 criteria; don't claim behaviour you didn't observe. Stop
+the server when done.
 
 What to look for:
 - **Movement:** fighters stuck or orbiting, lines tearing apart, interpenetration, stragglers after a wheel,

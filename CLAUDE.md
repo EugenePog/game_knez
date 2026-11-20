@@ -37,8 +37,9 @@ files under `sim/src` and reports violations back to you. Fix them; don't suppre
 
 ## Seeing the battle
 
-You can't play the Unity build. To see behaviour, run a scenario with the CLI (`--frames`), serve the repo with
-`python3 -m http.server` and open `tools/replay-viewer/` in the browser pane. Screenshots of the viewer are the
+You can't play the Unity build. To see behaviour, run a scenario with the CLI (`--frames`), serve the repo
+(`replay-viewer` in `.claude/launch.json`, or `python3 -u -m http.server 8765 --bind 127.0.0.1` from a shell if that
+one never starts) and open `tools/replay-viewer/` in the browser pane. Screenshots of the viewer are the
 way to check formations, jams and routs (see `battle-run`).
 
 ## Concept document

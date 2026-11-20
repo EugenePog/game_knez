@@ -7,9 +7,9 @@ using Knez.Sim.Defs;
 namespace Knez.Sim.Cli;
 
 /// <summary>
-/// Headless battle runner (battle-sim.md §17). <c>run</c> loads a scenario from <c>content/</c>, simulates it and
-/// prints the tick count and final state hash. <c>--frames</c>, <c>batch</c>, <c>bench</c> and <c>replay verify</c>
-/// arrive in later M1 steps.
+/// Headless battle runner (battle-sim.md §17). <c>run</c> loads a scenario from <c>content/</c>, simulates it,
+/// prints the tick count and final state hash, and with <c>--frames</c> writes a file for the replay viewer.
+/// <c>batch</c>, <c>bench</c> and <c>replay verify</c> arrive in later M1 steps.
 /// </summary>
 public static class CliApp
 {
@@ -24,7 +24,8 @@ public static class CliApp
         knez-sim - headless Game_knez battle runner
 
         Usage:
-          dotnet run --project sim/tools/Knez.Sim.Cli -c Release -- run <scenario.json> [--seed N] [--ticks N] [--json]
+          dotnet run --project sim/tools/Knez.Sim.Cli -c Release -- run <scenario.json> [--seed N] [--ticks N]
+              [--frames FILE] [--json]
 
         Commands:
           run     Simulate a scenario; print its squads, the tick count and the final state hash.
@@ -32,14 +33,17 @@ public static class CliApp
           help    Show this text.
 
         Options for run:
-          --seed N    battle seed (default 1)
-          --ticks N   ticks to simulate, 20 per second (default 600 = 30 s)
-          --json      print one JSON object instead of text
+          --seed N         battle seed (default 1)
+          --ticks N        ticks to simulate, 20 per second (default 600 = 30 s)
+          --frames FILE    also write every tick to FILE for tools/replay-viewer/ (folders are created);
+                           put it under artifacts/replays/, which git ignores
+          --json           print one JSON object instead of text
 
         Example:
-          ... -- run content/scenarios/formations.json --seed 42
+          ... -- run content/scenarios/formations.json --seed 42 --frames artifacts/replays/formations-s42.frames.json
 
-        Exit codes: 0 ok, 1 simulation error, 2 bad arguments or content.
+        Exit codes: 0 ok, 1 simulation error (a frames file is still closed as valid JSON, marked "faulted"),
+                    2 bad arguments, bad content, or the frames file can't be written.
         """;
 
     public static int Run(string[] args, TextWriter stdout, TextWriter stderr)
@@ -63,6 +67,7 @@ public static class CliApp
         int ticks = DefaultTicks;
         bool json = false;
         string? scenarioPath = null;
+        string? framesPath = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -77,6 +82,11 @@ public static class CliApp
                 case "--json":
                     json = true;
                     break;
+                case "--frames" when i + 1 < args.Length && !args[i + 1].StartsWith('-') && args[i + 1].Length > 0:
+                    framesPath = args[++i];
+                    break;
+                case "--frames":
+                    return UsageError(stderr, "--frames needs a file path");
                 case "--seed" or "--ticks":
                     return UsageError(stderr, $"{args[i]} needs a positive whole number");
                 case var other when !other.StartsWith('-'):
@@ -108,12 +118,65 @@ public static class CliApp
             return ExitUsage;
         }
 
-        try
+        // Open the frames file before simulating, so a bad path fails fast and as a usage error.
+        Stream? framesStream = null;
+        if (framesPath != null)
         {
-            var sim = new BattleSimulation(BattleSetup.Create(scenario, seed));
-            var clock = Stopwatch.StartNew();
-            sim.StepTicks(ticks);
-            clock.Stop();
+            try
+            {
+                string full = Path.GetFullPath(framesPath);
+                if (string.Equals(full, Path.GetFullPath(scenarioPath), StringComparison.Ordinal))
+                {
+                    return UsageError(stderr, "--frames would overwrite the scenario file; write frames under artifacts/replays/");
+                }
+
+                Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+                framesStream = new FileStream(full, FileMode.Create, FileAccess.Write);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+            {
+                stderr.WriteLine($"knez-sim: cannot write frames to {framesPath}: {ex.Message}");
+                return ExitUsage;
+            }
+        }
+
+        using (framesStream)
+        {
+            BattleSimulation? sim = null;
+            FrameRecorder? recorder = null;
+            var clock = new Stopwatch(); // only stepping is timed; writing frames is not part of the sim's cost
+            try
+            {
+                sim = new BattleSimulation(BattleSetup.Create(scenario, seed));
+                recorder = framesStream == null ? null : new FrameRecorder(framesStream, sim.State);
+                recorder?.Capture(sim.State);
+                for (int i = 0; i < ticks; i++)
+                {
+                    clock.Start();
+                    sim.Step();
+                    clock.Stop();
+                    recorder?.Capture(sim.State);
+                }
+
+                recorder?.Complete();
+            }
+            catch (IOException ex)
+            {
+                // The sim does no I/O (the purity check enforces it), so this came from writing frames.
+                stderr.WriteLine($"knez-sim: writing frames to {framesPath} failed: {ex.Message}");
+                return ExitUsage;
+            }
+            catch (Exception ex)
+            {
+                stderr.WriteLine($"simulation error: {ex.GetType().Name}: {ex.Message}");
+                FinishFaultedFrames(recorder, sim, ex, framesPath, stderr);
+                return ExitSimulationError;
+            }
+            finally
+            {
+                recorder?.Dispose();
+            }
+
             var hash = sim.ComputeHash();
             double elapsedMs = clock.Elapsed.TotalMilliseconds;
             var state = sim.State;
@@ -130,6 +193,7 @@ public static class CliApp
                     fighters = state.Fighters.Count,
                     finalHash = Hex(hash.Total),
                     sections = new { core = Hex(hash.Core), rng = Hex(hash.Rng), squads = Hex(hash.Squads), fighters = Hex(hash.Fighters) },
+                    frames = recorder == null ? null : new { file = framesPath, count = recorder.FrameCount },
                     elapsedMs = Math.Round(elapsedMs, 3),
                 }));
             }
@@ -142,14 +206,37 @@ public static class CliApp
                 stdout.WriteLine(string.Format(inv, "ticks:      {0} ({1:0.0} s of battle)", state.Tick, state.Tick / (double)BattleState.TicksPerSecond));
                 stdout.WriteLine($"final hash: {hash}");
                 stdout.WriteLine(string.Format(inv, "elapsed:    {0:0.###} ms ({1:0.####} ms/tick)", elapsedMs, elapsedMs / state.Tick));
+                if (recorder != null)
+                {
+                    stdout.WriteLine($"frames:     {framesPath} ({recorder.FrameCount} frames)");
+                }
             }
 
             return ExitOk;
         }
-        catch (Exception ex)
+    }
+
+    /// <summary>
+    /// After the simulation threw, close the frames file as valid JSON with a "faulted" note: the ticks just before a
+    /// crash are the ones worth watching. The writer is between frames unless Capture itself threw.
+    /// </summary>
+    private static void FinishFaultedFrames(FrameRecorder? recorder, BattleSimulation? sim, Exception ex, string? framesPath,
+        TextWriter stderr)
+    {
+        if (recorder == null || sim == null)
         {
-            stderr.WriteLine($"simulation error: {ex.GetType().Name}: {ex.Message}");
-            return ExitSimulationError;
+            return;
+        }
+
+        int tick = sim.State.Tick;
+        try
+        {
+            recorder.CompleteFaulted(tick, $"{ex.GetType().Name}: {ex.Message}");
+            stderr.WriteLine($"frames:     {framesPath} ({recorder.FrameCount} frames, faulted in tick {tick})");
+        }
+        catch (Exception writeError) when (writeError is IOException or InvalidOperationException)
+        {
+            stderr.WriteLine($"knez-sim: could not finish {framesPath}: {writeError.Message}");
         }
     }
 

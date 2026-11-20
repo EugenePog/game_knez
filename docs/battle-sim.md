@@ -273,17 +273,46 @@ Utility + FSM, no neural nets, inside the sim and deterministic:
 
 ## 17. Tools
 
-- `Knez.Sim.Cli` (`sim/tools/Knez.Sim.Cli`). **Now (M1 step 1):** `run <scenario> [--seed N] [--ticks N] [--json]`
-  loads the scenario and its defs, simulates it and prints the forces per side, the tick count and the final hash
-  (JSON: `scenario`, `squads`, `fighters`, `finalHash` + section hashes); exit codes 0 ok, 1 simulation error, 2 bad
-  arguments or content. The list below is the target contract, built through M1:
+- `Knez.Sim.Cli` (`sim/tools/Knez.Sim.Cli`). **Now (M1 step 2):** `run <scenario> [--seed N] [--ticks N]
+  [--frames FILE] [--json]` loads the scenario and its defs, simulates it and prints the forces per side, the tick
+  count and the final hash (JSON: `scenario`, `squads`, `fighters`, `finalHash` + section hashes, `frames`); exit codes
+  0 ok, 1 simulation error, 2 bad arguments, bad content, or a frames file that can't be written (refused up front,
+  including the scenario's own path, or failing mid-run). Recording is read-only: the final hash is the same with or
+  without `--frames` (tested tick by tick on a moving battle). The list below is the target contract, built through M1:
   - `run <scenario> --seed N [--ticks N] [--out replay.json] [--frames frames.json]` → summary (winner, duration,
     casualties, morale breaks, final hash);
   - `batch <scenario> --seeds 1-200 [--json]` → aggregate metrics and win rate;
   - `bench <scenario> [--fighters N]` → tick time p50/p99;
   - `replay verify <replay.json>` → re-simulate and compare checkpoints.
-- `tools/replay-viewer/`: static HTML canvas page that plays `frames.json` (circles, facing, squad colours, order
-  arrows, morale bars, event markers) with play/pause/step/scrub. Lets agents and humans see the battle without Unity.
+- Frames file (`--frames`, written by `FrameRecorder`; this is the only copy of the spec), format `knez-frames` v1:
+  ```
+  { "format": "knez-frames", "version": 1, "scenario", "description", "seed" (string), "ticksPerSecond",
+    "map": { "width", "height" },
+    "squads":   [ { "id", "name", "side", "formation" } ],
+    "fighters": [ { "id", "squad", "slot", "side", "def", "radius" } ],
+    "frames":   [ { "tick", "hash", "squads": [[id, anchorX, anchorY, facing°]],
+                    "fighters": [[id, x, y, facing°, alive 1|0]], "events": [{ "type", … }] } ],
+    "faulted":  { "tick", "error" } }   // only when the simulation threw
+  ```
+  - One frame for tick 0, then exactly one after every tick (players assume one frame per tick); metres to 0.1 mm,
+    degrees (0 = east, counter-clockwise) to 0.01°; rows in id order; `hash` is the state's total hash.
+  - `seed` is a string because JavaScript numbers lose 64-bit values above 2^53.
+  - `events` holds that tick's events. `type` is the C# class name (renaming an event class changes the format);
+    fields are written for the types in `FrameRecorder.DescribedEventTypes` — today `CommandRejected`: `command`,
+    `side`, `reason`. A test fails when a `SimEvent` subclass has no entry there.
+  - If the simulation throws, the file is still closed as valid JSON: the frames up to the last finished tick plus
+    `faulted` (the tick that threw and the exception); the CLI exits 1.
+  - Static tables describe the battle at tick 0. **Compatibility:** adding row columns, keys or event types keeps
+    version 1 — readers ignore what they don't know; a version bump is only for breaking changes. When slots start
+    changing (step 7), fighter rows gain `[squad, slot]` columns and the viewer prefers them over the static table.
+- `tools/replay-viewer/`: static page (HTML + one script, no dependencies) that plays a frames file: map with a 1 m /
+  5 m grid, fighters as circles in squad colours with a facing tick, squad anchors with facing arrows and names, dead
+  fighters greyed, events of the current tick, hover details; play/pause/step/scrub, speed ×0.25–×4, zoom/pan,
+  interpolation between ticks, a red note for a faulted run. URL:
+  `?frames=<url>&tick=N&speed=2&play=1&labels=0&anchors=0&grid=0&ids=1`; a file can also be picked or dropped.
+  `window.knezViewer` (`tick`, `seekTick(n)` — renders at once, `loaded`, `error`) lets agents drive it from the
+  console. Pausing always lands on a whole tick. Order arrows, morale bars and event markers on the map arrive with
+  their mechanics; at ×2/×4 the events panel shows only the tick on screen (collect skipped ticks when markers come).
 
 ## 18. Testing
 

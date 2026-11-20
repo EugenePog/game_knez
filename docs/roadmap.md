@@ -50,6 +50,10 @@ Steps — one change each, each ending with build/tests/purity green and a `sim-
    forward vector → step 3).
 2. Frames and the replay viewer: CLI `--frames`, `tools/replay-viewer/` (circles, facing, squad colours, anchors), so
    every later step is checked by eye.
+   ✅ 2026-11-20: `knez-frames` v1 (battle-sim.md §17), crash-safe and streamed; vanilla canvas viewer with playback,
+   scrub, zoom/pan, hover, events and `window.knezViewer` for agents; checked in the browser pane on the formations
+   scenario and on synthetic moving/faulted files. 246 tests. `sim-reviewer`: 1 major (a crash left an unreadable
+   file) + minors — all fixed.
 3. Moving a squad: `MoveSquad` command, the anchor walks straight to the target and turns, fighters seek and arrive at
    their slots, facing follows movement (`Atan2`). No collisions yet.
 4. Crowding: spatial index, separation steering, circle–circle collision relaxation; overlap metric.

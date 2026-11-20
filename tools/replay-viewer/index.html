@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Knez replay viewer</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="viewer.css">
+</head>
+<body>
+  <!--
+    Plays a frames file written by `knez-sim run <scenario> --frames FILE` (battle-sim.md §17).
+    Open with ?frames=<url> through a local server (see the battle-run skill), or pick/drop a file.
+    URL options: tick=N (start there), speed=0.25|0.5|1|2|4, play=1, labels=0, anchors=0, grid=0, ids=1.
+    No dependencies, no build step: plain HTML, CSS and one classic script.
+  -->
+  <header class="bar">
+    <strong class="brand">Knez replay</strong>
+    <span id="title" class="title">no frames loaded</span>
+    <span class="spacer"></span>
+    <label class="file-button">Open frames…<input id="file" type="file" accept=".json,application/json"></label>
+  </header>
+
+  <main class="main">
+    <div id="stage" class="stage">
+      <canvas id="canvas"></canvas>
+      <div id="message" class="message">Open a frames file, drop one here, or add <code>?frames=&lt;url&gt;</code>.</div>
+    </div>
+
+    <aside class="panel">
+      <section>
+        <h2>Tick</h2>
+        <dl class="facts">
+          <dt>Tick</dt><dd id="tick">–</dd>
+          <dt>Time</dt><dd id="time">–</dd>
+          <dt>Hash</dt><dd id="hash" class="mono">–</dd>
+          <dt>Seed</dt><dd id="seed">–</dd>
+        </dl>
+        <p id="faulted" class="faulted" hidden></p>
+      </section>
+      <section>
+        <h2>Squads</h2>
+        <ul id="squads" class="squads"></ul>
+      </section>
+      <section>
+        <h2>Events this tick</h2>
+        <ul id="events" class="events"><li class="muted">none</li></ul>
+      </section>
+      <section>
+        <h2>Under the cursor</h2>
+        <div id="hover" class="hover muted">Point at a fighter.</div>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="controls">
+    <button id="first" title="First tick (Home)">⏮</button>
+    <button id="back" title="Back one tick (←, Shift+← = 20)">◀</button>
+    <button id="play" class="play" title="Play / pause (Space)">▶</button>
+    <button id="forward" title="Forward one tick (→, Shift+→ = 20)">▶|</button>
+    <button id="last" title="Last tick (End)">⏭</button>
+    <input id="scrub" class="scrub" type="range" min="0" max="0" value="0" step="1" aria-label="Tick">
+    <select id="speed" title="Playback speed">
+      <option value="0.25">×0.25</option>
+      <option value="0.5">×0.5</option>
+      <option value="1" selected>×1</option>
+      <option value="2">×2</option>
+      <option value="4">×4</option>
+    </select>
+    <label><input id="labels" type="checkbox" checked> Labels</label>
+    <label><input id="anchors" type="checkbox" checked> Anchors</label>
+    <label><input id="grid" type="checkbox" checked> Grid</label>
+    <label><input id="ids" type="checkbox"> Ids</label>
+    <button id="fit" title="Fit the map (F)">Fit</button>
+  </footer>
+
+  <script src="viewer.js"></script>
+</body>
+</html>
