@@ -1,0 +1,17 @@
+{
+  "description": "Movement rules: how squads march, crowd, pass allies and regroup (battle-sim.md §10). Distances in metres, times in seconds (whole ticks of 0.05 s), angles in degrees. Fighter sizes and speeds are in fighters.json; formation spacing, hold weight and ally squeeze speed in formations.json.",
+  "movement": {
+    "pivotTolerance": 30,
+    "slotCatchUpTime": 0.5,
+    "personalSpace": 0.1,
+    "separationTime": 0.25,
+    "holdingReach": 1.5,
+    "formedUpReach": 0.3,
+    "collisionPasses": 6,
+    "allyPartingDepth": 0.25,
+    "pathBudget": 4000,
+    "regroupLead": 1.0,
+    "regroupMaxWait": 5,
+    "regroupCost": 1
+  }
+}

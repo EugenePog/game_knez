@@ -172,13 +172,13 @@ public class WallTests
         var map = OneBlock();
         var nearWestFace = new FixVec2(Fix.FromInt(20) - M(35), Fix.FromInt(12)); // 5 cm of personal space left
         var intoAndAlong = new FixVec2(M(5), M(5));
-        var slid = Terrain.SlideAlongWalls(map, nearWestFace, R, intoAndAlong);
+        var slid = Terrain.SlideAlongWalls(map, MovementDef.Standard.PersonalSpace, nearWestFace, R, intoAndAlong);
         var away = new FixVec2(-M(5), Fix.Zero);
         Assert.Multiple(() =>
         {
             Assert.That(slid.X.Raw, Is.EqualTo(0).Within(2), "nothing left heading into the wall");
             Assert.That(slid.Y, Is.EqualTo(M(5)), "the northward slide is kept");
-            Assert.That(Terrain.SlideAlongWalls(map, nearWestFace, R, away), Is.EqualTo(away), "walking away is untouched");
+            Assert.That(Terrain.SlideAlongWalls(map, MovementDef.Standard.PersonalSpace, nearWestFace, R, away), Is.EqualTo(away), "walking away is untouched");
         });
     }
 

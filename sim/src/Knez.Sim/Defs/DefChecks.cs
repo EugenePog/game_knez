@@ -60,6 +60,28 @@ namespace Knez.Sim.Defs
             return value;
         }
 
+        public static Fix NonNegative(Fix value, int max, string unit, string parameter)
+        {
+            if (value < Fix.Zero || value > Fix.FromInt(max))
+            {
+                throw new ArgumentException($"{parameter} must be 0..{max}{(unit.Length > 0 ? " " + unit : string.Empty)} (got {value}).");
+            }
+
+            return value;
+        }
+
+        /// <summary>Seconds → whole ticks (rounded to the nearest), at least 1 and at most <paramref name="maxSeconds"/>.</summary>
+        public static int Ticks(Fix seconds, int maxSeconds, string parameter)
+        {
+            long ticks = ((seconds.Raw * BattleState.TicksPerSecond) + (Fix.OneRaw / 2)) >> Fix.FractionBits;
+            if (seconds <= Fix.Zero || ticks < 1 || seconds > Fix.FromInt(maxSeconds))
+            {
+                throw new ArgumentException($"{parameter} must be 0.05..{maxSeconds} s, rounded to whole 0.05 s ticks (got {seconds}).");
+            }
+
+            return (int)ticks;
+        }
+
         public static int Range(int value, int min, int max, string parameter)
         {
             if (value < min || value > max)

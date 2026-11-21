@@ -70,7 +70,7 @@ namespace Knez.Sim.Content
             root.RejectUnknownMembers(ScenarioMembers);
 
             // Whole-scenario checks (unique names, slots on the map, script order and squads) name the entry themselves.
-            return Build(root, rootValue.Get("squads")!, () => new ScenarioDef(id, description, map, squads, script));
+            return Build(root, rootValue.Get("squads")!, () => new ScenarioDef(id, description, map, squads, script, defs.Movement));
         }
 
         private static ScriptedOrderDef ReadScriptedOrder(JsonValue value, string path, string sourceName)

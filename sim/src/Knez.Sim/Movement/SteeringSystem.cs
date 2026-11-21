@@ -47,7 +47,7 @@ namespace Knez.Sim.Movement
                 FixVec2 separation = Crowding.Separation(state, weights, roles, i);
                 FixVec2 desired = Follow(state, fighter, separation).ClampLength(fighter.Def.RunPerTick);
                 FixVec2 slid = Crowding.Slide(state, weights, roles, i, desired);
-                slid = Terrain.SlideAlongWalls(state.Scenario.Map, fighter.Position, fighter.Radius, slid);
+                slid = Terrain.SlideAlongWalls(state.Scenario.Map, state.Scenario.Movement.PersonalSpace, fighter.Position, fighter.Radius, slid);
                 fighter.Velocity = Crowding.Squeeze(state, roles, i, slid);
             }
         }
@@ -79,7 +79,7 @@ namespace Knez.Sim.Movement
                 ? FixVec2.Zero
                 : slot - Terrain.ConstrainToward(map, SlotTracking.PreviousPosition(squad, offset), fighter.Radius, squad.Anchor - squad.Velocity);
             FixVec2 lag = gap - slotMotion; // the gap already includes this tick's slot motion: don't count it twice
-            return slotMotion + lag / MovementRules.SlotCatchUpTicks + separation;
+            return slotMotion + lag / state.Scenario.Movement.SlotCatchUpTicks + separation;
         }
     }
 }

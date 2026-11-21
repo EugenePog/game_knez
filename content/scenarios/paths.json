@@ -1,0 +1,29 @@
+{
+  "id": "paths",
+  "description": "M1 step 6: squads plan routes round walls. A palisade has a 2 m gap and, 5 m east of it, a 6 m gap; its east end is open. The column (1.6 m across) goes straight through the narrow gap; the line (3.6 m across) would have to regroup into 2 files for it, which costs more than the short walk to the wide gap, so it goes that way. The shield wall walks round a building to the far side. The raiders are ordered into a walled yard with no way in, and stop on their side of it, outside its east wall.",
+  "map": {
+    "width": 60, "height": 40,
+    "walls": [
+      { "from": [0, 19],  "to": [17, 20] },
+      { "from": [19, 19], "to": [23, 20] },
+      { "from": [29, 19], "to": [36, 20] },
+      { "from": [44, 22], "to": [52, 27] },
+      { "from": [4, 28],   "to": [10, 28.5] },
+      { "from": [4, 33.5], "to": [10, 34] },
+      { "from": [4, 28],   "to": [4.5, 34] },
+      { "from": [9.5, 28], "to": [10, 34] }
+    ]
+  },
+  "squads": [
+    { "name": "Hird column", "side": 0, "fighter": "warrior", "count": 6, "formation": "column",     "position": [12, 6],  "facing": 90 },
+    { "name": "Hird line",   "side": 0, "fighter": "warrior", "count": 8, "formation": "line",       "position": [20, 8],  "facing": 90 },
+    { "name": "Shield wall", "side": 0, "fighter": "warrior", "count": 8, "formation": "shieldwall", "position": [48, 10], "facing": 90 },
+    { "name": "Raiders",     "side": 1, "fighter": "warrior", "count": 8, "formation": "line",       "position": [40, 36], "facing": 180 }
+  ],
+  "script": [
+    { "tick": 10, "order": "move", "squad": "Hird column", "target": [13, 24] },
+    { "tick": 10, "order": "move", "squad": "Hird line",   "target": [22, 29] },
+    { "tick": 10, "order": "move", "squad": "Shield wall", "target": [48, 34] },
+    { "tick": 10, "order": "move", "squad": "Raiders",     "target": [8, 31] }
+  ]
+}

@@ -13,7 +13,7 @@ namespace Knez.Sim.Movement
     {
         /// <summary>The slot's offset from the anchor in local coordinates for <paramref name="fighter"/> in <paramref name="squad"/>.</summary>
         public static FixVec2 Offset(Squad squad, Fighter fighter) =>
-            FormationLayout.SlotOffset(squad.Formation, squad.MemberList.Count, fighter.SlotIndex);
+            FormationLayout.SlotOffset(squad.Formation, squad.MemberList.Count, fighter.SlotIndex, squad.Files);
 
         /// <summary>The slot's world position now.</summary>
         public static FixVec2 Position(Squad squad, FixVec2 offset) => FormationLayout.ToWorld(squad.Anchor, squad.Facing, offset);

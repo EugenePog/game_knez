@@ -18,9 +18,10 @@ namespace Knez.Sim.Defs
         /// name the squad as <c>squads[i]</c>.
         /// </summary>
         public ScenarioDef(string id, string description, MapDef map, IReadOnlyList<SquadSpawnDef> squads,
-            IReadOnlyList<ScriptedOrderDef>? script = null)
+            IReadOnlyList<ScriptedOrderDef>? script = null, MovementDef? movement = null)
         {
             Id = DefChecks.Id(id, nameof(id));
+            Movement = movement ?? MovementDef.Standard;
             Description = description ?? string.Empty;
             Map = map ?? throw new ArgumentNullException(nameof(map));
             if (squads == null)
@@ -52,6 +53,7 @@ namespace Knez.Sim.Defs
                 }
 
                 CheckOnMap(map, squad, i);
+                CheckPersonalSpace(Movement, squad, i);
                 copy[i] = squad;
             }
 
@@ -73,6 +75,9 @@ namespace Knez.Sim.Defs
         /// <summary>The battle map.</summary>
         public MapDef Map { get; }
 
+        /// <summary>Movement rules (content's <c>movement.json</c>; <see cref="MovementDef.Standard"/> when built in code).</summary>
+        public MovementDef Movement { get; }
+
         /// <summary>Starting squads in spawn order (ids are allocated in this order).</summary>
         public IReadOnlyList<SquadSpawnDef> Squads { get; }
 
@@ -85,6 +90,22 @@ namespace Knez.Sim.Defs
         /// </summary>
         public ulong Fingerprint { get; }
 
+        /// <summary>
+        /// Men standing in their slots must not crowd each other: personal space has to fit in the gap between two bodies
+        /// side by side and rank behind rank, or a formation at rest keeps pushing itself apart.
+        /// </summary>
+        private static void CheckPersonalSpace(MovementDef movement, SquadSpawnDef squad, int index)
+        {
+            Fix bodies = squad.Fighter.Radius * 2;
+            Fix gap = FixMath.Min(squad.Formation.Spacing, squad.Formation.RankSpacing) - bodies;
+            if (movement.PersonalSpace >= gap)
+            {
+                throw new ArgumentException(
+                    $"squads[{index}] '{squad.Name}': personalSpace {movement.PersonalSpace} m must be less than the {gap} m between " +
+                    $"'{squad.Fighter.Id}' bodies in formation '{squad.Formation.Id}'.");
+            }
+        }
+
         private static void CheckOnMap(MapDef map, SquadSpawnDef squad, int index)
         {
             for (int slot = 0; slot < squad.Count; slot++)
@@ -96,7 +117,7 @@ namespace Knez.Sim.Defs
                         $"squads[{index}] '{squad.Name}': slot {slot} at {position} is off the {map} map; move the squad inward.");
                 }
 
-                if (Movement.Terrain.WallDepth(map, position, squad.Fighter.Radius) > Fix.Zero)
+                if (Knez.Sim.Movement.Terrain.WallDepth(map, position, squad.Fighter.Radius) > Fix.Zero)
                 {
                     throw new ArgumentException(
                         $"squads[{index}] '{squad.Name}': slot {slot} at {position} is in or against a wall; move the squad clear of it.");
@@ -142,6 +163,7 @@ namespace Knez.Sim.Defs
             var hash = Fnv1a64.Start();
             hash.Add(Id);
             Map.AddTo(ref hash);
+            Movement.AddTo(ref hash);
             hash.Add(Squads.Count);
             for (int i = 0; i < Squads.Count; i++)
             {

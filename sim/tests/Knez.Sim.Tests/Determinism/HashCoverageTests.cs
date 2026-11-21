@@ -35,6 +35,12 @@ public class HashCoverageTests
         yield return Case("SquadVelocityY", "Squads", s => s.SquadList[0].Velocity += new FixVec2(Fix.Zero, Fix.FromRaw(1)));
         yield return Case("SquadSpin", "Squads", s => s.SquadList[0].Spin = 3);
         yield return Case("SquadOrderKind", "Squads", s => s.SquadList[0].Order = SquadOrder.Move(FixVec2.Zero, Angle.Zero));
+        yield return Case("SquadPathPoint", "Squads", s => { s.SquadList[0].PathList.Add(FixVec2.Zero); s.SquadList[0].PathFilesList.Add(-1); });
+        yield return Case("SquadPathFiles", "Squads", s => { s.SquadList[0].PathList.Add(FixVec2.Zero); s.SquadList[0].PathFilesList.Add(2); });
+        yield return Case("SquadFiles", "Squads", s => s.SquadList[0].Files = 2);
+        yield return Case("SquadRegroupSince", "Squads", s => s.SquadList[0].RegroupSince = 0);
+        yield return Case("SquadPathIndex", "Squads", s => s.SquadList[0].PathIndex = 1);
+        yield return Case("SquadPathRequest", "Squads", s => s.SquadList[0].PathRequestTick = 0);
         yield return Case("Rng", "Rng", s => s.Rng(RngStream.Misc).NextUInt());
         yield return Case("IdCounter", "Core", s => s.AllocateId());
     }
@@ -67,6 +73,7 @@ public class HashCoverageTests
             With(SquadOrder.Move(new FixVec2(Fix.FromInt(5) + Fix.FromRaw(1), Fix.FromInt(5)), Angle.Zero)),
             With(SquadOrder.Move(new FixVec2(Fix.FromInt(5), Fix.FromInt(5) + Fix.FromRaw(1)), Angle.Zero)),
             With(SquadOrder.Move(FixVec2.FromInts(5, 5), Angle.FromRaw(1))),
+            With(SquadOrder.Move(FixVec2.FromInts(5, 5), Angle.Zero, facingFromMarch: true)),
         ];
         foreach (var variant in variants)
         {

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Knez.Sim.Numerics;
 using Knez.Sim.Units;
 
 namespace Knez.Sim
@@ -43,9 +44,24 @@ namespace Knez.Sim
                 squads.Add(squad.Order.Target.X.Raw);
                 squads.Add(squad.Order.Target.Y.Raw);
                 squads.Add((int)squad.Order.Facing.Raw);
+                squads.Add(squad.Order.FacingFromMarch);
                 squads.Add(squad.Velocity.X.Raw);
                 squads.Add(squad.Velocity.Y.Raw);
                 squads.Add(squad.Spin);
+                squads.Add(squad.PathRequestTick);
+                squads.Add(squad.PathIndex);
+                List<FixVec2> path = squad.PathList;
+                squads.Add(path.Count);
+                for (int p = 0; p < path.Count; p++)
+                {
+                    squads.Add(path[p].X.Raw);
+                    squads.Add(path[p].Y.Raw);
+                    squads.Add(squad.PathFilesList[p]);
+                }
+
+                squads.Add(squad.Files);
+                squads.Add(squad.RegroupSince);
+
                 List<EntityId> members = squad.MemberList;
                 squads.Add(members.Count);
                 for (int m = 0; m < members.Count; m++)

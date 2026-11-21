@@ -1,6 +1,6 @@
 {
   "id": "walls",
-  "description": "M1 step 5: walls are rectangles no body enters. A palisade crosses the field with a 3 m gate: the column marches through it, then the line (wider than the gate) squeezes through and on through the column's ranks. East of it, the shield wall marches straight at a building: without paths (step 6) its men slide along the wall and stay pressed against it. The raiders are ordered onto the building's roof and go to the nearest open ground beside it. The wall guard stands with its back to the palisade: its rear rank's slots are inside the wall, so those men stand against it, and the squad still forms up.",
+  "description": "M1 step 5: walls are rectangles no body enters. A palisade crosses the field with a 3 m gate: the column marches through it, then the line (wider than the gate) stops just before it to regroup into 3 files, goes through, widens again and passes on through the column's ranks. East of it, the shield wall's straight line runs into a building, so it routes round it (step 6). The raiders are ordered onto the building's roof and go to the nearest open ground beside it. The wall guard stands with its back to the palisade: its rear rank's slots are inside the wall, so those men stand against it, and the squad still forms up.",
   "map": {
     "width": 60, "height": 40,
     "walls": [

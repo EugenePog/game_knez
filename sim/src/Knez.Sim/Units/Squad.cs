@@ -12,6 +12,8 @@ namespace Knez.Sim.Units
     public sealed class Squad : IHasEntityId
     {
         private readonly List<EntityId> _members;
+        private readonly List<FixVec2> _path;
+        private readonly List<int> _pathFiles;
 
         internal Squad(EntityId id, int sideId, string name, FormationDef formation, FixVec2 anchor, Angle facing)
         {
@@ -22,6 +24,10 @@ namespace Knez.Sim.Units
             Anchor = anchor;
             Facing = facing;
             _members = new List<EntityId>();
+            _path = new List<FixVec2>();
+            _pathFiles = new List<int>();
+            PathRequestTick = -1;
+            RegroupSince = -1;
         }
 
         private Squad(Squad source)
@@ -36,6 +42,12 @@ namespace Knez.Sim.Units
             Velocity = source.Velocity;
             Spin = source.Spin;
             _members = new List<EntityId>(source._members);
+            _path = new List<FixVec2>(source._path);
+            _pathFiles = new List<int>(source._pathFiles);
+            PathIndex = source.PathIndex;
+            PathRequestTick = source.PathRequestTick;
+            Files = source.Files;
+            RegroupSince = source.RegroupSince;
         }
 
         /// <summary>Identity; squads are kept sorted by it.</summary>
@@ -65,6 +77,46 @@ namespace Knez.Sim.Units
         /// <summary>How far the facing turned this tick, in <see cref="Angle"/> units (positive = counter-clockwise).
         /// With <see cref="Velocity"/> it gives each slot's own motion, which members follow.</summary>
         public int Spin { get; internal set; }
+
+        /// <summary>
+        /// The route of the current move order: waypoints after the anchor's starting point, the last one the order's
+        /// target. Empty while there is no order or the route is still being planned.
+        /// </summary>
+        public IReadOnlyList<FixVec2> Path => _path;
+
+        /// <summary>The waypoint in <see cref="Path"/> the anchor is heading for.</summary>
+        public int PathIndex { get; internal set; }
+
+        /// <summary>The tick the squad asked for a route and is still waiting since (first come, first served), or -1.</summary>
+        public int PathRequestTick { get; internal set; }
+
+        /// <summary>
+        /// What the squad does on reaching each waypoint of <see cref="Path"/>: −1 nothing, 0 widen back to its
+        /// formation's width, k > 0 stop and regroup into k files before a narrow gap.
+        /// </summary>
+        public IReadOnlyList<int> PathFiles => _pathFiles;
+
+        /// <summary>Files the squad is narrowed to for a gap, or 0 when it stands in its formation's own width.</summary>
+        public int Files { get; internal set; }
+
+        /// <summary>The tick the squad stopped to regroup and is still waiting since, or -1.</summary>
+        public int RegroupSince { get; internal set; }
+
+        /// <summary>The path list itself, for systems.</summary>
+        internal List<FixVec2> PathList => _path;
+
+        /// <summary>The waypoint actions list itself, for systems (same length as <see cref="PathList"/>).</summary>
+        internal List<int> PathFilesList => _pathFiles;
+
+        /// <summary>Forgets the route (the order ended or was replaced). The squad keeps its current width.</summary>
+        internal void ClearPath()
+        {
+            _path.Clear();
+            _pathFiles.Clear();
+            PathIndex = 0;
+            PathRequestTick = -1;
+            RegroupSince = -1;
+        }
 
         /// <summary>Member fighter ids, sorted by id.</summary>
         public IReadOnlyList<EntityId> Members => _members;

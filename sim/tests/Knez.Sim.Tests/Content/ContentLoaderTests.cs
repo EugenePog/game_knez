@@ -1,4 +1,5 @@
 using Knez.Sim.Content;
+using Knez.Sim.Defs;
 using Knez.Sim.Numerics;
 
 namespace Knez.Sim.Tests.Content;
@@ -79,7 +80,7 @@ public class ContentLoaderTests
     [TestCase("""{ "fighters": [ { "id": "w", "radius": 0.3, "walkSpeed": 1 } ] }""",
         "f.json:1:17: fighters[0]: missing member 'runSpeed'")]
     [TestCase("""{ "fighter": [] }""",
-        "f.json:1:14: fighter: unknown member 'fighter' (allowed: description, fighters, formations)")]
+        "f.json:1:14: fighter: unknown member 'fighter' (allowed: description, fighters, formations, movement)")]
     [TestCase("""[]""",
         "f.json:1:1: expected an object, got an array")]
     public void DefLibrary_Parse_BadDef_LocatedError(string json, string expected)
@@ -206,5 +207,49 @@ public class ContentLoaderTests
         string squad = GoodSquad.Replace(from, to);
         var ex = Assert.Throws<ContentException>(() => ScenarioLoader.Parse(new SourceText("s.json", Scenario(squad)), Defs()));
         Assert.That(ex!.Message, Is.EqualTo(expected));
+    }
+
+    private const string Movement = """
+        { "movement": { "pivotTolerance": 45, "slotCatchUpTime": 0.35, "personalSpace": 0.12, "separationTime": 0.25,
+          "holdingReach": 1.5, "formedUpReach": 0.4, "collisionPasses": 4, "allyPartingDepth": 0.25, "pathBudget": 2000,
+          "regroupLead": 2, "regroupMaxWait": 4, "regroupCost": 0.5 } }
+        """;
+
+    [Test]
+    public void DefLibrary_Parse_MovementRules_ReachTheScenarioAndItsFingerprint()
+    {
+        var defs = DefLibrary.Parse([new SourceText("formations.json", Formations), new SourceText("fighters.json", Fighters),
+            new SourceText("movement.json", Movement)]);
+        var scenario = ScenarioLoader.Parse(new SourceText("s.json", Scenario(GoodSquad)), defs);
+        var standard = ScenarioLoader.Parse(new SourceText("s.json", Scenario(GoodSquad)), Defs());
+        var rules = scenario.Movement;
+        Assert.Multiple(() =>
+        {
+            Assert.That(rules.PivotToleranceUnits, Is.EqualTo(Angle.UnitsPerTurn / 8));
+            Assert.That(rules.SlotCatchUpTicks, Is.EqualTo(7), "0.35 s = 7 ticks");
+            Assert.That(rules.FormedUpReach, Is.EqualTo(Fix.Ratio(4, 10)));
+            Assert.That(rules.CollisionPasses, Is.EqualTo(4));
+            Assert.That(rules.PathBudget, Is.EqualTo(2000));
+            Assert.That(rules.RegroupMaxWaitTicks, Is.EqualTo(80));
+            Assert.That(rules.RegroupCost, Is.EqualTo(Fix.Ratio(1, 2)));
+            Assert.That(standard.Movement, Is.SameAs(MovementDef.Standard), "no movement file: the standard rules");
+            Assert.That(scenario.Fingerprint, Is.Not.EqualTo(standard.Fingerprint));
+        });
+    }
+
+    [TestCase("\"collisionPasses\": 4", "\"collisionPasses\": 0", "movement: collisionPasses must be 1..20 (got 0)")]
+    [TestCase("\"regroupMaxWait\": 4", "\"regroupMaxWait\": 0.01", "movement: regroupMaxWait must be 0.05..60 s")]
+    [TestCase("\"regroupCost\": 0.5", "\"regroupCost\": 0.5, \"regroupCosts\": 1", "movement.regroupCosts: unknown member 'regroupCosts'")]
+    public void DefLibrary_Parse_BadMovementRules_LocatedError(string from, string to, string expected)
+    {
+        var ex = Assert.Throws<ContentException>(() => DefLibrary.Parse([new SourceText("m.json", Movement.Replace(from, to))]));
+        Assert.That(ex!.Message, Does.Contain(expected));
+    }
+
+    [Test]
+    public void DefLibrary_Parse_MovementRulesInTwoFiles_IsAnError()
+    {
+        var ex = Assert.Throws<ContentException>(() => DefLibrary.Parse([new SourceText("a.json", Movement), new SourceText("b.json", Movement)]));
+        Assert.That(ex!.Message, Does.Contain("movement 'rules' is already defined at a.json"));
     }
 }

@@ -189,7 +189,7 @@ public class MarchTests
         sim.Step();
         Assert.Multiple(() =>
         {
-            Assert.That(Line(sim).Order, Is.EqualTo(SquadOrder.Move(FixVec2.FromInts(20, 20), Angle.FromDegrees(90))));
+            Assert.That(Line(sim).Order, Is.EqualTo(SquadOrder.Move(FixVec2.FromInts(20, 20), Angle.FromDegrees(90), facingFromMarch: true)));
             Assert.That(sim.Commands.Log, Is.Empty);
         });
     }

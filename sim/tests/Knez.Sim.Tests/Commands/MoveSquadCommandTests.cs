@@ -45,7 +45,7 @@ public class MoveSquadCommandTests
         var state = State();
         var line = state.Squads[0]; // anchor (20, 10)
         new MoveSquadCommand(0, line.Id, FixVec2.FromInts(30, 10)).Apply(state, null!);
-        Assert.That(line.Order, Is.EqualTo(SquadOrder.Move(FixVec2.FromInts(30, 10), Angle.FromDegrees(0))));
+        Assert.That(line.Order, Is.EqualTo(SquadOrder.Move(FixVec2.FromInts(30, 10), Angle.FromDegrees(0), facingFromMarch: true)));
     }
 
     [Test]

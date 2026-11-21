@@ -8,20 +8,24 @@ namespace Knez.Sim.Content
 {
     /// <summary>
     /// All defs from the content def files (<c>content/defs/*.json</c>), looked up by id. Each file is an object with
-    /// optional <c>fighters</c> and <c>formations</c> arrays (and an optional <c>description</c>); ids are unique across
-    /// all files. Lists are sorted by id (ordinal), so the order of files never matters.
+    /// optional <c>fighters</c> and <c>formations</c> arrays, an optional <c>movement</c> object (the movement rules: in
+    /// at most one file) and an optional <c>description</c>; ids are unique across all files. Lists are sorted by id
+    /// (ordinal), so the order of files never matters.
     /// </summary>
     public sealed class DefLibrary
     {
-        private const string FileMembers = "description, fighters, formations";
+        private const string FileMembers = "description, fighters, formations, movement";
+        private const string MovementMembers = "pivotTolerance, slotCatchUpTime, personalSpace, separationTime, holdingReach, " +
+            "formedUpReach, collisionPasses, allyPartingDepth, pathBudget, regroupLead, regroupMaxWait, regroupCost";
         private const string FighterMembers = "id, radius, walkSpeed, runSpeed, turnRate";
         private const string FormationMembers = "id, spacing, rankSpacing, ranks, width, turnRate, holdWeight, allyPassSpeed";
 
         private readonly Dictionary<string, FighterDef> _fighters;
         private readonly Dictionary<string, FormationDef> _formations;
 
-        private DefLibrary(List<FighterDef> fighters, List<FormationDef> formations)
+        private DefLibrary(List<FighterDef> fighters, List<FormationDef> formations, MovementDef? movement)
         {
+            Movement = movement;
             fighters.Sort((a, b) => string.CompareOrdinal(a.Id, b.Id));
             formations.Sort((a, b) => string.CompareOrdinal(a.Id, b.Id));
             Fighters = new ReadOnlyCollection<FighterDef>(fighters);
@@ -45,17 +49,22 @@ namespace Knez.Sim.Content
         /// <summary>Formation defs sorted by id.</summary>
         public IReadOnlyList<FormationDef> Formations { get; }
 
+        /// <summary>The movement rules, or null when no def file has a <c>movement</c> object.</summary>
+        public MovementDef? Movement { get; }
+
         /// <summary>Parses def files; throws <see cref="ContentException"/> on the first problem.</summary>
         public static DefLibrary Parse(IReadOnlyList<SourceText> files)
         {
             var fighters = new List<FighterDef>();
             var formations = new List<FormationDef>();
             var seen = new Dictionary<string, string>(StringComparer.Ordinal); // "kind:id" → where it was defined
+            MovementDef? movement = null;
 
             for (int f = 0; f < files.Count; f++)
             {
                 SourceText file = files[f];
-                var root = JsonObjectReader.Of(JsonReader.Parse(file), string.Empty, file.Name);
+                JsonValue rootValue = JsonReader.Parse(file);
+                var root = JsonObjectReader.Of(rootValue, string.Empty, file.Name);
                 root.OptionalString("description");
 
                 IReadOnlyList<JsonValue> fighterItems = root.OptionalArray("fighters");
@@ -90,10 +99,34 @@ namespace Knez.Sim.Content
                         () => new FormationDef(id, spacing, rankSpacing, ranks, width, formationTurnRate, holdWeight, allyPassSpeed)));
                 }
 
+                JsonObjectReader? movementReader = root.OptionalObject("movement");
+                if (movementReader != null)
+                {
+                    var item = movementReader;
+                    JsonValue movementValue = rootValue.Get("movement")!;
+                    Claim(seen, "movement", "rules", item, movementValue, file.Name);
+                    var pivotTolerance = item.RequireFix("pivotTolerance");
+                    var slotCatchUpTime = item.RequireFix("slotCatchUpTime");
+                    var personalSpace = item.RequireFix("personalSpace");
+                    var separationTime = item.RequireFix("separationTime");
+                    var holdingReach = item.RequireFix("holdingReach");
+                    var formedUpReach = item.RequireFix("formedUpReach");
+                    int collisionPasses = item.RequireInt("collisionPasses");
+                    var allyPartingDepth = item.RequireFix("allyPartingDepth");
+                    int pathBudget = item.RequireInt("pathBudget");
+                    var regroupLead = item.RequireFix("regroupLead");
+                    var regroupMaxWait = item.RequireFix("regroupMaxWait");
+                    var regroupCost = item.RequireFix("regroupCost");
+                    item.RejectUnknownMembers(MovementMembers);
+                    movement = Build(item, movementValue, () => new MovementDef(pivotTolerance, slotCatchUpTime, personalSpace,
+                        separationTime, holdingReach, formedUpReach, collisionPasses, allyPartingDepth, pathBudget, regroupLead,
+                        regroupMaxWait, regroupCost));
+                }
+
                 root.RejectUnknownMembers(FileMembers);
             }
 
-            return new DefLibrary(fighters, formations);
+            return new DefLibrary(fighters, formations, movement);
         }
 
         /// <summary>The fighter def with <paramref name="id"/>, or null.</summary>

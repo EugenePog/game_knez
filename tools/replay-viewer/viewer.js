@@ -197,7 +197,7 @@
     const squads = sample('squads', t);
     const fighters = sample('fighters', t);
     if (show.anchors) {
-      drawOrders(squads); // sampled rows: the anchor is interpolated, the order columns come from the frame
+      drawOrders(squads, routesAt(t)); // sampled rows: the anchor is interpolated, the order columns come from the frame
       drawAnchors(squads);
     }
     drawFighters(fighters);
@@ -261,8 +261,19 @@
     ctx.stroke();
   }
 
-  /** Move orders: a dashed line from the anchor to the target, a ring there and a tick for the arrival facing. */
-  function drawOrders(squads) {
+  /** Planned routes of the frame at or before `time` (files from before step 6 have none): id → [x, y, x, y, …]. */
+  function routesAt(time) {
+    const frame = data.frames[Math.min(Math.floor(time), data.frames.length - 1)];
+    const routes = new Map();
+    for (const [id, ...coords] of frame.paths || []) routes.set(id, coords);
+    return routes;
+  }
+
+  /**
+   * Move orders: a dashed line from the anchor along the planned route (straight when there is none yet) to the
+   * target, a ring there and a tick for the arrival facing.
+   */
+  function drawOrders(squads, routes) {
     for (const [id, x, y, , ordered, tx, ty, tf] of squads) {
       const info = squadInfo.get(id);
       if (!info || ordered !== 1) continue;
@@ -274,6 +285,8 @@
       ctx.setLineDash([2, 4]);
       ctx.beginPath();
       ctx.moveTo(sx(x), sy(y));
+      const route = routes.get(id) || [];
+      for (let k = 0; k + 1 < route.length; k += 2) ctx.lineTo(sx(route[k]), sy(route[k + 1]));
       ctx.lineTo(px, py);
       ctx.stroke();
       ctx.setLineDash([]);

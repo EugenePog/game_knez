@@ -124,6 +124,28 @@ public sealed class FrameRecorder : IDisposable
 
         _json.WriteEndArray();
 
+        // Planned routes still ahead: [squad, x, y, x, y, …] from the waypoint the anchor heads for to the target.
+        _json.WriteStartArray("paths");
+        foreach (Squad squad in state.Squads)
+        {
+            if (squad.Order.Kind != SquadOrderKind.Move || squad.Path.Count == 0)
+            {
+                continue;
+            }
+
+            _json.WriteStartArray();
+            _json.WriteNumberValue(squad.Id.Value);
+            for (int p = squad.PathIndex; p < squad.Path.Count; p++)
+            {
+                _json.WriteNumberValue(Metres(squad.Path[p].X));
+                _json.WriteNumberValue(Metres(squad.Path[p].Y));
+            }
+
+            _json.WriteEndArray();
+        }
+
+        _json.WriteEndArray();
+
         _json.WriteStartArray("fighters");
         foreach (Fighter fighter in state.Fighters)
         {

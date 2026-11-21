@@ -27,6 +27,27 @@ public class RepoContentTests
     }
 
     [Test]
+    public void Repo_DefsCarryTheMovementRules()
+    {
+        // Content, not code, owns the movement rules: a scenario from the repo must never fall back to the code's copy.
+        var scenario = ScenarioFiles.Load(Path.Combine(RepoPaths.Content, "scenarios", "march.json"));
+        Assert.That(scenario.Movement, Is.Not.SameAs(Knez.Sim.Defs.MovementDef.Standard));
+    }
+
+    [Test]
+    public void Repo_MovementRules_EqualTheCodesStandardCopy()
+    {
+        // Tests and code-built scenarios use MovementDef.Standard; content uses movement.json. Keep them identical, or
+        // the goldens stop describing the game. Change both together.
+        var file = ScenarioFiles.Load(Path.Combine(RepoPaths.Content, "scenarios", "march.json")).Movement;
+        var standard = Knez.Sim.Defs.MovementDef.Standard;
+        foreach (var property in typeof(Knez.Sim.Defs.MovementDef).GetProperties())
+        {
+            Assert.That(property.GetValue(file), Is.EqualTo(property.GetValue(standard)), property.Name);
+        }
+    }
+
+    [Test]
     public void Repo_HasAtLeastOneScenario()
     {
         Assert.That(ScenarioFilesInRepo(), Is.Not.Empty);

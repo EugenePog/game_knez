@@ -18,9 +18,10 @@ public class StateCoverageTests
     {
         [typeof(BattleState)] = ["<Scenario>k__BackingField", "<Seed>k__BackingField", "<Tick>k__BackingField", "_events",
             "_fighters", "_nextEntityId", "_rng", "_squads"],
-        [typeof(Squad)] = ["<Anchor>k__BackingField", "<Facing>k__BackingField", "<Formation>k__BackingField",
-            "<Id>k__BackingField", "<Name>k__BackingField", "<Order>k__BackingField", "<SideId>k__BackingField",
-            "<Spin>k__BackingField", "<Velocity>k__BackingField", "_members"],
+        [typeof(Squad)] = ["<Anchor>k__BackingField", "<Facing>k__BackingField", "<Files>k__BackingField", "<Formation>k__BackingField",
+            "<Id>k__BackingField", "<Name>k__BackingField", "<Order>k__BackingField", "<PathIndex>k__BackingField",
+            "<PathRequestTick>k__BackingField", "<RegroupSince>k__BackingField", "<SideId>k__BackingField", "<Spin>k__BackingField",
+            "<Velocity>k__BackingField", "_members", "_path", "_pathFiles"],
         [typeof(Fighter)] = ["<Def>k__BackingField", "<Facing>k__BackingField", "<Id>k__BackingField", "<IsAlive>k__BackingField",
             "<PassingThrough>k__BackingField", "<Position>k__BackingField", "<SideId>k__BackingField", "<SlotIndex>k__BackingField",
             "<SquadId>k__BackingField", "<Velocity>k__BackingField"],
@@ -45,7 +46,12 @@ public class StateCoverageTests
         [typeof(SquadSpawnDef)] = ["<Count>k__BackingField", "<Facing>k__BackingField", "<Fighter>k__BackingField",
             "<Formation>k__BackingField", "<Name>k__BackingField", "<Position>k__BackingField", "<SideId>k__BackingField"],
         [typeof(ScenarioDef)] = ["<Description>k__BackingField", "<Fingerprint>k__BackingField", "<Id>k__BackingField",
-            "<Map>k__BackingField", "<Script>k__BackingField", "<Squads>k__BackingField"],
+            "<Map>k__BackingField", "<Movement>k__BackingField", "<Script>k__BackingField", "<Squads>k__BackingField"],
+        [typeof(MovementDef)] = ["<AllyPartingDepth>k__BackingField", "<CollisionPasses>k__BackingField",
+            "<FormedUpReach>k__BackingField", "<HoldingReach>k__BackingField", "<PathBudget>k__BackingField",
+            "<PersonalSpace>k__BackingField", "<PivotTolerance>k__BackingField", "<RegroupCost>k__BackingField",
+            "<RegroupLead>k__BackingField", "<RegroupMaxWaitTicks>k__BackingField", "<SeparationTicks>k__BackingField",
+            "<SlotCatchUpTicks>k__BackingField"],
     };
 
     [TestCaseSource(nameof(DefTypes))]

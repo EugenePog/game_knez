@@ -68,7 +68,8 @@ namespace Knez.Sim.Commands
             FixVec2 target = FitInside(state, squad, Target, facing);
             Fighter? any = state.FindFighter(squad.MemberList[0]);
             target = Terrain.Constrain(state.Scenario.Map, target, any != null ? any.Radius : Fix.Zero);
-            squad.Order = SquadOrder.Move(target, facing);
+            squad.Order = SquadOrder.Move(target, facing, facingFromMarch: Facing == null && delta.Length > MovementRules.ArriveDistance);
+            PathPlanner.Request(state, squad);
         }
 
         /// <inheritdoc/>

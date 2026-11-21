@@ -9,11 +9,12 @@ namespace Knez.Sim.Orders
     /// </summary>
     public readonly struct SquadOrder : IEquatable<SquadOrder>
     {
-        private SquadOrder(SquadOrderKind kind, FixVec2 target, Angle facing)
+        private SquadOrder(SquadOrderKind kind, FixVec2 target, Angle facing, bool facingFromMarch)
         {
             Kind = kind;
             Target = target;
             Facing = facing;
+            FacingFromMarch = facingFromMarch;
         }
 
         /// <summary>No order.</summary>
@@ -28,11 +29,19 @@ namespace Knez.Sim.Orders
         /// <summary>Move: the facing on arrival (already resolved: an explicit one, or the march direction).</summary>
         public Angle Facing { get; }
 
+        /// <summary>
+        /// Move: no facing was ordered, so the squad ends facing the way it marched. <see cref="Facing"/> starts as the
+        /// straight-line direction to the target and becomes the route's last leg once the route is planned.
+        /// </summary>
+        public bool FacingFromMarch { get; }
+
         /// <summary>March to <paramref name="target"/>, then face <paramref name="facing"/>.</summary>
-        public static SquadOrder Move(FixVec2 target, Angle facing) => new SquadOrder(SquadOrderKind.Move, target, facing);
+        public static SquadOrder Move(FixVec2 target, Angle facing, bool facingFromMarch = false) =>
+            new SquadOrder(SquadOrderKind.Move, target, facing, facingFromMarch);
 
         /// <inheritdoc/>
-        public bool Equals(SquadOrder other) => Kind == other.Kind && Target == other.Target && Facing == other.Facing;
+        public bool Equals(SquadOrder other) =>
+            Kind == other.Kind && Target == other.Target && Facing == other.Facing && FacingFromMarch == other.FacingFromMarch;
 
         /// <inheritdoc/>
         public override bool Equals(object? obj) => obj is SquadOrder other && Equals(other);

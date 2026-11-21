@@ -108,6 +108,13 @@ namespace Knez.Sim.Content
 
         public JsonObjectReader RequireObject(string name) => Of(Require(name), MemberPath(name), Source);
 
+        /// <summary>The named member as an object, or null when it is absent.</summary>
+        public JsonObjectReader? OptionalObject(string name)
+        {
+            JsonValue? value = Optional(name);
+            return value == null ? null : Of(value, MemberPath(name), Source);
+        }
+
         /// <summary>Throws for the first member no getter asked for.</summary>
         public void RejectUnknownMembers(string allowed)
         {

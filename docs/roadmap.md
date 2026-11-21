@@ -94,6 +94,28 @@ Steps — one change each, each ending with build/tests/purity green and a `sim-
    radius + 5 cm per tick. 377 tests.
 6. Pathfinding: A* for squad anchors with a per-tick budget, path following. First decision: the grid's cell size
    (0.5 m or 1 m), moved here from step 5.
+   Decided 2026-11-21: 0.5 m cells; ground narrower than the formation costs 3× (prefer wide routes, squeeze when the
+   detour is long); an unreachable target becomes the nearest reachable spot. Built 2026-11-21: clearance grid, A*
+   with a 4 000-node budget per tick (first come first served), corner cutting and straightening, route following,
+   routes in the frames and the viewer, `paths.json`. Goldens re-recorded: the hash now covers routes (open-ground
+   motion verified unchanged); the gate trace also changes because the line now plans its way through. Reviewed by `sim-reviewer`: a route's first or last leg (anchor or target
+   to the nearest cell centre) could cross a wall thinner than a cell, and the squad then never formed up. Fixed with an
+   exact segment-through-wall check on those legs, plus a corner-room rule for diagonal steps; the grid is now built
+   when the simulation is created. 396 tests.
+   Changed 2026-11-21 after playing with it: no 3× cost — before a narrow gap the squad regroups into fewer files a
+   little ahead of it, waits for its men, goes through and widens again, and the route search charges only the extra
+   depth that costs; an unreachable target becomes the near side of the obstacle, not the geometrically nearest spot;
+   every movement rule that shapes feel moved from code into `content/defs/movement.json`. Goldens re-recorded (the
+   fingerprint now includes the movement rules; with the new fields left out, every trace but the gate's is unchanged,
+   and the gate's line now regroups into 3 files). Reviewed again by `sim-reviewer`: narrowed slots could lie in walls
+   (the route ran beside a gap's middle line, the squad widened with its rear still in the gap, the straight-line
+   shortcut took squads into gaps full width), and narrowed files came out uneven. Fixed: narrowness is now the
+   narrowest corridor across a cell (a wall alongside no longer counts), routes are shifted sideways to keep the
+   formation clear (centred in tight gaps), widening waits for the rear, files are balanced, the squad regroups facing
+   the gap, and the code's default movement rules now equal `movement.json` exactly (goldens re-recorded for that and
+   for the gate). A third review found shifted runs could meet at a corner behind the squad (it pivoted about and
+   back) and odd men unevenly spread for 9+ men; fixed (doubling-back waypoints dropped, odd men round-robin across
+   ranks), with a seeded random-map sweep and a multi-start test pinning it. 435 tests.
 7. Formations in motion: `SetFormation` (Line, ShieldWall, Column), wheeling, slot reassignment after losses.
    First: `ScenarioDef` carries and fingerprints the whole def catalogue (battle-sim.md §7).
 8. Bench: scenarios S1–S5, metrics, `bench` and `batch`; tune; decide steering vs ORCA; check the exit criteria.

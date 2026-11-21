@@ -1,6 +1,6 @@
 # Battle simulation — technical design
 
-Status: **draft v0.6** (2026-11-21, M1 step 5: walls). Owner: Eugene. Scope: phase 1 skirmish; the same sim later drives the 3D view
+Status: **draft v0.7** (2026-11-21, M1 step 6: routes). Owner: Eugene. Scope: phase 1 skirmish; the same sim later drives the 3D view
 and campaign battles. Code names follow the glossary in [AGENTS.md](../AGENTS.md#glossary-russian-design-term--code-name).
 
 When code and this document disagree, fix one of them in the same change.
@@ -97,7 +97,9 @@ Assemblies:
 - `EntityId`: `readonly struct` over `int`, allocated monotonically by `BattleState`, never reused; `0` = none.
 - `BattleState` owns everything:
   - `Tick`, RNG stream states, the entity id counter;
-  - `Map`: grid (cell size 0.5 m — to confirm in M1) with walkable, height level, cover and line-of-sight blockers;
+  - `Map`: the scenario's map (walls). Its route grid (`Movement/NavGrid.cs`: 0.5 m cells, decided 2026-11-21, each
+    with its clearance — the exact distance from its centre to the nearest wall or map edge) is derived from it, so it
+    lives in `TickContext`, built when the simulation is created or restored (maps with walls), never hashed or cloned. Height, cover and line of sight come with combat;
   - `Sides` (player, enemy; later more — for now just `SideId` ints on squads and fighters), `Squads`, `Fighters`
     (heroes are fighters with a `HeroData` part);
   - spatial index for neighbour queries (rebuilt each tick, deterministic order) — *not built yet*: phase 1 battles have
@@ -117,7 +119,10 @@ Assemblies:
   (current action, cooldowns, target), squad membership and slot, def reference. Now (M1 step 3): id, def, side,
   position, velocity (m per tick), facing, squad id, slot index, alive.
 - `Squad`: id, side, name, formation def, anchor (centre of the front rank), facing, order (`SquadOrder`: kind,
-  target, arrival facing), velocity and spin (how far the anchor moved and the front turned this tick — they give each
+  target, arrival facing, whether that facing is "the way it marched"), route (`Path`: waypoints, the last one the
+  target; `PathFiles`: what it does at each — regroup into k files, widen, or nothing; `PathIndex`: the one it heads
+  for; `PathRequestTick`: waiting for a route since that tick, or −1), `Files` (narrowed to this many files for a gap,
+  0 = its own width), `RegroupSince` (waiting for its men to regroup since that tick, or −1), velocity and spin (how far the anchor moved and the front turned this tick — they give each
   slot's own motion), member ids (sorted). Build the
   starting state with `BattleSetup.Create(scenario, seed)`: squads in scenario order, each followed by its fighters in
   slot order, every fighter on its slot facing with its squad.
@@ -134,7 +139,8 @@ def gets the fields its systems need when they arrive; M1 step 1 has:
 |---|---|
 | `FighterDef` | `id`, `radius` (m), `walkSpeed`, `runSpeed` (m/s, at most 8, and under radius + 5 cm per tick so nobody steps through a 10 cm wall), `turnRate` (°/s) |
 | `FormationDef` | `id`, `spacing` (m between neighbours), `rankSpacing` (m between ranks), `ranks` *or* `width`, `turnRate` (°/s), `holdWeight` (how much harder men holding their ground are to push; moving men weigh 1), `allyPassSpeed` (fraction of walking speed at which allies squeeze through this formation while it holds) |
-| `MapDef` | `width`, `height` (m), optional `walls[]` (at most 64): `from` `[x, y]`, `to` `[x, y]` (opposite corners of an axis-aligned rectangle, ≥ 0.1 m thick, on the map) |
+| `MovementDef` (`movement.json`, decided 2026-11-21: tunables in content, not code) | `pivotTolerance` (° off the heading a squad still marches at, 30), `slotCatchUpTime` (s, 0.5), `personalSpace` (m, 0.1), `separationTime` (s, 0.25), `holdingReach` (m, 1.5), `formedUpReach` (m, 0.3), `collisionPasses` (6), `allyPartingDepth` (m, 0.25), `pathBudget` (search nodes per tick, 4 000), `regroupLead` (m, 1), `regroupMaxWait` (s, 5), `regroupCost` (route metres per metre of extra depth, 1). Times are rounded to the nearest whole tick (0.05 s). At most one def file holds it; scenarios built in code use `MovementDef.Standard`, which a test keeps equal to the file. A scenario is refused when `personalSpace` doesn't fit between two of its men side by side or rank behind rank |
+| `MapDef` | `width`, `height` (m, at most 250: 500 route cells), optional `walls[]` (at most 64): `from` `[x, y]`, `to` `[x, y]` (opposite corners of an axis-aligned rectangle, ≥ 0.1 m thick, on the map) |
 | `ScenarioDef` | `id`, `description`, `map`, `squads[]`: `name`, `side`, `fighter`, `count`, `formation`, `position` `[x, y]`, `facing` (degrees); optional `script[]`: `tick`, `order` (`"move"`), `squad` (name), `target` `[x, y]`, optional `facing` |
 
 Agreed values (2026-11-20): walk 1.4 m/s, run 3.5 m/s; squad turn rate column 90°/s, line 45°/s, shield wall 30°/s;
@@ -183,7 +189,10 @@ rank; an incomplete rank is the rearmost and is centred. Width = `width`, or ⌈
   within 30 cm of his slot (decided 2026-11-21). A squad blocked short of its slots keeps its order. A target that
   would put part of the formation (at the arrival facing) off the map is moved inward until it all fits — otherwise
   slots past an edge are pulled onto the same spot and the squad can never form up. A target inside a wall then moves
-  to the nearest open ground (M1 step 5, `Terrain.Constrain`, §10).
+  to the nearest open ground (M1 step 5, `Terrain.Constrain`, §10). Since step 6 the squad follows a route (§10): straight
+  when the line has room for its frontage, otherwise planned by `PathSystem` this tick, marching from the next. A
+  target no route reaches becomes the near side of whatever is in the way, and without an ordered facing the squad ends
+  facing along the route's last leg (decided 2026-11-21).
 
 ## 9. Tick pipeline (fixed order)
 
@@ -193,7 +202,7 @@ rank; an incomplete rank is the rearmost and is centred. Width = `width`, or ⌈
 | 1 | `CommandSystem` | apply this tick's commands |
 | 2 | `AiSystem` | side → squad → fighter decisions; squads evaluated staggered (every 5 ticks, offset by id) |
 | 3 | `OrderSystem` | squad orders → anchor goal, facing, formation slots, slot assignment |
-| 4 | `PathSystem` | A* requests for squad anchors and detached fighters, per-tick budget, FIFO queue |
+| 4 | `PathSystem` | A* for squads waiting for a route, first come first served (request tick, then id), 4 000 search nodes per tick; detached fighters later |
 | 5 | `SteeringSystem` | desired velocity: slot seek/arrive, separation, obstacle avoidance |
 | 6 | `MovementSystem` | integrate, resolve collisions (circle–circle, circle–wall), update facing |
 | 7 | `TargetingSystem` | engagement and target choice in reach; tie-break by distance, then id |
@@ -209,15 +218,64 @@ their milestone. Scratch buffers live in `TickContext`, never in system fields.
 
 ## 10. Movement and formations — the main risk (M1)
 
-- A squad has an **anchor** (position + facing) that follows the A* path; the formation defines **slots**
+- A squad has an **anchor** (position + facing) that follows its route; the formation defines **slots**
   relative to the anchor. Fighters steer to their slots.
-- **Move order (step 3, straight line until A* in step 6).** `OrderSystem` turns the squad's front toward the target at
-  the formation's turn rate, in place, until the target is within 30° of the front (a fixed rule agreed 2026-11-20, not
+- **Routes (step 6, decided 2026-11-21).** `MoveSquad` gives the squad its route at once when it stands in its own
+  width and the straight line to the target has room for the formation all the way (every 25 cm sample at least half
+  the frontage plus a body radius, less 23 cm). Otherwise the squad waits (`PathRequestTick`) and `PathSystem` runs A*
+  over the 0.5 m grid (`Movement/PathPlanner.cs`): 8-connected, octile costs (10 per cell, 14 diagonally). A cell a man
+  fits in (clearance ≥ the widest member's radius) is passable. A diagonal step needs both side cells passable and
+  enough room at the corner they share that no post there can sit on the step. The first leg starts at the anchor and
+  the last ends at the target, anywhere in their cells, so those two are checked exactly against the walls
+  (`Terrain.CrossesWall`): a thin wall can run through a cell.
+- **Regrouping for narrow gaps (decided 2026-11-21, replacing a 3× cost for narrow ground).** Each cell knows its
+  corridor (`NavGrid.Corridor`): its narrowest cross-section, wall to wall (or map edge), over four directions (E–W,
+  N–S and both diagonals; rays from the cell centre, capped at 32 m). A gap is narrow whichever way it is crossed, while
+  a single wall beside or behind a squad never makes ground narrow, since the open side keeps every cross-section wide.
+  Where the corridor is narrower than the formation's frontage, the squad narrows to as many files as fit. The route
+  search charges only the extra waiting: each metre the squad grows deeper (its rear goes through that much later)
+  costs `regroupCost` metres of route (1 by default). So it squeezes through a gap when a detour is longer than the
+  depth it gains, and goes round otherwise. On the route, `regroupLead` (1 m) before each narrow stretch the squad stops
+  and regroups (`Squad.Files`): each old rank splits left to right into bands as even as possible (the odd men go to the bands
+  round-robin across ranks, so the new files differ by one man at most), and within a new file men stand by their old rank,
+  inner files first — the middle of the front stays in front and the flanks fall in behind
+  (`FormationLayout.SlotOffset(…, files)`, `NarrowedRanks`). It turns to face the gap while the men fall in, waits until
+  formed up (at most `regroupMaxWait`, 5 s), marches through and widens back (no wait) once its narrowed depth plus
+  `regroupLead` is past the stretch; stretches too close to widen between count as one, narrowed to the tightest. It
+  widens at the target only if its rear is through by then and the target has room for its frontage at the arrival
+  facing; otherwise it ends narrowed. A squad given a new order while narrowed counts its own spot as narrow ground, so
+  it widens only once its rear is clear. Regroup and widen waypoints (`Squad.PathFiles`) are never straightened away.
+  Slot reassignment after losses is still step 7.
+- **Route shape and limits.** The cell chain is split into straight runs, and each run is shifted sideways so the
+  formation (in the width it marches there) keeps clear of walls on both sides with up to 25 cm to spare — by as little
+  as that takes, the first run preferring the line the squad already stands on; in a gap that leaves no spare room
+  that is its middle line, and where no shift fits, the middle of the run's tightest cross-section. Shifted runs meet
+  where their lines cross; a waypoint that would then turn the squad back on itself next to a short leg is dropped
+  (unless marked or the shortcut would cross a wall), before and after straightening. If any shifted leg would cross a wall, the whole route is laid unshifted (the legs the search
+  walked). Waypoints: the anchor, the corners, the first and last cell, the marked cells and the target; unshifted
+  corners in open ground are then straightened where the straight stretch has about as much room as the cells it
+  skips (25 cm samples, no less than their room minus 23 cm, capped at the frontage, never under 25 cm, so no stretch
+  hops a wall between samples). A target no route reaches (walled in, or across a wall with no gap) becomes the near
+  side of whatever is in the way (decided 2026-11-21): walking the straight line back from the target toward the anchor,
+  the first cell the squad can reach and stand in — not the geometrically nearest reachable spot, which may lie round
+  the far side. The order's target becomes that spot; a target in the anchor's own cell but behind a thin wall leaves the
+  squad where it is. Ties everywhere break by fixed neighbour order and cell index. Searches run to the end within the
+  tick they start; once `pathBudget` (4 000) nodes are spent (laying the route out isn't counted) the rest wait for the
+  next tick. Measured: 0.22 ms for a 4 400-node search on a 60 × 40 m map, 1.9 ms for a 23 000-node flood of a
+  120 × 100 m one — splitting searches over ticks waits for bigger maps. The grid (clearance, a corner value and 8 rays per cell) is built
+  when the simulation is created or restored, only for maps with walls: about 0.47 s in Release (5.4 s in Debug) for a
+  250 × 250 m map with 64 walls, negligible at phase-1 sizes; restoring could reuse a built grid later. Known, for the bench: on a short diagonal leg
+  into a gap's mouth one man's slot can graze the wall's corner for a few ticks (sideways room is sampled at cell
+  centres); no re-planning yet, so a squad shoved off its route marches on to the next waypoint.
+- **Move order (step 3; along the route since step 6).** `OrderSystem` turns the squad's front toward the next waypoint at
+  the formation's turn rate, in place, until the target is within 30° of the front (`pivotTolerance`, agreed 2026-11-20, not
   per formation); then the anchor marches straight
   at the walk speed of the slowest living member while the front finishes turning. Within 1 cm of the target the anchor
   stops there and turns to the order's facing; the order is cleared once every living member stands within 30 cm of
-  his slot (formed up; `MovementRules.FormedUpReach`), and the squad holds. The squad pivots around its
-  anchor, so a column's tail swings wide in an about-turn — revisit with wheeling in step 7.
+  his slot (formed up; `formedUpReach` in `movement.json`), and the squad holds. At an intermediate waypoint it heads for
+  the next one the same way (turning in place first when the corner is sharper than 30°); the rest of that tick's
+  stride is dropped. The squad pivots around its anchor, so a column's tail swings wide in an about-turn and cuts
+  corners — revisit with wheeling in step 7.
 - **Following the slot.** `SteeringSystem`: velocity = the slot's own motion this tick (from the anchor's velocity
   and spin) + a tenth of the lag the fighter had before (a 10-tick time constant; 1 m of lag closes to 2 cm in ~37
   ticks), capped at run speed. On a straight march a member never leaves its slot; a displaced one runs back. When the
@@ -225,8 +283,10 @@ their milestone. Scratch buffers live in `TickContext`, never in system fields.
   creeping. `MovementSystem` applies the velocity and turns the fighter at its turn rate: toward the squad's front while
   in formation — also when shuffling sideways or swinging round with a turning squad, whose outer slots move faster than
   walking — and toward its movement only when it moves faster than walking pace *relative to its own slot* (running to
-  catch up). Both systems share the slot motion (`Movement/SlotTracking.cs`). Solver settings live in
-  `Movement/MovementRules.cs`, not in content — tune them on the bench.
+  catch up). Both systems share the slot motion (`Movement/SlotTracking.cs`). Every movement rule that shapes how the battle
+  feels is content: `content/defs/movement.json` (`MovementDef`, §7) — tune it there and on the bench.
+  `Movement/MovementRules.cs` keeps only numerical constants that keep the maths exact (1 cm arrival, 2 cm snap, 25 cm
+  route samples and the 23 cm shortcut slack), as do `NavGrid` (0.5 m cells) and `Terrain` (3 push-out rounds).
 - A `MoveSquad` target within the 1 cm arrival distance keeps the squad's facing (a sub-centimetre offset has no
   meaningful direction).
 - **Crowding (step 4).** Every living fighter is solid to every other, allies included (agreed 2026-11-20: crossing
@@ -274,8 +334,7 @@ their milestone. Scratch buffers live in `TickContext`, never in system fields.
   squad is formed up without men whose slots have no room for a body (`Constrain` moves the slot: past the edge, in or
   against a wall, in a gap narrower than a body), since several of them may be sent to the same spot. Steering
   removes the part of a man's velocity heading into a wall within personal space. Spawns in or against a wall are
-  content errors. No grid yet: the A* grid and its cell size come with pathfinding (step 6). Known: without paths, a
-  squad marching at a building stays pressed against it (step 6); a formation ordered so tight to a wall that its men
+  content errors. Routes round walls came in step 6 (above). Known: a formation ordered so tight to a wall that its men
   with in-wall slots have no room on their squad's side (a line whose front rank is 0.5 m from a 1 m palisade; 0.6 m
   forms up) shoves its own front rank and never forms up (re-forming around obstacles: step 7).
 - **Known, for the bench (step 8):** a push several squads deep beats `holdWeight` — three lines marching through a
@@ -364,7 +423,8 @@ Utility + FSM, no neural nets, inside the sim and deterministic:
   squads face between sine-table entries), `GoldenMarchHash` (a scripted march with an about-turn and an arrival
   facing, 400 ticks), `GoldenCrossingTrace` (every tick's hash of two lines jostling through each other, folded into one
   value — the crossing settles exactly on its slots afterwards, so an end-state hash wouldn't notice a crowding change),
-  `GoldenAlliesThroughTrace` (the same for a line squeezing through an allied holding line) and `ContentGoldenTests` (a test-owned JSON fixture: fingerprint and spawned state). `HashCoverageTests` checks that every state field moves its own hash section.
+  `GoldenAlliesThroughTrace` (the same for a line squeezing through an allied holding line), `GoldenGateTrace` (the
+  same for a line of 8 regrouping into 3 files for a 3 m gate, going through and widening again) and `ContentGoldenTests` (a test-owned JSON fixture: fingerprint and spawned state). `HashCoverageTests` checks that every state field moves its own hash section.
 
 ## 16. Events and the view contract
 
@@ -389,7 +449,7 @@ Utility + FSM, no neural nets, inside the sim and deterministic:
   fighter-ticks with a fighter pressed more than 5 cm into someone, and the worst tick (JSON `overlap.ratio`,
   `overlap.worstTickFighters`) and, separately, the share of fighter-ticks spent passing through allied ranks
   (`overlap.passingRatio`), so an allowed overlap can't hide a failure, and the share with a fighter more than 5 cm
-  inside a wall (`overlap.inWallsRatio`; printed as "inside walls"). The replay viewer draws the map's walls. The list below is the target contract, built
+  inside a wall (`overlap.inWallsRatio`; printed as "inside walls"). The replay viewer draws the map's walls and each squad's planned route. The list below is the target contract, built
   through M1:
   - `run <scenario> --seed N [--ticks N] [--out replay.json] [--frames frames.json]` → summary (winner, duration,
     casualties, morale breaks, final hash);
@@ -403,6 +463,7 @@ Utility + FSM, no neural nets, inside the sim and deterministic:
     "squads":   [ { "id", "name", "side", "formation" } ],
     "fighters": [ { "id", "squad", "slot", "side", "def", "radius" } ],
     "frames":   [ { "tick", "hash", "squads": [[id, anchorX, anchorY, facing°, ordered 1|0, targetX, targetY, targetFacing°]],
+                    "paths": [[squad, x, y, x, y, …]],   // route still ahead: next waypoint … target (step 6)
                     "fighters": [[id, x, y, facing°, alive 1|0, holdsGround 1|0, passingThrough 1|0]], "events": [{ "type", … }] } ],
     "faulted":  { "tick", "error" } }   // only when the simulation threw
   ```
@@ -441,7 +502,7 @@ Utility + FSM, no neural nets, inside the sim and deterministic:
 
 ## 19. Open questions
 
-- Grid cell size (0.5 m vs 1 m) and fighter radius — decide from the M1 bench.
+- Fighter radius — decide from the M1 bench. (Grid cell size: 0.5 m, decided 2026-11-21.)
 - Steering vs ORCA-like avoidance — decide from the M1 bench.
 - Exact formation set for phase 1 (proposal: Line, ShieldWall, Column).
 - Morale numbers, thresholds and rout rules — tune in M3 with playtests.

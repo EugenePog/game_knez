@@ -3,24 +3,12 @@ using Knez.Sim.Numerics;
 namespace Knez.Sim.Movement
 {
     /// <summary>
-    /// Constants of the movement algorithms (battle-sim.md §10). These are solver settings, not balance: speeds and turn
-    /// rates live in content defs. Revisit on the M1 bench (step 8); move a value to content if it turns out to shape feel.
+    /// Numerical constants of the movement algorithms (battle-sim.md §10) that keep the maths exact or safe; nothing here
+    /// shapes how the battle feels. Everything that does is in content: <c>movement.json</c> (<see cref="Defs.MovementDef"/>),
+    /// fighter and formation defs.
     /// </summary>
     internal static class MovementRules
     {
-        /// <summary>
-        /// A squad turns in place until its front is within this of the march heading, then marches while finishing the
-        /// turn: 30°. A fixed rule agreed on 2026-11-20 (not per formation); move it to FormationDef if formations should
-        /// differ.
-        /// </summary>
-        public const int PivotToleranceUnits = Angle.UnitsPerTurn / 12;
-
-        /// <summary>
-        /// Time constant for closing the lag to the slot, on top of the slot's own motion: each tick a fighter closes
-        /// 1/10 of it (10 ticks = 0.5 s; 1 m of lag reaches the 2 cm snap in about 37 ticks).
-        /// </summary>
-        public const int SlotCatchUpTicks = BattleState.TicksPerSecond / 2;
-
         /// <summary>The anchor counts as arrived within this distance: about 1 cm.</summary>
         public static readonly Fix ArriveDistance = Fix.FromRaw(Fix.OneRaw / 100);
 
@@ -28,36 +16,15 @@ namespace Knez.Sim.Movement
         /// formations settle instead of creeping forever.</summary>
         public static readonly Fix SnapDistance = Fix.FromRaw(Fix.OneRaw / 50);
 
-        /// <summary>
-        /// Room a fighter keeps around itself beyond touching: about 10 cm. Inside it, steering eases away from the other
-        /// man. Smaller than the tightest formation gap (shield wall: 0.75 m spacing − 0.6 m of bodies), so men in their
-        /// slots never push each other.
-        /// </summary>
-        public static readonly Fix PersonalSpace = Fix.FromRaw(Fix.OneRaw / 10);
-
-        /// <summary>Time constant for easing out of someone's personal space: a fifth of the intrusion per tick.</summary>
-        public const int SeparationTicks = 5;
+        /// <summary>Spacing of the points a straight stretch of route is checked at for room: 25 cm.</summary>
+        public static readonly Fix RouteSampleStep = Fix.Ratio(1, 4);
 
         /// <summary>
-        /// A man holds his ground — and weighs his formation's hold weight in a push — only while his squad has no order and
-        /// he stands within this of his slot: 1.5 m. Beyond it he is trying to get somewhere, like anyone on the move.
-        /// Without the second condition, a squad whose anchor arrived while its men are still blocked metres short of their
-        /// slots would count as holding and shove an enemy line at full weight.
+        /// How much less room a shortcut may sample than the planned cells had: 23 cm. Between two cell centres a diagonal
+        /// cell route can come 35 cm (half a cell diagonal) closer to a wall than its cells, a straight one 25 cm; a
+        /// shortcut sampled every 25 cm comes at most 12.5 cm closer than its samples, so 35 cm in all. A shortcut is
+        /// thus never tighter than a diagonal cell route and at most 10 cm tighter than a straight one.
         /// </summary>
-        public static readonly Fix HoldingReach = Fix.Ratio(3, 2);
-
-        /// <summary>
-        /// A move order ends only when every living member stands within this of his slot (about 30 cm), besides the anchor
-        /// being at the target and facing the order's way (decided 2026-11-21: orders end when formed up). Until then the
-        /// squad is on the move: it may pass through allied ranks and weighs 1 in pushes.
-        /// </summary>
-        public static readonly Fix FormedUpReach = Fix.Ratio(3, 10);
-
-        /// <summary>
-        /// Most collision relaxation passes per tick, each over all pairs in id order; passes stop early once nothing
-        /// overlaps. A push travels one link per pass against id order, so 3 passes left pushes 4+ men deep overlapping
-        /// (7 % of fighter-ticks in a three-lines-deep test); 6 clears it at the same cost.
-        /// </summary>
-        public const int CollisionPasses = 6;
+        public static readonly Fix ShortcutSlack = Fix.Ratio(23, 100);
     }
 }

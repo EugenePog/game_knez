@@ -24,7 +24,7 @@ namespace Knez.Sim.Movement
         /// <summary>
         /// <paramref name="fighter"/>'s crowding role this tick: <see cref="CrowdRole.Ordered"/> while his squad has a move
         /// order; <see cref="CrowdRole.Holding"/> when it has none and he stands within
-        /// <see cref="MovementRules.HoldingReach"/> of his slot; otherwise <see cref="CrowdRole.Loose"/>.
+        /// <see cref="Defs.MovementDef.HoldingReach"/> of his slot; otherwise <see cref="CrowdRole.Loose"/>.
         /// </summary>
         public static CrowdRole Role(BattleState state, Fighter fighter)
         {
@@ -44,7 +44,7 @@ namespace Knez.Sim.Movement
                 return CrowdRole.Ordered;
             }
 
-            return DistanceToSlot(state, squad, fighter) <= MovementRules.HoldingReach ? CrowdRole.Holding : CrowdRole.Loose;
+            return DistanceToSlot(state, squad, fighter) <= state.Scenario.Movement.HoldingReach ? CrowdRole.Holding : CrowdRole.Loose;
         }
 
         /// <summary>True when <paramref name="fighter"/> holds his ground this tick (see <see cref="Role"/>).</summary>
@@ -107,7 +107,7 @@ namespace Knez.Sim.Movement
                     }
 
                     Fix touching = self.Radius + other.Radius;
-                    Fix reach = touching + MovementRules.PersonalSpace;
+                    Fix reach = touching + state.Scenario.Movement.PersonalSpace;
                     FixVec2 toOther = other.Position - self.Position;
                     if (FixMath.Abs(toOther.X) >= reach || FixMath.Abs(toOther.Y) >= reach)
                     {
@@ -139,7 +139,7 @@ namespace Knez.Sim.Movement
 
         /// <summary>
         /// Steering away from neighbours inside personal space: per neighbour, a share of the intrusion over
-        /// <see cref="MovementRules.SeparationTicks"/>; the lighter (moving) man takes the larger share.
+        /// <see cref="Defs.MovementDef.SeparationTicks"/>; the lighter (moving) man takes the larger share.
         /// </summary>
         public static FixVec2 Separation(BattleState state, List<int> weights, List<CrowdRole> roles, int index)
         {
@@ -154,7 +154,7 @@ namespace Knez.Sim.Movement
                     continue;
                 }
 
-                Fix reach = self.Radius + other.Radius + MovementRules.PersonalSpace;
+                Fix reach = self.Radius + other.Radius + state.Scenario.Movement.PersonalSpace;
                 FixVec2 away = self.Position - other.Position;
                 if (FixMath.Abs(away.X) >= reach || FixMath.Abs(away.Y) >= reach)
                 {
@@ -167,14 +167,14 @@ namespace Knez.Sim.Movement
                     continue;
                 }
 
-                if (self.Radius + other.Radius - distance > DeepAllyOverlap && AlliedOtherSquad(self, other))
+                if (self.Radius + other.Radius - distance > state.Scenario.Movement.AllyPartingDepth && AlliedOtherSquad(self, other))
                 {
                     continue; // allied squads that deep inside each other are parted gently by Resolve; don't shove
                 }
 
                 // Equal weights → a full share (2·w/2w = 1); holding 3 vs moving 1 → ½ for the holder, 1½ for the mover.
                 int total = weights[index] + weights[j];
-                Fix push = (reach - distance) * (2 * weights[j]) / (total * MovementRules.SeparationTicks);
+                Fix push = (reach - distance) * (2 * weights[j]) / (total * state.Scenario.Movement.SeparationTicks);
                 sum += Apart(away, distance, push, negativeX: index < j); // same spot: the lower id goes west
             }
 
@@ -199,7 +199,7 @@ namespace Knez.Sim.Movement
                     continue;
                 }
 
-                Fix reach = self.Radius + other.Radius + MovementRules.PersonalSpace;
+                Fix reach = self.Radius + other.Radius + state.Scenario.Movement.PersonalSpace;
                 FixVec2 toward = other.Position - self.Position;
                 if (FixMath.Abs(toward.X) >= reach || FixMath.Abs(toward.Y) >= reach)
                 {
@@ -265,7 +265,7 @@ namespace Knez.Sim.Movement
         }
 
         /// <summary>
-        /// Pushes overlapping living fighters apart until no pair overlaps (up to <see cref="MovementRules.CollisionPasses"/>
+        /// Pushes overlapping living fighters apart until no pair overlaps (up to <see cref="Defs.MovementDef.CollisionPasses"/>
         /// passes over all pairs in id order). Both bodies of a pushed pair are put back where they fit — on the map, out of
         /// walls — at once (constraining only at the end would push men at an edge or wall back into their neighbours), and
         /// finally every body is.
@@ -274,7 +274,7 @@ namespace Knez.Sim.Movement
         {
             MapDef map = state.Scenario.Map;
             List<Fighter> fighters = state.FighterList;
-            for (int pass = 0; pass < MovementRules.CollisionPasses; pass++)
+            for (int pass = 0; pass < state.Scenario.Movement.CollisionPasses; pass++)
             {
                 bool moved = false;
                 for (int i = 0; i < fighters.Count; i++)
@@ -288,7 +288,7 @@ namespace Knez.Sim.Movement
                     for (int j = i + 1; j < fighters.Count; j++)
                     {
                         Fighter b = fighters[j];
-                        if (b.IsAlive && !PassThrough(fighters, roles, i, j) && Separate(map, a, b, weights[i], weights[j]))
+                        if (b.IsAlive && !PassThrough(fighters, roles, i, j) && Separate(map, state.Scenario.Movement, a, b, weights[i], weights[j]))
                         {
                             moved = true;
                         }
@@ -315,7 +315,7 @@ namespace Knez.Sim.Movement
         /// Pushes <paramref name="a"/> and <paramref name="b"/> apart by their overlap and keeps both on the map; true if
         /// they overlapped.
         /// </summary>
-        private static bool Separate(MapDef map, Fighter a, Fighter b, int weightA, int weightB)
+        private static bool Separate(MapDef map, MovementDef rules, Fighter a, Fighter b, int weightA, int weightB)
         {
             Fix minimum = a.Radius + b.Radius;
             FixVec2 apart = b.Position - a.Position; // from a toward b
@@ -331,7 +331,7 @@ namespace Knez.Sim.Movement
             }
 
             Fix overlap = minimum - distance;
-            if (overlap > DeepAllyOverlap && AlliedOtherSquad(a, b))
+            if (overlap > rules.AllyPartingDepth && AlliedOtherSquad(a, b))
             {
                 // Men of different allied squads this deep inside each other were passing through until now (an order
                 // given or finished mid-squeeze): they drift apart ~10 cm a tick instead of jumping. Ordinary overlaps
@@ -339,7 +339,7 @@ namespace Knez.Sim.Movement
                 // once; capping them too breaks crossings. Men of one squad never pass through each other, so any overlap
                 // between them is a push and is cleared at once. Known: once a deep pair gets under the threshold, the
                 // rest clears in one tick (≤ ~0.3 m measured) — bench item.
-                overlap = AllyCorrectionPerPass;
+                overlap = rules.PersonalSpace / rules.CollisionPasses; // personal space spread over all passes (~1.7 cm)
             }
 
             Fix shareA = overlap * weightB / (weightA + weightB); // the heavier one moves less
@@ -349,12 +349,6 @@ namespace Knez.Sim.Movement
             b.Position = Terrain.Constrain(map, b.Position + Apart(apart, distance, shareB, negativeX: false), b.Radius);
             return true;
         }
-
-        /// <summary>Between different allied squads, an overlap deeper than this (25 cm) comes from men who were passing through.</summary>
-        private static readonly Fix DeepAllyOverlap = Fix.Ratio(1, 4);
-
-        /// <summary>How far such a deep allied pair is pushed apart per pass: personal space spread over all passes (~1.7 cm).</summary>
-        private static readonly Fix AllyCorrectionPerPass = MovementRules.PersonalSpace / MovementRules.CollisionPasses;
 
         /// <summary>
         /// <paramref name="direction"/> scaled to <paramref name="length"/>. Two bodies on exactly the same spot have no

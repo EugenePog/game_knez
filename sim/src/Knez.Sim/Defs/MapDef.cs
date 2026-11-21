@@ -44,8 +44,9 @@ namespace Knez.Sim.Defs
         /// <summary>Walls in file order.</summary>
         public IReadOnlyList<WallDef> Walls { get; }
 
-        /// <summary>Largest map side; keeps squared distances well inside <see cref="Fix"/> range.</summary>
-        public const int MaxSideMetres = 2000;
+        /// <summary>Largest map side: 250 m, 500 route cells (a 250 × 250 m map has 250 000). A sanity bound for skirmish
+        /// maps; it also keeps squared distances well inside <see cref="Fix"/> range.</summary>
+        public const int MaxSideMetres = 250;
 
         /// <summary>Extent along X (east), metres.</summary>
         public Fix Width { get; }

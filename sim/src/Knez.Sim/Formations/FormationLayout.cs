@@ -44,6 +44,110 @@ namespace Knez.Sim.Formations
             return new FixVec2(x, y);
         }
 
+        /// <summary>
+        /// Offset of <paramref name="slot"/> when the squad is narrowed to <paramref name="files"/> files to pass a gap (0,
+        /// or at least the formation's own width: the normal layout). Each old rank splits left to right into
+        /// <paramref name="files"/> bands as even as possible, the odd men going to the bands round-robin across ranks so
+        /// the new files differ by one man at most; within a new file men stand by their old rank, inner files before outer ones, so the
+        /// middle of the front stays in front and the flanks fall in behind. O(squad size) per call; only narrowed squads
+        /// pay it.
+        /// </summary>
+        public static FixVec2 SlotOffset(FormationDef formation, int count, int slot, int files)
+        {
+            int width = Width(formation, count);
+            if (files <= 0 || files >= width)
+            {
+                return SlotOffset(formation, count, slot);
+            }
+
+            if (slot < 0 || slot >= count)
+            {
+                throw new ArgumentOutOfRangeException(nameof(slot), $"slot {slot} is outside 0..{count - 1}.");
+            }
+
+            Place(width, count, slot, files, out int file, out int rank, out int lateral);
+            int depth = 0;
+            for (int other = 0; other < count; other++)
+            {
+                Place(width, count, other, files, out int otherFile, out int otherRank, out int otherLateral);
+                if (otherFile == file && Before(otherRank, otherLateral, rank, lateral))
+                {
+                    depth++;
+                }
+            }
+
+            Fix x = formation.Spacing * (2 * file - (files - 1)) / 2;
+            Fix y = -(formation.RankSpacing * depth);
+            return new FixVec2(x, y);
+        }
+
+        /// <summary>Ranks of the deepest file when a squad of <paramref name="count"/> is narrowed to <paramref name="files"/>
+        /// files (the normal rank count when that is no narrowing).</summary>
+        public static int NarrowedRanks(FormationDef formation, int count, int files)
+        {
+            int width = Width(formation, count);
+            if (files <= 0 || files >= width)
+            {
+                return (count + width - 1) / width;
+            }
+
+            int deepest = 0;
+            for (int f = 0; f < files; f++)
+            {
+                int inFile = 0;
+                for (int slot = 0; slot < count; slot++)
+                {
+                    Place(width, count, slot, files, out int file, out _, out _);
+                    inFile += file == f ? 1 : 0;
+                }
+
+                deepest = Math.Max(deepest, inFile);
+            }
+
+            return deepest;
+        }
+
+        /// <summary>For <paramref name="slot"/> in the normal layout: its rank, its place across the front in half spacings
+        /// (0 = the middle), and the narrowed file it goes to.</summary>
+        private static void Place(int width, int count, int slot, int files, out int file, out int rank, out int lateral)
+        {
+            rank = slot / width;
+            int inRank = Math.Min(width, count - rank * width);
+            int position = slot - rank * width;
+            lateral = 2 * position - (inRank - 1);
+
+            // Bands of inRank / files men; the odd men go round-robin, carrying on from where the ranks in front left off
+            // (all of them full: width % files odd men each), so every band gets its share of odd men overall.
+            int perBand = inRank / files;
+            int extra = inRank % files;
+            int firstExtra = (rank * (width % files)) % files;
+            int start = 0;
+            file = files - 1;
+            for (int band = 0; band < files; band++)
+            {
+                int size = perBand + (((band - firstExtra + files) % files) < extra ? 1 : 0);
+                if (position < start + size)
+                {
+                    file = band;
+                    return;
+                }
+
+                start += size;
+            }
+        }
+
+        private static bool Before(int rankA, int lateralA, int rankB, int lateralB)
+        {
+            if (rankA != rankB)
+            {
+                return rankA < rankB;
+            }
+
+            int innerA = lateralA < 0 ? -lateralA : lateralA;
+            int innerB = lateralB < 0 ? -lateralB : lateralB;
+            return innerA != innerB ? innerA < innerB : lateralA < lateralB;
+        }
+
         /// <summary>World position of a local offset for an anchor at <paramref name="anchor"/> facing <paramref name="facing"/>.</summary>
         public static FixVec2 ToWorld(FixVec2 anchor, Angle facing, FixVec2 local)
         {
