@@ -48,6 +48,8 @@ namespace Knez.Sim.Units
             PathRequestTick = source.PathRequestTick;
             Files = source.Files;
             RegroupSince = source.RegroupSince;
+            Frontage = source.Frontage;
+            Reforming = source.Reforming;
         }
 
         /// <summary>Identity; squads are kept sorted by it.</summary>
@@ -95,6 +97,15 @@ namespace Knez.Sim.Units
         /// formation's width, k > 0 stop and regroup into k files before a narrow gap.
         /// </summary>
         public IReadOnlyList<int> PathFiles => _pathFiles;
+
+        /// <summary>
+        /// Files across the front of its formation, fixed when it forms up (spawn, formation change). Losses thin the rear
+        /// first: the front narrows only once fewer men are left than this (decided 2026-11-21).
+        /// </summary>
+        public int Frontage { get; internal set; }
+
+        /// <summary>Changing formation: men are moving to their new places and the squad marches at reduced pace.</summary>
+        public bool Reforming { get; internal set; }
 
         /// <summary>Files the squad is narrowed to for a gap, or 0 when it stands in its formation's own width.</summary>
         public int Files { get; internal set; }

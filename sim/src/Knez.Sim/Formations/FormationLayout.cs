@@ -25,14 +25,26 @@ namespace Knez.Sim.Formations
         }
 
         /// <summary>Offset of <paramref name="slot"/> from the anchor in local coordinates (X right, Y forward).</summary>
-        public static FixVec2 SlotOffset(FormationDef formation, int count, int slot)
+        public static FixVec2 SlotOffset(FormationDef formation, int count, int slot) =>
+            SlotOffsetAt(formation, Width(formation, count), count, slot, 0);
+
+        /// <summary>
+        /// Files across the front for <paramref name="count"/> men in a formation whose front was set at
+        /// <paramref name="frontage"/> files (0 = the formation's own width for this count): losses thin the rear, so the
+        /// front narrows only when fewer men are left than files.
+        /// </summary>
+        public static int Width(FormationDef formation, int frontage, int count) =>
+            frontage <= 0 ? Width(formation, count) : Math.Min(frontage, count);
+
+        /// <summary>Offset of <paramref name="slot"/> with <paramref name="width"/> files across the front (the incomplete
+        /// rank is the rearmost, centred).</summary>
+        private static FixVec2 Normal(FormationDef formation, int width, int count, int slot)
         {
             if (slot < 0 || slot >= count)
             {
                 throw new ArgumentOutOfRangeException(nameof(slot), $"slot {slot} is outside 0..{count - 1}.");
             }
 
-            int width = Width(formation, count);
             int rank = slot / width;
             int file = slot - rank * width;
             int inRank = Math.Min(width, count - rank * width);
@@ -52,12 +64,18 @@ namespace Knez.Sim.Formations
         /// middle of the front stays in front and the flanks fall in behind. O(squad size) per call; only narrowed squads
         /// pay it.
         /// </summary>
-        public static FixVec2 SlotOffset(FormationDef formation, int count, int slot, int files)
+        public static FixVec2 SlotOffset(FormationDef formation, int count, int slot, int files) =>
+            SlotOffsetAt(formation, Width(formation, count), count, slot, files);
+
+        /// <summary>
+        /// Offset of <paramref name="slot"/> with <paramref name="width"/> files across the front (see
+        /// <see cref="Width(FormationDef, int, int)"/>), narrowed to <paramref name="files"/> files for a gap (0: not narrowed).
+        /// </summary>
+        public static FixVec2 SlotOffsetAt(FormationDef formation, int width, int count, int slot, int files)
         {
-            int width = Width(formation, count);
             if (files <= 0 || files >= width)
             {
-                return SlotOffset(formation, count, slot);
+                return Normal(formation, width, count, slot);
             }
 
             if (slot < 0 || slot >= count)
@@ -83,9 +101,12 @@ namespace Knez.Sim.Formations
 
         /// <summary>Ranks of the deepest file when a squad of <paramref name="count"/> is narrowed to <paramref name="files"/>
         /// files (the normal rank count when that is no narrowing).</summary>
-        public static int NarrowedRanks(FormationDef formation, int count, int files)
+        public static int NarrowedRanks(FormationDef formation, int count, int files) =>
+            NarrowedRanks(Width(formation, count), count, files);
+
+        /// <summary>As <see cref="NarrowedRanks(FormationDef, int, int)"/> for a front of <paramref name="width"/> files.</summary>
+        public static int NarrowedRanks(int width, int count, int files)
         {
-            int width = Width(formation, count);
             if (files <= 0 || files >= width)
             {
                 return (count + width - 1) / width;

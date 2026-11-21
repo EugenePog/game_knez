@@ -37,6 +37,7 @@ namespace Knez.Sim.Movement
             {
                 squad.PathList.Add(target);
                 squad.PathFilesList.Add(-1);
+                ApproachForFacingAbout(state, squad);
                 return;
             }
 
@@ -94,7 +95,51 @@ namespace Knez.Sim.Movement
             }
 
             squad.Order = SquadOrder.Move(end, facing, order.FacingFromMarch);
+            ApproachForFacingAbout(state, squad);
             return expanded;
+        }
+
+        /// <summary>
+        /// When the order's facing is more than a quarter turn from the route's last leg, the squad will face about at the
+        /// end. So that its new front rank lands on the ordered point (decided 2026-11-21), the route runs on one
+        /// squad-depth past the target, where the rear rank — the front after facing about — will be over the target. Only
+        /// where the ground allows it; otherwise the squad faces about at the target and steps back.
+        /// </summary>
+        private static void ApproachForFacingAbout(BattleState state, Squad squad)
+        {
+            SquadOrder order = squad.Order;
+            List<FixVec2> path = squad.PathList;
+            List<int> marks = squad.PathFilesList;
+            if (order.FacingFromMarch || path.Count == 0)
+            {
+                return;
+            }
+
+            FixVec2 target = path[path.Count - 1];
+            FixVec2 leg = target - (path.Count >= 2 ? path[path.Count - 2] : squad.Anchor);
+            int turn = FixMath.Atan2(leg.Y, leg.X).DeltaTo(order.Facing);
+            if (leg.Length <= MovementRules.ArriveDistance || (turn <= Angle.UnitsPerTurn / 4 && turn >= -(Angle.UnitsPerTurn / 4)))
+            {
+                return;
+            }
+
+            int files = squad.Files; // the width it will arrive in: the last regroup or widen on the route decides
+            for (int i = 0; i < marks.Count; i++)
+            {
+                files = marks[i] >= 0 ? marks[i] : files;
+            }
+
+            Fix depth = SlotTracking.Depth(squad, files);
+            Fix body = ShapeOf(state, squad, null).Body;
+            MapDef map = state.Scenario.Map;
+            FixVec2 approach = target - (order.Facing.Forward * depth);
+            if (depth <= Fix.Zero || Terrain.Clearance(map, approach) < body || !Terrain.SegmentClear(map, target, approach, body))
+            {
+                return;
+            }
+
+            path.Insert(path.Count - 1, approach);
+            marks.Insert(marks.Count - 1, -1);
         }
 
         /// <summary>
@@ -121,7 +166,7 @@ namespace Knez.Sim.Movement
                 }
             }
 
-            return new Shape(squad.Formation, members.Count < 1 ? 1 : members.Count, body, ranksByFiles);
+            return new Shape(squad.Formation, squad.Frontage, members.Count < 1 ? 1 : members.Count, body, ranksByFiles);
         }
 
         /// <summary>The least room a sampled straight stretch may show when the route it replaces has <paramref name="room"/>,
@@ -642,18 +687,18 @@ namespace Knez.Sim.Movement
             private readonly FormationDef _formation;
             private readonly int[]? _ranks;
 
-            public Shape(FormationDef formation, int count, Fix body, int[]? ranksByFiles)
+            public Shape(FormationDef formation, int frontage, int count, Fix body, int[]? ranksByFiles)
             {
                 _formation = formation;
                 Body = body;
-                Files = FormationLayout.Width(formation, count);
+                Files = FormationLayout.Width(formation, frontage, count);
                 Wide = HalfFrontOf(formation, Files, body);
                 _ranks = ranksByFiles;
                 if (_ranks != null)
                 {
                     for (int files = 1; files <= Files; files++)
                     {
-                        _ranks[files] = FormationLayout.NarrowedRanks(formation, count, files);
+                        _ranks[files] = FormationLayout.NarrowedRanks(Files, count, files);
                     }
                 }
             }

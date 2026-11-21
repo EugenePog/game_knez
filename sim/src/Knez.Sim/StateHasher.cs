@@ -60,6 +60,8 @@ namespace Knez.Sim
                 }
 
                 squads.Add(squad.Files);
+                squads.Add(squad.Frontage);
+                squads.Add(squad.Reforming);
                 squads.Add(squad.RegroupSince);
 
                 List<EntityId> members = squad.MemberList;

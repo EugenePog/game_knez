@@ -18,7 +18,8 @@ namespace Knez.Sim.Defs
         /// name the squad as <c>squads[i]</c>.
         /// </summary>
         public ScenarioDef(string id, string description, MapDef map, IReadOnlyList<SquadSpawnDef> squads,
-            IReadOnlyList<ScriptedOrderDef>? script = null, MovementDef? movement = null)
+            IReadOnlyList<ScriptedOrderDef>? script = null, MovementDef? movement = null,
+            IReadOnlyList<FormationDef>? formations = null)
         {
             Id = DefChecks.Id(id, nameof(id));
             Movement = movement ?? MovementDef.Standard;
@@ -58,7 +59,8 @@ namespace Knez.Sim.Defs
             }
 
             Squads = new ReadOnlyCollection<SquadSpawnDef>(copy);
-            Script = new ReadOnlyCollection<ScriptedOrderDef>(CheckScript(script ?? Array.Empty<ScriptedOrderDef>(), copy, map));
+            Formations = new ReadOnlyCollection<FormationDef>(Catalogue(formations, copy));
+            Script = new ReadOnlyCollection<ScriptedOrderDef>(CheckScript(script ?? Array.Empty<ScriptedOrderDef>(), copy, map, Formations));
             Fingerprint = ComputeFingerprint();
         }
 
@@ -75,6 +77,26 @@ namespace Knez.Sim.Defs
         /// <summary>The battle map.</summary>
         public MapDef Map { get; }
 
+        /// <summary>
+        /// Every formation the battle may use (content's whole catalogue; when built in code, the ones the squads spawn
+        /// in), sorted by id and fingerprinted. Formation changes name formations from here.
+        /// </summary>
+        public IReadOnlyList<FormationDef> Formations { get; }
+
+        /// <summary>The formation with <paramref name="id"/> in <see cref="Formations"/>, or null.</summary>
+        public FormationDef? FindFormation(string id)
+        {
+            for (int i = 0; i < Formations.Count; i++)
+            {
+                if (string.Equals(Formations[i].Id, id, StringComparison.Ordinal))
+                {
+                    return Formations[i];
+                }
+            }
+
+            return null;
+        }
+
         /// <summary>Movement rules (content's <c>movement.json</c>; <see cref="MovementDef.Standard"/> when built in code).</summary>
         public MovementDef Movement { get; }
 
@@ -85,7 +107,8 @@ namespace Knez.Sim.Defs
         public IReadOnlyList<ScriptedOrderDef> Script { get; }
 
         /// <summary>
-        /// FNV-1a hash of everything that affects the battle (map, squads and the defs they use), in a canonical order.
+        /// FNV-1a hash of everything that affects the battle (map, movement rules, the formation catalogue, squads and the
+        /// defs they use, script), in a canonical order.
         /// Hashed in the state's Core section, so two runs of different content never share a hash.
         /// </summary>
         public ulong Fingerprint { get; }
@@ -125,7 +148,63 @@ namespace Knez.Sim.Defs
             }
         }
 
-        private static ScriptedOrderDef[] CheckScript(IReadOnlyList<ScriptedOrderDef> script, SquadSpawnDef[] squads, MapDef map)
+        /// <summary>
+        /// The catalogue: <paramref name="given"/> (or the spawns' formations), sorted by id, one object per id, and holding
+        /// the very def object each spawn uses (state hashes name formations by id).
+        /// </summary>
+        private static FormationDef[] Catalogue(IReadOnlyList<FormationDef>? given, SquadSpawnDef[] squads)
+        {
+            var list = new List<FormationDef>();
+            if (given != null)
+            {
+                for (int i = 0; i < given.Count; i++)
+                {
+                    list.Add(given[i] ?? throw new ArgumentNullException(nameof(given), $"formations[{i}] is null."));
+                }
+            }
+
+            for (int i = 0; i < squads.Length; i++)
+            {
+                if (given == null && !list.Contains(squads[i].Formation))
+                {
+                    list.Add(squads[i].Formation);
+                }
+            }
+
+            for (int i = 1; i < list.Count; i++)
+            {
+                // Insertion sort by id (ordinal): a handful of defs, and no lambda for the def-type tests to trip over.
+                FormationDef item = list[i];
+                int j = i - 1;
+                while (j >= 0 && string.CompareOrdinal(list[j].Id, item.Id) > 0)
+                {
+                    list[j + 1] = list[j];
+                    j--;
+                }
+
+                list[j + 1] = item;
+            }
+            for (int i = 1; i < list.Count; i++)
+            {
+                if (string.Equals(list[i - 1].Id, list[i].Id, StringComparison.Ordinal))
+                {
+                    throw new ArgumentException($"formation id '{list[i].Id}' appears twice in the catalogue.");
+                }
+            }
+
+            for (int i = 0; i < squads.Length; i++)
+            {
+                if (!list.Contains(squads[i].Formation))
+                {
+                    throw new ArgumentException($"squads[{i}] '{squads[i].Name}': formation '{squads[i].Formation.Id}' is not the catalogue's def of that id.");
+                }
+            }
+
+            return list.ToArray();
+        }
+
+        private static ScriptedOrderDef[] CheckScript(IReadOnlyList<ScriptedOrderDef> script, SquadSpawnDef[] squads, MapDef map,
+            IReadOnlyList<FormationDef> formations)
         {
             var copy = new ScriptedOrderDef[script.Count];
             for (int i = 0; i < copy.Length; i++)
@@ -147,7 +226,20 @@ namespace Knez.Sim.Defs
                     throw new ArgumentException($"script[{i}]: no squad is named '{entry.SquadName}'.");
                 }
 
-                if (!map.Contains(entry.Target))
+                if (entry.FormationId != null)
+                {
+                    bool exists = false;
+                    for (int f = 0; f < formations.Count && !exists; f++)
+                    {
+                        exists = string.Equals(formations[f].Id, entry.FormationId, StringComparison.Ordinal);
+                    }
+
+                    if (!exists)
+                    {
+                        throw new ArgumentException($"script[{i}]: no formation '{entry.FormationId}' in the catalogue.");
+                    }
+                }
+                else if (!map.Contains(entry.Target))
                 {
                     throw new ArgumentException($"script[{i}]: target {entry.Target} is off the {map} map.");
                 }
@@ -164,6 +256,12 @@ namespace Knez.Sim.Defs
             hash.Add(Id);
             Map.AddTo(ref hash);
             Movement.AddTo(ref hash);
+            hash.Add(Formations.Count);
+            for (int i = 0; i < Formations.Count; i++)
+            {
+                Formations[i].AddTo(ref hash);
+            }
+
             hash.Add(Squads.Count);
             for (int i = 0; i < Squads.Count; i++)
             {

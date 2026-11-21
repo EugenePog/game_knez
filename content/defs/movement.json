@@ -12,6 +12,8 @@
     "pathBudget": 4000,
     "regroupLead": 1.0,
     "regroupMaxWait": 5,
-    "regroupCost": 1
+    "regroupCost": 1,
+    "reformPace": 0.5,
+    "stepBackPace": 0.5
   }
 }

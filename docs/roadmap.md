@@ -118,6 +118,20 @@ Steps — one change each, each ending with build/tests/purity green and a `sim-
    ranks), with a seeded random-map sweep and a multi-start test pinning it. 435 tests.
 7. Formations in motion: `SetFormation` (Line, ShieldWall, Column), wheeling, slot reassignment after losses.
    First: `ScenarioDef` carries and fingerprints the whole def catalogue (battle-sim.md §7).
+   Decided 2026-11-21: wheel round the inner flank at route corners, face about for more than a quarter turn; re-form
+   on the move at half pace; losses keep the front and thin the rear. Built 2026-11-21: formation catalogue in the
+   scenario (fingerprinted), `SetFormation` (+ scripted `formation` orders, `unknown-formation`), `Frontage` and
+   ranks closing from the back in `CleanupSystem`, nearest-man slot assignment on re-forming and facing about, tangent
+   wheels at corners, `reformPace` in `movement.json`, squad/slot and formation columns in the frames,
+   `content/scenarios/drill.json`, a drill golden. Other goldens re-recorded: the hash gained frontage, re-forming
+   and the catalogue; with those left out every old golden matched (their squads never turn more than 30°).
+   Reviewed by `sim-reviewer`: a wheel or face-about could carry the anchor into a wall (57 of 160 near-wall cases) and
+   a face-about on arrival left the front a depth past the ordered point. Decided 2026-11-21: the front lands on the
+   ordered point (the route runs a depth past it and the squad faces about there; a target just behind: face about and
+   step back, `stepBackPace`). Fixed: wheels and face-abouts only on clear ground (0 of 160), `FitInside` uses the real
+   frontage, single-rank squads skip a waypoint just behind them; tests for arrival, re-issue, step back, the wall
+   repro, a right wheel, random losses and formation changes while waiting or regrouping. Goldens re-recorded for the
+   fingerprint only (`stepBackPace`). 456 tests.
 8. Bench: scenarios S1–S5, metrics, `bench` and `batch`; tune; decide steering vs ORCA; check the exit criteria.
 
 **Checkpoint:** M1 exit criteria in `battle-sim.md` §10 (no stuck > 2 s, overlap < 1 %, p99 < 2 ms for 50 fighters,

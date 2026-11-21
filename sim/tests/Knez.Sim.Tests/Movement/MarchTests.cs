@@ -68,21 +68,22 @@ public class MarchTests
     }
 
     [Test]
-    public void Order_TargetBehind_TurnsInPlaceFirst_ThenMarches()
+    public void Order_TargetBehind_FacesAbout_ThenMarches()
     {
+        // Straight behind: more than a quarter turn, so the line faces about (decided 2026-11-21) — every man turns round,
+        // the rear rank becomes the front, and the anchor jumps to where the rear rank's centre was (1.5 m back).
         var sim = OneLine();
-        Order(sim, 20, 0); // straight behind: 180° to turn, march once within 30°
-        sim.StepTicks(60);
+        Order(sim, 20, 0);
+        sim.StepTicks(2);
         Assert.Multiple(() =>
         {
-            Assert.That(Line(sim).Anchor, Is.EqualTo(FixVec2.FromInts(20, 10)), "still turning in place");
-            Assert.That(Line(sim).Facing, Is.Not.EqualTo(Angle.FromDegrees(90)));
-            Assert.That(Line(sim).Velocity, Is.EqualTo(FixVec2.Zero));
-            Assert.That(Line(sim).Spin, Is.EqualTo(-410), "half a turn goes clockwise at 45°/s");
+            Assert.That(Line(sim).Facing, Is.EqualTo(Angle.FromDegrees(270)));
+            Assert.That(Line(sim).Anchor, Is.EqualTo(new FixVec2(Fix.FromInt(20), Fix.Ratio(17, 2))));
+            Assert.That(WorstSlotError(sim.State), Is.LessThan(0.01), "nobody walks: each new place goes to the man standing there");
         });
 
-        sim.StepTicks(20); // (180° − 30°) at 45°/s = 3.33 s = 67 ticks
-        Assert.That(Line(sim).Anchor.Y, Is.LessThan(Fix.FromInt(10)), "marching south");
+        sim.StepTicks(20);
+        Assert.That(Line(sim).Anchor.Y, Is.LessThan(Fix.Ratio(17, 2)), "marching south at once");
     }
 
     [Test]
@@ -244,27 +245,27 @@ public class MarchTests
     }
 
     [Test]
-    public void NewOrderMidTurn_ReplacesTheOld_AndTurnsOnFromTheCurrentFacing()
+    public void NewOrderMidWheel_ReplacesTheOld_AndTurnsOnFromTheCurrentFacing()
     {
         var sim = OneLine();
-        Order(sim, 20, 0); // about-turn: clockwise
-        sim.StepTicks(20);
-        var midTurn = Line(sim).Facing;
-        Assert.That(midTurn, Is.Not.EqualTo(Angle.FromDegrees(90)));
+        Order(sim, 6, 24); // 45° to the left: a wheel round the left flank
+        sim.StepTicks(8);
+        var midWheel = Line(sim).Facing;
+        Assert.That(midWheel, Is.Not.EqualTo(Angle.FromDegrees(90)));
 
-        Order(sim, 35, 10); // now east
+        Order(sim, 34, 30); // now north-east
         sim.Step();
         Assert.Multiple(() =>
         {
-            Assert.That(Line(sim).Order.Target, Is.EqualTo(FixVec2.FromInts(35, 10)));
-            Assert.That(Math.Abs(midTurn.DeltaTo(Line(sim).Facing)), Is.LessThanOrEqualTo(410), "no jump: one tick of turning");
+            Assert.That(Line(sim).Order.Target, Is.EqualTo(FixVec2.FromInts(34, 30)));
+            Assert.That(Math.Abs(midWheel.DeltaTo(Line(sim).Facing)), Is.LessThanOrEqualTo(410), "no jump: one tick of turning");
         });
 
-        sim.StepTicks(300); // ~15° more turning, then 15 m at 1.4 m/s (215 ticks)
+        sim.StepTicks(500);
         Assert.Multiple(() =>
         {
-            Assert.That(Line(sim).Anchor, Is.EqualTo(FixVec2.FromInts(35, 10)));
-            Assert.That(Line(sim).Facing, Is.EqualTo(Angle.FromDegrees(0)));
+            Assert.That(Line(sim).Anchor, Is.EqualTo(FixVec2.FromInts(34, 30)));
+            Assert.That(Line(sim).Order, Is.EqualTo(SquadOrder.None));
         });
     }
 

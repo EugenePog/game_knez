@@ -54,6 +54,23 @@ public static class TestDefs
     ]);
 
     /// <summary>
+    /// The step 7 drill: a line ordered a quarter turn left (it wheels round its left end), re-forming into a column on the
+    /// march and back into a line; a column ordered straight back (it faces about). The golden test also kills one man.
+    /// </summary>
+    public static ScenarioDef Drill() => new("test-drill", "test", Map,
+    [
+        Squad("Line", 0, 8, FixVec2.FromInts(40, 10), 90),
+        Squad("Column", 1, 6, FixVec2.FromInts(20, 30), 100, Column),
+    ],
+    [
+        new ScriptedOrderDef(1, "Line", FixVec2.FromInts(15, 12), null),
+        new ScriptedOrderDef(1, "Column", FixVec2.FromInts(22, 14), null),
+        ScriptedOrderDef.Formation(60, "Line", "test-column"),
+        ScriptedOrderDef.Formation(260, "Line", "test-line"),
+    ],
+    formations: [Line, Column]);
+
+    /// <summary>
     /// Benchmark S3 in miniature: two friendly lines of 8 cross at 90° — one marching east, one north — both 16 m from
     /// the crossing point, so they reach it together and their men have to jostle past each other.
     /// </summary>

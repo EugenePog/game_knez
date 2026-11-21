@@ -163,7 +163,7 @@ public class ContentLoaderTests
         });
     }
 
-    [TestCase("""{ "tick": 5, "order": "charge", "squad": "A", "target": [30, 20] }""", "script[0].order: unknown order 'charge' (known: move)")]
+    [TestCase("""{ "tick": 5, "order": "charge", "squad": "A", "target": [30, 20] }""", "script[0].order: unknown order 'charge' (known: move, formation)")]
     [TestCase("""{ "tick": 5, "order": "move", "squad": "Nobody", "target": [30, 20] }""", "script[0]: no squad is named 'Nobody'.")]
     [TestCase("""{ "tick": 0, "order": "move", "squad": "A", "target": [30, 20] }""", "script[0]: tick must be 1..2147483647 (got 0).")]
     [TestCase("""{ "tick": 5, "order": "move", "squad": "A", "target": [99, 20] }""", "script[0]: target (99.00000, 20.00000) is off the")]
@@ -212,7 +212,7 @@ public class ContentLoaderTests
     private const string Movement = """
         { "movement": { "pivotTolerance": 45, "slotCatchUpTime": 0.35, "personalSpace": 0.12, "separationTime": 0.25,
           "holdingReach": 1.5, "formedUpReach": 0.4, "collisionPasses": 4, "allyPartingDepth": 0.25, "pathBudget": 2000,
-          "regroupLead": 2, "regroupMaxWait": 4, "regroupCost": 0.5 } }
+          "regroupLead": 2, "regroupMaxWait": 4, "regroupCost": 0.5, "reformPace": 0.5, "stepBackPace": 0.5 } }
         """;
 
     [Test]

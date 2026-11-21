@@ -19,6 +19,7 @@ namespace Knez.Sim
             {
                 SquadSpawnDef spawn = scenario.Squads[i];
                 Squad squad = state.AddSquad(spawn.SideId, spawn.Name, spawn.Formation, spawn.Position, spawn.Facing);
+                squad.Frontage = FormationLayout.Width(spawn.Formation, spawn.Count);
                 for (int slot = 0; slot < spawn.Count; slot++)
                 {
                     FixVec2 position = FormationLayout.SlotPosition(spawn.Formation, spawn.Count, slot, spawn.Position, spawn.Facing);

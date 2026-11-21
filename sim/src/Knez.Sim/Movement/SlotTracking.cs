@@ -13,7 +13,41 @@ namespace Knez.Sim.Movement
     {
         /// <summary>The slot's offset from the anchor in local coordinates for <paramref name="fighter"/> in <paramref name="squad"/>.</summary>
         public static FixVec2 Offset(Squad squad, Fighter fighter) =>
-            FormationLayout.SlotOffset(squad.Formation, squad.MemberList.Count, fighter.SlotIndex, squad.Files);
+            FormationLayout.SlotOffsetAt(squad.Formation, FormationLayout.Width(squad.Formation, squad.Frontage, squad.MemberList.Count),
+                squad.MemberList.Count, fighter.SlotIndex, squad.Files);
+
+        /// <summary>Front rank to rear rank of the squad as it stands now, metres (narrowed or not).</summary>
+        public static Fix Depth(Squad squad) => Depth(squad, squad.Files);
+
+        /// <summary>Front rank to rear rank of the squad in <paramref name="files"/> files (0 = its own width), metres.</summary>
+        public static Fix Depth(Squad squad, int files)
+        {
+            int count = squad.MemberList.Count;
+            if (count == 0)
+            {
+                return Fix.Zero;
+            }
+
+            int width = FormationLayout.Width(squad.Formation, squad.Frontage, count);
+            int ranks = files > 0 && files < width
+                ? FormationLayout.NarrowedRanks(width, count, files)
+                : (count + width - 1) / width;
+            return squad.Formation.RankSpacing * (ranks - 1);
+        }
+
+        /// <summary>The width of the squad's front as it stands now, slot centre to slot centre (narrowed or not).</summary>
+        public static Fix FrontWidth(Squad squad)
+        {
+            int count = squad.MemberList.Count;
+            if (count == 0)
+            {
+                return Fix.Zero;
+            }
+
+            int width = FormationLayout.Width(squad.Formation, squad.Frontage, count);
+            int files = squad.Files > 0 && squad.Files < width ? squad.Files : width;
+            return squad.Formation.Spacing * (files - 1);
+        }
 
         /// <summary>The slot's world position now.</summary>
         public static FixVec2 Position(Squad squad, FixVec2 offset) => FormationLayout.ToWorld(squad.Anchor, squad.Facing, offset);

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Knez.Sim.Formations;
 using Knez.Sim.Movement;
 using Knez.Sim.Numerics;
 using Knez.Sim.Units;
@@ -6,13 +7,14 @@ using Knez.Sim.Units;
 namespace Knez.Sim.Orders
 {
     /// <summary>
-    /// Tick stage 3: carries out squad orders by moving and turning the anchor (battle-sim.md §10). A move order turns the
-    /// squad in place until the target is within 30° of its front, then marches straight there at the walk speed of its
-    /// slowest living member while finishing the turn, and on arrival turns to the order's facing at the formation's turn
-    /// rate. The order ends only when the squad is formed up: every living member within 30 cm of his slot (decided
-    /// 2026-11-21) — until then it is on the move. Since step 6 it marches its planned route (<see cref="Squad.Path"/>)
-    /// leg by leg, turning the same way at each corner, and waits while the route is planned. Wheeling and slot
-    /// reassignment come in step 7.
+    /// Tick stage 3: carries out squad orders (battle-sim.md §10). A move order marches the anchor along its planned route
+    /// (<see cref="Squad.Path"/>) at the walk speed of the slowest living member — at <c>reformPace</c> while re-forming —
+    /// and waits while the route is planned or the squad regroups for a gap. Turns of up to 30° are finished about the
+    /// anchor on the march; 30°–90° the squad wheels round its inner flank (from just before a corner, so it comes out on
+    /// the next leg); more than a quarter turn it faces about, the rear rank becoming the front (decided 2026-11-21) —
+    /// each only on clear ground, else it pivots in place. On arrival it turns to the order's facing; a face-about there
+    /// was planned for (the route runs a depth past the target) or is followed by a step back, so the front rank ends on
+    /// the ordered point. The order ends when the squad is formed up: every living member within 30 cm of his slot.
     /// </summary>
     public sealed class OrderSystem : ISimSystem
     {
@@ -25,6 +27,11 @@ namespace Knez.Sim.Orders
                 Squad squad = squads[i];
                 squad.Velocity = FixVec2.Zero;
                 squad.Spin = 0;
+                if (squad.Reforming && FormedUp(state, squad))
+                {
+                    squad.Reforming = false; // in its new formation: back to full pace
+                }
+
                 if (squad.Order.Kind == SquadOrderKind.Move)
                 {
                     Move(state, squad);
@@ -40,6 +47,11 @@ namespace Knez.Sim.Orders
                 squad.Order = SquadOrder.None; // nobody left to march
                 squad.ClearPath();
                 return;
+            }
+
+            if (squad.Reforming)
+            {
+                speed = speed * state.Scenario.Movement.ReformPace; // re-forming on the move (decided 2026-11-21)
             }
 
             if (squad.PathRequestTick >= 0)
@@ -73,7 +85,8 @@ namespace Knez.Sim.Orders
                 squad.RegroupSince = -1;
             }
 
-            while (squad.PathIndex < path.Count - 1 && (path[squad.PathIndex] - squad.Anchor).Length <= MovementRules.ArriveDistance)
+            while (squad.PathIndex < path.Count - 1
+                && ((path[squad.PathIndex] - squad.Anchor).Length <= MovementRules.ArriveDistance || PassedByFacingAbout(squad, path[squad.PathIndex])))
             {
                 if (Reach(state, squad))
                 {
@@ -95,6 +108,14 @@ namespace Knez.Sim.Orders
                     squad.Files = 0; // widen back to its own formation at the target
                 }
 
+                if (IsAbout(squad.Facing.DeltaTo(order.Facing)) && FaceAboutHelps(state, squad, order.Target, lastLeg: true))
+                {
+                    // No room was left for an approach past the target: face about here; the new front stands one depth
+                    // past the target, so the next ticks step back onto it (the front lands on the ordered point).
+                    FaceAbout(state, squad);
+                    return;
+                }
+
                 Turn(squad, order.Facing, turnRate);
                 if (squad.Facing == order.Facing && FormedUp(state, squad))
                 {
@@ -105,13 +126,57 @@ namespace Knez.Sim.Orders
                 return;
             }
 
-            Angle heading = FixMath.Atan2(delta.Y, delta.X);
-            Turn(squad, heading, turnRate);
-            int offHeading = squad.Facing.DeltaTo(heading);
             int tolerance = state.Scenario.Movement.PivotToleranceUnits;
+            if (!lastLeg && WheelsHere(squad, waypoint, distance, tolerance, out Angle nextHeading)
+                && WheelClear(state, squad, nextHeading, squad.PathIndex + 1 < path.Count ? path[squad.PathIndex + 1] : order.Target))
+            {
+                // Wheel through the corner on an arc tangent to both legs, so the squad comes out on the next leg instead
+                // of half a frontage off it.
+                Reach(state, squad);
+                Wheel(state, squad, nextHeading, turnRate);
+                return;
+            }
+
+            Angle heading = FixMath.Atan2(delta.Y, delta.X);
+            int offHeading = squad.Facing.DeltaTo(heading);
+            if (IsAbout(offHeading))
+            {
+                if (lastLeg && !IsAbout(squad.Facing.DeltaTo(order.Facing)) && distance <= SlotTracking.Depth(squad) + NavGrid.CellSize)
+                {
+                    // The target is just behind and the squad already faces the way it should end: step back onto it.
+                    FixVec2 back = distance <= speed * state.Scenario.Movement.StepBackPace ? delta : delta.WithLength(speed * state.Scenario.Movement.StepBackPace);
+                    squad.Anchor += back;
+                    squad.Velocity = back;
+                    return;
+                }
+
+                if (FaceAboutHelps(state, squad, waypoint, lastLeg))
+                {
+                    FaceAbout(state, squad); // more than a quarter turn: face about, the rear rank leads (decided 2026-11-21)
+                    return;
+                }
+            }
+
             if (offHeading > tolerance || offHeading < -tolerance)
             {
-                return; // still turning in place
+                if (!IsAbout(offHeading) && distance > SlotTracking.FrontWidth(squad) && WheelClear(state, squad, heading, waypoint))
+                {
+                    Wheel(state, squad, heading, turnRate); // wheel round the inner flank (decided 2026-11-21)
+                    return;
+                }
+
+                // A leg shorter than the front (a wheel would overshoot it), one a face-about would leave behind, or
+                // ground where a wheel or face-about would carry the squad into a wall: pivot in place as before.
+                Turn(squad, heading, turnRate);
+                int left = squad.Facing.DeltaTo(heading);
+                if (left > tolerance || left < -tolerance)
+                {
+                    return;
+                }
+            }
+            else
+            {
+                Turn(squad, heading, turnRate); // the last few degrees about the anchor, while marching
             }
 
             FixVec2 step = distance <= speed ? delta : delta.WithLength(speed);
@@ -144,6 +209,153 @@ namespace Knez.Sim.Orders
             }
 
             return false;
+        }
+
+        private static bool IsAbout(int delta) => delta > Angle.UnitsPerTurn / 4 || delta < -(Angle.UnitsPerTurn / 4);
+
+        /// <summary>
+        /// Whether the squad, marching on <paramref name="waypoint"/> (<paramref name="distance"/> away, an unmarked corner),
+        /// should start wheeling onto the next leg now: the turn there is more than the pivot tolerance and at most a
+        /// quarter turn, and the corner is within half·tan(θ/2) — where a wheel round the inner flank (radius half the
+        /// front) leaves the first leg and meets the next.
+        /// </summary>
+        private static bool WheelsHere(Squad squad, FixVec2 waypoint, Fix distance, int tolerance, out Angle nextHeading)
+        {
+            nextHeading = squad.Facing;
+            List<FixVec2> path = squad.PathList;
+            if (squad.PathFilesList[squad.PathIndex] != -1)
+            {
+                return false; // regroup and widen points are reached, not cut
+            }
+
+            FixVec2 next = squad.PathIndex + 1 < path.Count ? path[squad.PathIndex + 1] : squad.Order.Target;
+            FixVec2 onward = next - waypoint;
+            Fix half = SlotTracking.FrontWidth(squad) / 2;
+            if (half <= Fix.Zero || onward.Length <= MovementRules.ArriveDistance)
+            {
+                return false;
+            }
+
+            nextHeading = FixMath.Atan2(onward.Y, onward.X);
+            int turn = squad.Facing.DeltaTo(nextHeading);
+            int size = turn < 0 ? -turn : turn;
+            if (size <= tolerance || IsAbout(turn))
+            {
+                return false;
+            }
+
+            Angle angle = Angle.FromRaw(size);
+            Fix lead = half * FixMath.Sin(angle) / (Fix.One + FixMath.Cos(angle));
+            return distance <= lead && onward.Length > lead;
+        }
+
+        /// <summary>
+        /// An unmarked waypoint more than a quarter turn behind the squad and closer than the squad is deep: facing about
+        /// carries the squad past it, so it is skipped (routes start at cell centres, which can lie just behind the anchor).
+        /// </summary>
+        private static bool PassedByFacingAbout(Squad squad, FixVec2 waypoint)
+        {
+            if (squad.PathFilesList[squad.PathIndex] != -1)
+            {
+                return false;
+            }
+
+            FixVec2 to = waypoint - squad.Anchor;
+            Fix reach = FixMath.Max(SlotTracking.Depth(squad), NavGrid.CellSize); // a single rank has no depth: half a cell
+            return to.Length <= reach && IsAbout(squad.Facing.DeltaTo(FixMath.Atan2(to.Y, to.X)));
+        }
+
+        /// <summary>
+        /// Whether facing about now serves the squad marching on <paramref name="waypoint"/>: the new anchor (where the rear
+        /// rank's centre is) stands clear of walls, and the waypoint then lies on it, ahead of the new front with a clear way
+        /// there, or — on the last leg — just behind it, within a step back. Otherwise facing about would have to be
+        /// undone, or would carry the squad into a wall, and it pivots instead.
+        /// </summary>
+        private static bool FaceAboutHelps(BattleState state, Squad squad, FixVec2 waypoint, bool lastLeg)
+        {
+            Defs.MapDef map = state.Scenario.Map;
+            Fix depth = SlotTracking.Depth(squad);
+            FixVec2 anchor = FormationLayout.ToWorld(squad.Anchor, squad.Facing, new FixVec2(Fix.Zero, -depth));
+            if (Terrain.Clearance(map, anchor) < MovementRules.RouteSampleStep || Terrain.CrossesWall(map, squad.Anchor, anchor))
+            {
+                return false;
+            }
+
+            FixVec2 on = waypoint - anchor;
+            if (on.Length <= NavGrid.CellSize)
+            {
+                return true; // lands on it
+            }
+
+            Angle about = Angle.FromRaw(squad.Facing.Raw + (Angle.UnitsPerTurn / 2));
+            if (!IsAbout(about.DeltaTo(FixMath.Atan2(on.Y, on.X))))
+            {
+                return Terrain.SegmentClear(map, anchor, waypoint, MovementRules.RouteSampleStep);
+            }
+
+            return lastLeg && on.Length <= depth + NavGrid.CellSize;
+        }
+
+        /// <summary>
+        /// Whether a wheel toward <paramref name="toward"/> leaves the squad on clear ground: where the anchor ends after
+        /// the whole turn (round the current inner flank) is clear of walls, the arc doesn't cross one, and the way on to
+        /// <paramref name="waypoint"/> is open. Near walls a wheel can carry the anchor half a front off the planned leg.
+        /// </summary>
+        private static bool WheelClear(BattleState state, Squad squad, Angle toward, FixVec2 waypoint)
+        {
+            Defs.MapDef map = state.Scenario.Map;
+            int turn = squad.Facing.DeltaTo(toward);
+            Fix half = SlotTracking.FrontWidth(squad) / 2;
+            Fix side = turn > 0 ? -half : half;
+            FixVec2 pivot = FormationLayout.ToWorld(squad.Anchor, squad.Facing, new FixVec2(side, Fix.Zero));
+            FixVec2 halfway = FormationLayout.ToWorld(pivot, Angle.FromRaw(squad.Facing.Raw + (turn / 2)), new FixVec2(-side, Fix.Zero));
+            FixVec2 end = FormationLayout.ToWorld(pivot, toward, new FixVec2(-side, Fix.Zero));
+            return Terrain.Clearance(map, end) >= MovementRules.RouteSampleStep
+                && !Terrain.CrossesWall(map, squad.Anchor, halfway) && !Terrain.CrossesWall(map, halfway, end)
+                && Terrain.SegmentClear(map, end, waypoint, MovementRules.RouteSampleStep);
+        }
+
+        /// <summary>
+        /// Faces the squad about: every man turns round and the rear rank becomes the front, so nobody walks far — the
+        /// anchor (front-rank centre) moves to where the rear rank's centre was, and each new place goes to the nearest
+        /// man. The slots jump rather than sweep, so this tick carries no slot motion.
+        /// </summary>
+        private static void FaceAbout(BattleState state, Squad squad)
+        {
+            squad.Anchor = FormationLayout.ToWorld(squad.Anchor, squad.Facing, new FixVec2(Fix.Zero, -SlotTracking.Depth(squad)));
+            squad.Facing = Angle.FromRaw(squad.Facing.Raw + (Angle.UnitsPerTurn / 2));
+            SlotAssignment.Nearest(state, squad);
+        }
+
+        /// <summary>
+        /// Turns the squad toward <paramref name="toward"/> by wheeling round the inner end of its front rank: that man marks
+        /// time, the outer flank swings round, and the anchor moves with the wheel. The wheel is no faster than the
+        /// formation's turn rate, nor than the outer flank can run.
+        /// </summary>
+        private static void Wheel(BattleState state, Squad squad, Angle toward, int turnRate)
+        {
+            int count = squad.MemberList.Count;
+            int width = FormationLayout.Width(squad.Formation, squad.Frontage, count);
+            int files = squad.Files > 0 && squad.Files < width ? squad.Files : width;
+            Fix half = squad.Formation.Spacing * (files - 1) / 2;
+            if (half <= Fix.Zero)
+            {
+                Turn(squad, toward, turnRate); // a single file pivots
+                return;
+            }
+
+            // Outer flank speed = 2·half·ω ≤ run: ω ≤ run / (2·half) radians per tick; 10 430 angle units per radian.
+            long runCap = SlowestRun(state, squad).Raw * 10430 / (half.Raw * 2);
+            int step = (int)(runCap < turnRate ? (runCap < 1 ? 1 : runCap) : turnRate);
+            Angle turned = squad.Facing.TurnToward(toward, step);
+            int spin = squad.Facing.DeltaTo(turned);
+            Fix side = spin > 0 ? -half : half; // turning left: pivot on the left end
+            FixVec2 pivot = FormationLayout.ToWorld(squad.Anchor, squad.Facing, new FixVec2(side, Fix.Zero));
+            FixVec2 anchor = FormationLayout.ToWorld(pivot, turned, new FixVec2(-side, Fix.Zero));
+            squad.Velocity = anchor - squad.Anchor;
+            squad.Anchor = anchor;
+            squad.Spin = spin;
+            squad.Facing = turned;
         }
 
         private static void Turn(Squad squad, Angle toward, int maxStep)
@@ -180,6 +392,23 @@ namespace Knez.Sim.Orders
             }
 
             return true;
+        }
+
+        /// <summary>Run speed per tick of the slowest living member, or zero when none lives.</summary>
+        private static Fix SlowestRun(BattleState state, Squad squad)
+        {
+            Fix slowest = Fix.Zero;
+            List<EntityId> members = squad.MemberList;
+            for (int i = 0; i < members.Count; i++)
+            {
+                Fighter? fighter = state.FindFighter(members[i]);
+                if (fighter != null && fighter.IsAlive && (slowest == Fix.Zero || fighter.Def.RunPerTick < slowest))
+                {
+                    slowest = fighter.Def.RunPerTick;
+                }
+            }
+
+            return slowest;
         }
 
         /// <summary>Walk speed per tick of the slowest living member, or zero when none lives.</summary>

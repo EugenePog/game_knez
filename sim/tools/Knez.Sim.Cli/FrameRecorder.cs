@@ -119,6 +119,8 @@ public sealed class FrameRecorder : IDisposable
             _json.WriteNumberValue(moving ? Metres(squad.Order.Target.X) : 0);
             _json.WriteNumberValue(moving ? Metres(squad.Order.Target.Y) : 0);
             _json.WriteNumberValue(moving ? Degrees(squad.Order.Facing) : 0);
+            _json.WriteStringValue(squad.Formation.Id); // changes with SetFormation (step 7)
+            _json.WriteNumberValue(squad.Files); // narrowed for a gap, 0 = its own width
             _json.WriteEndArray();
         }
 
@@ -157,6 +159,8 @@ public sealed class FrameRecorder : IDisposable
             _json.WriteNumberValue(fighter.IsAlive ? 1 : 0);
             _json.WriteNumberValue(MovementMetrics.HoldsGround(state, fighter) ? 1 : 0);
             _json.WriteNumberValue(fighter.PassingThrough ? 1 : 0);
+            _json.WriteNumberValue(fighter.SquadId.Value); // 0 once he falls (step 7)
+            _json.WriteNumberValue(fighter.SlotIndex); // changes as ranks close and squads re-form
             _json.WriteEndArray();
         }
 

@@ -16,7 +16,7 @@ namespace Knez.Sim.Content
     {
         private const string FileMembers = "description, fighters, formations, movement";
         private const string MovementMembers = "pivotTolerance, slotCatchUpTime, personalSpace, separationTime, holdingReach, " +
-            "formedUpReach, collisionPasses, allyPartingDepth, pathBudget, regroupLead, regroupMaxWait, regroupCost";
+            "formedUpReach, collisionPasses, allyPartingDepth, pathBudget, regroupLead, regroupMaxWait, regroupCost, reformPace, stepBackPace";
         private const string FighterMembers = "id, radius, walkSpeed, runSpeed, turnRate";
         private const string FormationMembers = "id, spacing, rankSpacing, ranks, width, turnRate, holdWeight, allyPassSpeed";
 
@@ -117,10 +117,12 @@ namespace Knez.Sim.Content
                     var regroupLead = item.RequireFix("regroupLead");
                     var regroupMaxWait = item.RequireFix("regroupMaxWait");
                     var regroupCost = item.RequireFix("regroupCost");
+                    var reformPace = item.RequireFix("reformPace");
+                    var stepBackPace = item.RequireFix("stepBackPace");
                     item.RejectUnknownMembers(MovementMembers);
                     movement = Build(item, movementValue, () => new MovementDef(pivotTolerance, slotCatchUpTime, personalSpace,
                         separationTime, holdingReach, formedUpReach, collisionPasses, allyPartingDepth, pathBudget, regroupLead,
-                        regroupMaxWait, regroupCost));
+                        regroupMaxWait, regroupCost, reformPace, stepBackPace));
                 }
 
                 root.RejectUnknownMembers(FileMembers);

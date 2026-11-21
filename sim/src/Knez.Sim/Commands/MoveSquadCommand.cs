@@ -88,7 +88,9 @@ namespace Knez.Sim.Commands
             Fix minX = Fix.MaxValue, maxX = Fix.MinValue, minY = Fix.MaxValue, maxY = Fix.MinValue;
             for (int slot = 0; slot < count; slot++)
             {
-                FixVec2 p = FormationLayout.SlotPosition(squad.Formation, count, slot, target, facing);
+                // The front the squad really has: after losses a formation set by ranks keeps its frontage (step 7).
+                FixVec2 p = FormationLayout.ToWorld(target, facing,
+                    FormationLayout.SlotOffsetAt(squad.Formation, FormationLayout.Width(squad.Formation, squad.Frontage, count), count, slot, 0));
                 minX = FixMath.Min(minX, p.X);
                 maxX = FixMath.Max(maxX, p.X);
                 minY = FixMath.Min(minY, p.Y);

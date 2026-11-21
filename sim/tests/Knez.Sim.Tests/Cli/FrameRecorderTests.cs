@@ -179,7 +179,9 @@ public class FrameRecorderTests
         Assert.Multiple(() =>
         {
             Assert.That(fighterRow[5].GetInt32(), Is.EqualTo(0), "his squad has a move order: not holding his ground");
-            Assert.That(row.GetArrayLength(), Is.EqualTo(8));
+            Assert.That(row.GetArrayLength(), Is.EqualTo(10), "… and from step 7 the formation id and the narrowing");
+            Assert.That(row[9].GetInt32(), Is.Zero, "not narrowed");
+            Assert.That(fighterRow.GetArrayLength(), Is.EqualTo(9), "… and from step 7 the current squad and slot");
             Assert.That(row[4].GetInt32(), Is.EqualTo(1));
             Assert.That(row[5].GetDouble(), Is.EqualTo(30.0));
             Assert.That(row[6].GetDouble(), Is.EqualTo(20.0));

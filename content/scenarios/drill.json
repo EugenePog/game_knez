@@ -1,0 +1,22 @@
+{
+  "id": "drill",
+  "description": "M1 step 7: formations in motion. The hird line marches round a building to the far corner of the field; on the way it re-forms into a column (at half pace until formed), wheels round its inner flank at the corners, and re-forms into a line before it arrives. The shield wall is ordered a quarter turn to its left and wheels round its left end. The rearguard column is ordered straight back: it faces about — every man turns round and the rear rank leads — instead of swinging its tail round.",
+  "map": {
+    "width": 60, "height": 40,
+    "walls": [
+      { "from": [20, 22], "to": [30, 30] }
+    ]
+  },
+  "squads": [
+    { "name": "Hird line",        "side": 0, "fighter": "warrior", "count": 8, "formation": "line",       "position": [10, 16], "facing": 90 },
+    { "name": "Shield wall",      "side": 0, "fighter": "warrior", "count": 8, "formation": "shieldwall", "position": [48, 10], "facing": 90 },
+    { "name": "Rearguard column", "side": 1, "fighter": "warrior", "count": 6, "formation": "column",     "position": [52, 30], "facing": 90 }
+  ],
+  "script": [
+    { "tick": 10, "order": "move", "squad": "Hird line", "target": [42,  34] },
+    { "tick": 10, "order": "move", "squad": "Shield wall", "target": [30,  10] },
+    { "tick": 10, "order": "move", "squad": "Rearguard column", "target": [52,  18] },
+    { "tick": 40, "order": "formation", "squad": "Hird line", "formation": "column" },
+    { "tick": 420, "order": "formation", "squad": "Hird line", "formation": "line" }
+  ]
+}

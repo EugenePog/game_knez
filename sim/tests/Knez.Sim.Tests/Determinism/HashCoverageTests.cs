@@ -38,6 +38,8 @@ public class HashCoverageTests
         yield return Case("SquadPathPoint", "Squads", s => { s.SquadList[0].PathList.Add(FixVec2.Zero); s.SquadList[0].PathFilesList.Add(-1); });
         yield return Case("SquadPathFiles", "Squads", s => { s.SquadList[0].PathList.Add(FixVec2.Zero); s.SquadList[0].PathFilesList.Add(2); });
         yield return Case("SquadFiles", "Squads", s => s.SquadList[0].Files = 2);
+        yield return Case("SquadFrontage", "Squads", s => s.SquadList[0].Frontage = 1);
+        yield return Case("SquadReforming", "Squads", s => s.SquadList[0].Reforming = true);
         yield return Case("SquadRegroupSince", "Squads", s => s.SquadList[0].RegroupSince = 0);
         yield return Case("SquadPathIndex", "Squads", s => s.SquadList[0].PathIndex = 1);
         yield return Case("SquadPathRequest", "Squads", s => s.SquadList[0].PathRequestTick = 0);

@@ -1,6 +1,6 @@
 {
   "id": "march",
-  "description": "M1 step 3: squads on the march, no collisions yet. Hird line advances 14 m; the column turns about and marches back; the shield wall wheels in place to face east; the raider line sidesteps west (a 90-degree pivot, march, then a turn back to face south); the flankers march to a point and face north-west. Squads pass through each other: separation comes in step 4.",
+  "description": "M1 step 3, turning updated in step 7: squads on the march. Hird line advances 14 m; the column, ordered back the way it came, faces about (its rear rank leads) and marches back; the shield wall turns to face east; the raider line moves west and turns back to face south; the flankers march to a point and face north-west. Turns of 30-90 degrees are wheels round a flank, more than 90 a face-about. Bodies are solid since step 4, so squads whose paths cross jostle past each other.",
   "map": { "width": 60, "height": 40 },
   "squads": [
     { "name": "Hird line",     "side": 0, "fighter": "warrior", "count": 8, "formation": "line",       "position": [14, 8],  "facing": 90 },

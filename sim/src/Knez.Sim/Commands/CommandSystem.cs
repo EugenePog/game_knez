@@ -36,7 +36,10 @@ namespace Knez.Sim.Commands
             {
                 ScriptedOrderDef entry = script[i];
                 Squad squad = FindByName(state.SquadList, entry.SquadName);
-                Run(new MoveSquadCommand(squad.SideId, squad.Id, entry.Target, entry.Facing), state, context);
+                ICommand command = entry.FormationId != null
+                    ? new SetFormationCommand(squad.SideId, squad.Id, entry.FormationId)
+                    : (ICommand)new MoveSquadCommand(squad.SideId, squad.Id, entry.Target, entry.Facing);
+                Run(command, state, context);
             }
         }
 

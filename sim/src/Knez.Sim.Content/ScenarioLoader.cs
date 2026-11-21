@@ -22,7 +22,7 @@ namespace Knez.Sim.Content
     public static class ScenarioLoader
     {
         private const string ScenarioMembers = "id, description, map, squads, script";
-        private const string ScriptMembers = "tick, order, squad, target, facing";
+        private const string ScriptMembers = "tick, order, squad, target, facing, formation";
         private const string MapMembers = "width, height, walls";
         private const string WallMembers = "from, to";
         private const string SquadMembers = "name, side, fighter, count, formation, position, facing";
@@ -70,7 +70,7 @@ namespace Knez.Sim.Content
             root.RejectUnknownMembers(ScenarioMembers);
 
             // Whole-scenario checks (unique names, slots on the map, script order and squads) name the entry themselves.
-            return Build(root, rootValue.Get("squads")!, () => new ScenarioDef(id, description, map, squads, script, defs.Movement));
+            return Build(root, rootValue.Get("squads")!, () => new ScenarioDef(id, description, map, squads, script, defs.Movement, defs.Formations));
         }
 
         private static ScriptedOrderDef ReadScriptedOrder(JsonValue value, string path, string sourceName)
@@ -79,12 +79,19 @@ namespace Knez.Sim.Content
             int tick = item.RequireInt("tick");
             string order = item.RequireString("order");
             string squad = item.RequireString("squad");
+            if (order == "formation")
+            {
+                string formation = item.RequireString("formation");
+                item.RejectUnknownMembers("tick, order, squad, formation");
+                return Build(item, value, () => ScriptedOrderDef.Formation(tick, squad, formation));
+            }
+
             FixVec2 target = item.RequireVec2("target");
             Fix? facingDegrees = item.OptionalFix("facing");
             item.RejectUnknownMembers(ScriptMembers);
             if (order != "move")
             {
-                throw item.Error(value.Get("order")!, item.MemberPath("order"), $"unknown order '{order}' (known: move)");
+                throw item.Error(value.Get("order")!, item.MemberPath("order"), $"unknown order '{order}' (known: move, formation)");
             }
 
             Angle? facing = facingDegrees.HasValue ? Angle.FromDegrees(facingDegrees.Value) : (Angle?)null;

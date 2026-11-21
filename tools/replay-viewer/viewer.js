@@ -503,10 +503,14 @@
       const info = fighterInfo.get(id);
       if (info && isAlive) alive.set(info.squad, (alive.get(info.squad) || 0) + 1);
     }
+    const current = new Map(frame.squads.map((r) => [r[0], r])); // rows gain [formation, files] in step 7 files
     for (const meta of document.querySelectorAll('#squads .meta')) {
       const id = Number(meta.dataset.squad);
       const s = squadInfo.get(id);
-      meta.textContent = `side ${s.side} · ${s.formation} · ${alive.get(id) || 0}/${s.size}`;
+      const row = current.get(id);
+      const formation = row && row.length > 8 ? row[8] : s.formation;
+      const files = row && row.length > 9 && row[9] > 0 ? ` (${row[9]} files for a gap)` : '';
+      meta.textContent = `side ${s.side} · ${formation}${files} · ${alive.get(id) || 0}/${s.size}`;
     }
 
     const events = $('events');
@@ -546,7 +550,10 @@
     el.innerHTML = '';
     const lines = [
       `Fighter #${hoverId} (${info.def}), side ${info.side}`,
-      squad ? `Squad ${squad.name} (#${squad.id}), slot ${info.slot}` : 'No squad',
+      // Rows from step 7 on carry the current squad and slot; older files only have the starting ones.
+      row.length > 8
+        ? (row[7] > 0 ? `Squad ${squadInfo.get(row[7]).name} (#${row[7]}), slot ${row[8]}` : `Fell from ${squad ? squad.name : 'no squad'}`)
+        : squad ? `Squad ${squad.name} (#${squad.id}), slot ${info.slot}` : 'No squad',
       `Position ${row[1].toFixed(3)}, ${row[2].toFixed(3)} m`,
       `Facing ${row[3].toFixed(2)}°, radius ${info.radius} m`,
       row[4] ? (row[5] === 1 ? 'Alive, holding his ground' : row[6] === 1 ? 'Alive, passing through allied ranks' : 'Alive') : 'Dead',

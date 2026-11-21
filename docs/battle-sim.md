@@ -1,6 +1,6 @@
 # Battle simulation — technical design
 
-Status: **draft v0.7** (2026-11-21, M1 step 6: routes). Owner: Eugene. Scope: phase 1 skirmish; the same sim later drives the 3D view
+Status: **draft v0.8** (2026-11-21, M1 step 7: formations in motion). Owner: Eugene. Scope: phase 1 skirmish; the same sim later drives the 3D view
 and campaign battles. Code names follow the glossary in [AGENTS.md](../AGENTS.md#glossary-russian-design-term--code-name).
 
 When code and this document disagree, fix one of them in the same change.
@@ -117,10 +117,12 @@ Assemblies:
   tick, preserving order.
 - Fighter data groups: transform (position, velocity, facing), body (HP, wounds, fatigue), morale, combat
   (current action, cooldowns, target), squad membership and slot, def reference. Now (M1 step 3): id, def, side,
-  position, velocity (m per tick), facing, squad id, slot index, alive.
+  position, velocity (m per tick), facing, squad id, slot index, alive. A fighter who falls leaves his squad (squad id
+  none, slot −1) at the end of the tick and stays in the list, dead, for the view.
 - `Squad`: id, side, name, formation def, anchor (centre of the front rank), facing, order (`SquadOrder`: kind,
   target, arrival facing, whether that facing is "the way it marched"), route (`Path`: waypoints, the last one the
-  target; `PathFiles`: what it does at each — regroup into k files, widen, or nothing; `PathIndex`: the one it heads
+  target; `PathFiles`: what it does at each — regroup into k files, widen, or nothing; `Frontage`: files across its front,
+  set when it forms up; `Reforming`: changing formation, at reduced pace; `PathIndex`: the one it heads
   for; `PathRequestTick`: waiting for a route since that tick, or −1), `Files` (narrowed to this many files for a gap,
   0 = its own width), `RegroupSince` (waiting for its men to regroup since that tick, or −1), velocity and spin (how far the anchor moved and the front turned this tick — they give each
   slot's own motion), member ids (sorted). Build the
@@ -139,9 +141,9 @@ def gets the fields its systems need when they arrive; M1 step 1 has:
 |---|---|
 | `FighterDef` | `id`, `radius` (m), `walkSpeed`, `runSpeed` (m/s, at most 8, and under radius + 5 cm per tick so nobody steps through a 10 cm wall), `turnRate` (°/s) |
 | `FormationDef` | `id`, `spacing` (m between neighbours), `rankSpacing` (m between ranks), `ranks` *or* `width`, `turnRate` (°/s), `holdWeight` (how much harder men holding their ground are to push; moving men weigh 1), `allyPassSpeed` (fraction of walking speed at which allies squeeze through this formation while it holds) |
-| `MovementDef` (`movement.json`, decided 2026-11-21: tunables in content, not code) | `pivotTolerance` (° off the heading a squad still marches at, 30), `slotCatchUpTime` (s, 0.5), `personalSpace` (m, 0.1), `separationTime` (s, 0.25), `holdingReach` (m, 1.5), `formedUpReach` (m, 0.3), `collisionPasses` (6), `allyPartingDepth` (m, 0.25), `pathBudget` (search nodes per tick, 4 000), `regroupLead` (m, 1), `regroupMaxWait` (s, 5), `regroupCost` (route metres per metre of extra depth, 1). Times are rounded to the nearest whole tick (0.05 s). At most one def file holds it; scenarios built in code use `MovementDef.Standard`, which a test keeps equal to the file. A scenario is refused when `personalSpace` doesn't fit between two of its men side by side or rank behind rank |
+| `MovementDef` (`movement.json`, decided 2026-11-21: tunables in content, not code) | `pivotTolerance` (° off the heading a squad still marches at, 30), `slotCatchUpTime` (s, 0.5), `personalSpace` (m, 0.1), `separationTime` (s, 0.25), `holdingReach` (m, 1.5), `formedUpReach` (m, 0.3), `collisionPasses` (6), `allyPartingDepth` (m, 0.25), `pathBudget` (search nodes per tick, 4 000), `regroupLead` (m, 1), `regroupMaxWait` (s, 5), `regroupCost` (route metres per metre of extra depth, 1), `reformPace` (fraction of the pace while changing formation, 0.5), `stepBackPace` (fraction of the pace when stepping back onto a target just behind, 0.5). Times are rounded to the nearest whole tick (0.05 s). At most one def file holds it; scenarios built in code use `MovementDef.Standard`, which a test keeps equal to the file. A scenario is refused when `personalSpace` doesn't fit between two of its men side by side or rank behind rank |
 | `MapDef` | `width`, `height` (m, at most 250: 500 route cells), optional `walls[]` (at most 64): `from` `[x, y]`, `to` `[x, y]` (opposite corners of an axis-aligned rectangle, ≥ 0.1 m thick, on the map) |
-| `ScenarioDef` | `id`, `description`, `map`, `squads[]`: `name`, `side`, `fighter`, `count`, `formation`, `position` `[x, y]`, `facing` (degrees); optional `script[]`: `tick`, `order` (`"move"`), `squad` (name), `target` `[x, y]`, optional `facing` |
+| `ScenarioDef` | `id`, `description`, `map`, `squads[]`: `name`, `side`, `fighter`, `count`, `formation`, `position` `[x, y]`, `facing` (degrees); optional `script[]`: `tick`, `order`, `squad` (name), then for `"move"` `target` `[x, y]` and optional `facing`, for `"formation"` `formation` (an id from the catalogue). Built from content it also carries the whole formation catalogue (`Formations`) |
 
 Agreed values (2026-11-20): walk 1.4 m/s, run 3.5 m/s; squad turn rate column 90°/s, line 45°/s, shield wall 30°/s;
 a standing squad gives way less than one on the move; (2026-11-21) a holding squad opens its ranks to its own side,
@@ -155,10 +157,11 @@ queued commands, issued as the squad's own side, but is not written to the comma
 fingerprint) already holds it. It exists because the CLI takes no commands and the S2–S4 benches need timed orders.
 Sanity bounds also cover speeds (0.1..20 m/s) and turn rates (0..3600 °/s).
 
-A scenario uses one def object per id (state hashes name defs by id); the fingerprint covers the defs its spawn
-entries use. **Before M1 step 7** (`SetFormation`, later heroes), `ScenarioDef` must carry the battle's whole def
-catalogue, fingerprint all of it, and commands must resolve def ids against `state.Scenario` — otherwise a def no spawn
-used would be hashed nowhere. Sanity bounds (not balance): side 0..7, squad size 1..64, ranks/width 0..64.
+A scenario uses one def object per id (state hashes name defs by id). Since M1 step 7 it carries the formation
+catalogue (`ScenarioDef.Formations`: every formation in the content's def files, or the spawns' own when built in code;
+each spawn's formation must be the catalogue's def of its id), fingerprints all of it, and `SetFormation` resolves ids
+against it — so a formation no spawn uses is still hashed. Fighter defs join the catalogue when something can switch a
+fighter's def (heroes, later). Sanity bounds (not balance): side 0..7, squad size 1..64, ranks/width 0..64.
 
 Files: `content/defs/*.json` (objects with `fighters` / `formations` arrays, ids unique across files) and
 `content/scenarios/**/*.json` (one scenario each, `id` = file name). `Knez.Sim.Content` reads them strictly
@@ -182,6 +185,8 @@ rank; an incomplete rank is the rearmost and is centred. Width = `width`, or ⌈
   with the reason code (`unknown-entity`, `wrong-side`, … — stable strings for the UI) and changes nothing. Each
   command checks the issuing side's ownership itself.
 - The command log + scenario + seed is the replay.
+- `SetFormation(side, squad, formation)` (M1 step 7): rejected as `unknown-entity`, `wrong-side`, `not-alive` (no
+  members left) or `unknown-formation` (not in the scenario's catalogue). Applying it re-forms the squad on the move (§10).
 - `MoveSquad(side, squad, target, facing?)` (M1 step 3): rejected as `unknown-entity`, `wrong-side`, `not-alive` (no
   living member) or `off-map` (target outside the map). Applying it replaces the squad's order; without a facing the
   squad will end facing the direction from its anchor to the target (its current facing if the target is the anchor).
@@ -210,7 +215,7 @@ rank; an incomplete rank is the rearmost and is centred. Width = `width`, or ⌈
 | 9 | `DamageSystem` | damage, wounds, deaths |
 | 10 | `MoraleSystem` | morale deltas, state transitions, rout and rally |
 | 11 | `FatigueSystem` | fatigue gain/recovery from movement, combat, stance |
-| 12 | `CleanupSystem` | compact dead, squad bookkeeping, victory check, end-of-tick events |
+| 12 | `CleanupSystem` | the fallen leave their squads and ranks close (step 7); victory check and end-of-tick events later |
 | 13 | `BattleSimulation.ComputeHash()` | state hash, called by tests and tools after a step (not a system) |
 
 Systems 1–12 exist from M0 in `BattleSimulation.CreateDefaultSystems()`; all but `CommandSystem` are empty until
@@ -267,15 +272,37 @@ their milestone. Scratch buffers live in `TickContext`, never in system fields.
   250 × 250 m map with 64 walls, negligible at phase-1 sizes; restoring could reuse a built grid later. Known, for the bench: on a short diagonal leg
   into a gap's mouth one man's slot can graze the wall's corner for a few ticks (sideways room is sampled at cell
   centres); no re-planning yet, so a squad shoved off its route marches on to the next waypoint.
-- **Move order (step 3; along the route since step 6).** `OrderSystem` turns the squad's front toward the next waypoint at
-  the formation's turn rate, in place, until the target is within 30° of the front (`pivotTolerance`, agreed 2026-11-20, not
-  per formation); then the anchor marches straight
-  at the walk speed of the slowest living member while the front finishes turning. Within 1 cm of the target the anchor
-  stops there and turns to the order's facing; the order is cleared once every living member stands within 30 cm of
-  his slot (formed up; `formedUpReach` in `movement.json`), and the squad holds. At an intermediate waypoint it heads for
-  the next one the same way (turning in place first when the corner is sharper than 30°); the rest of that tick's
-  stride is dropped. The squad pivots around its anchor, so a column's tail swings wide in an about-turn and cuts
-  corners — revisit with wheeling in step 7.
+- **Move order (step 3; along the route since step 6; turning since step 7).** `OrderSystem` marches the anchor at the
+  walk speed of the slowest living member toward the next waypoint, finishing turns of up to 30° (`pivotTolerance`)
+  about the anchor while marching. A sharper turn (decided 2026-11-21):
+  - **more than a quarter turn: face about.** Every man turns round and the rear rank becomes the front: the anchor
+    moves to where the rear rank's centre was and each new place goes to the nearest man (`SlotAssignment.Nearest`), so
+    nobody walks far and a column's tail no longer swings round. It is skipped when the waypoint would still lie behind
+    the squad afterwards (closer than the squad is deep) — then it pivots in place as before; an unmarked waypoint that
+    close behind is passed over instead.
+  - **30°–90°: wheel round the inner flank.** The man at the inner end of the front rank marks time and the outer flank
+    swings round, no faster than the formation's turn rate nor than the outer flank can run; the anchor moves on the arc.
+    At a route corner the wheel starts half·tan(θ/2) before it (half = half the front), so the arc is tangent to both legs
+    and the squad comes out on the next leg; regroup and widen points are reached first, not cut. A leg shorter than the
+    front (the wheel would overshoot it) is turned in place instead.
+  Within 1 cm of the target the anchor stops there and turns to the order's facing about the anchor. When the order's
+  facing is more than a quarter turn from the last leg, the front rank still lands on the ordered point (decided
+  2026-11-21): the route runs one squad-depth past the target (where the ground allows), the squad faces about there,
+  and its new front stands on the point; failing that it faces about at the target and steps back onto it. A target
+  behind the squad and closer than its depth: it faces about and steps back (`stepBackPace`, half pace), never pivots.
+  Wheels and face-abouts happen only on clear ground — the anchor after the turn clear of walls, its arc not crossing
+  one, and the way on open — otherwise the squad pivots in place as before. The order is cleared once every living member stands within 30 cm of his slot (formed up; `formedUpReach` in
+  `movement.json`), and the squad holds. Deep formations still wheel rigidly: a column's tail sweeps wide at a 90° route
+  corner (follow-the-leader columns: bench item).
+- **Formation changes (step 7, decided 2026-11-21).** `SetFormation` switches the squad to another formation of the
+  catalogue: its frontage is set for its living men, each new slot (front first) goes to the nearest man, and it keeps
+  its order — a move order is re-planned for the new shape — marching at `reformPace` (half) until formed up, then at
+  full pace. Narrowing for a gap (`Files`) is kept when it is still narrower than the new front.
+- **Losses (step 7, decided 2026-11-21: keep the front, thin the rear).** At the end of the tick (`CleanupSystem`) the
+  fallen leave their squad and the ranks close from the back (`SlotAssignment.CloseRanks`): each gap, front rank
+  first, is taken by the nearest man (sideways) of the nearest rank behind that still has men, whose place then becomes
+  the gap, until the gaps are all in the rear rank, which the layout centres. The front keeps its `Frontage` until fewer
+  men are left than its files. Ties go to the lower id.
 - **Following the slot.** `SteeringSystem`: velocity = the slot's own motion this tick (from the anchor's velocity
   and spin) + a tenth of the lag the fighter had before (a 10-tick time constant; 1 m of lag closes to 2 cm in ~37
   ticks), capped at run speed. On a straight march a member never leaves its slot; a displaced one runs back. When the
@@ -336,7 +363,7 @@ their milestone. Scratch buffers live in `TickContext`, never in system fields.
   removes the part of a man's velocity heading into a wall within personal space. Spawns in or against a wall are
   content errors. Routes round walls came in step 6 (above). Known: a formation ordered so tight to a wall that its men
   with in-wall slots have no room on their squad's side (a line whose front rank is 0.5 m from a 1 m palisade; 0.6 m
-  forms up) shoves its own front rank and never forms up (re-forming around obstacles: step 7).
+  forms up) shoves its own front rank and never forms up (re-forming around obstacles: bench item).
 - **Known, for the bench (step 8):** a push several squads deep beats `holdWeight` — three lines marching through a
   holding line shove it back ~12 m (design question: may a mass of movers drive a holding line back? default: yes until
   M3's melee lock stops "march on" pushing), and a front line crushed between such a push and its own reserve overlaps
@@ -344,8 +371,8 @@ their milestone. Scratch buffers live in `TickContext`, never in system fields.
   overlapping the same ground) never settle — their men keep shuffling ~1 cm per tick; when an order changes while
   allies are deep inside each other (or a squad stops on clashing allied slots), the last 25 cm of overlap clears in one
   tick (jumps up to ~0.3 m measured).
-- Slot assignment is stable (keep last assignment); after losses, reassign with a deterministic greedy
-  min-distance pass in id order. Ranks fill from the back.
+- Slot assignment is stable: it changes only when men fall (ranks close from the back) and when the squad re-forms or
+  faces about (nearest man per slot, front first) — see above.
 - Steering: arrive-at-slot + separation from neighbours + wall avoidance; engaged fighters are held in place
   (melee lock) and only shuffle to keep spacing.
 - Collision: relaxation passes in id order (6 since step 4), push apart overlapping circles, clamp to the map and out
@@ -424,7 +451,8 @@ Utility + FSM, no neural nets, inside the sim and deterministic:
   facing, 400 ticks), `GoldenCrossingTrace` (every tick's hash of two lines jostling through each other, folded into one
   value — the crossing settles exactly on its slots afterwards, so an end-state hash wouldn't notice a crowding change),
   `GoldenAlliesThroughTrace` (the same for a line squeezing through an allied holding line), `GoldenGateTrace` (the
-  same for a line of 8 regrouping into 3 files for a 3 m gate, going through and widening again) and `ContentGoldenTests` (a test-owned JSON fixture: fingerprint and spawned state). `HashCoverageTests` checks that every state field moves its own hash section.
+  same for a line of 8 regrouping into 3 files for a 3 m gate, going through and widening again), `GoldenDrillTrace`
+  (the same for a wheel, a face-about, line → column → line on the march and ranks closing after a loss) and `ContentGoldenTests` (a test-owned JSON fixture: fingerprint and spawned state). `HashCoverageTests` checks that every state field moves its own hash section.
 
 ## 16. Events and the view contract
 
@@ -462,9 +490,9 @@ Utility + FSM, no neural nets, inside the sim and deterministic:
     "map": { "width", "height", "walls": [[minX, minY, maxX, maxY]] },
     "squads":   [ { "id", "name", "side", "formation" } ],
     "fighters": [ { "id", "squad", "slot", "side", "def", "radius" } ],
-    "frames":   [ { "tick", "hash", "squads": [[id, anchorX, anchorY, facing°, ordered 1|0, targetX, targetY, targetFacing°]],
+    "frames":   [ { "tick", "hash", "squads": [[id, anchorX, anchorY, facing°, ordered 1|0, targetX, targetY, targetFacing°, formation, files]],
                     "paths": [[squad, x, y, x, y, …]],   // route still ahead: next waypoint … target (step 6)
-                    "fighters": [[id, x, y, facing°, alive 1|0, holdsGround 1|0, passingThrough 1|0]], "events": [{ "type", … }] } ],
+                    "fighters": [[id, x, y, facing°, alive 1|0, holdsGround 1|0, passingThrough 1|0, squad, slot]], "events": [{ "type", … }] } ],
     "faulted":  { "tick", "error" } }   // only when the simulation threw
   ```
   - One frame for tick 0, then exactly one after every tick (players assume one frame per tick); metres to 0.1 mm,
@@ -476,8 +504,9 @@ Utility + FSM, no neural nets, inside the sim and deterministic:
   - If the simulation throws, the file is still closed as valid JSON: the frames up to the last finished tick plus
     `faulted` (the tick that threw and the exception); the CLI exits 1.
   - Static tables describe the battle at tick 0. **Compatibility:** adding row columns, keys or event types keeps
-    version 1 — readers ignore what they don't know; a version bump is only for breaking changes. When slots start
-    changing (step 7), fighter rows gain `[squad, slot]` columns and the viewer prefers them over the static table.
+    version 1 — readers ignore what they don't know; a version bump is only for breaking changes. Since step 7 squad
+    rows carry the current formation id and narrowing, and fighter rows the current squad (0 once fallen) and slot; the
+    viewer shows them in the squad list and the hover panel, and falls back to the static tables for older files.
 - `tools/replay-viewer/`: static page (HTML + one script, no dependencies) that plays a frames file: map with a 1 m /
   5 m grid, fighters as circles in squad colours with a facing tick, squad anchors with facing arrows and names, dead
   fighters greyed, events of the current tick, hover details; play/pause/step/scrub, speed ×0.25–×4, zoom/pan,
