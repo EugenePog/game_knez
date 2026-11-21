@@ -147,9 +147,12 @@ def gets the fields its systems need when they arrive; M1 step 1 has:
 
 Agreed values (2026-11-20): walk 1.4 m/s, run 3.5 m/s; squad turn rate column 90°/s, line 45°/s, shield wall 30°/s;
 a standing squad gives way less than one on the move; (2026-11-21) a holding squad opens its ranks to its own side,
-allies squeezing through at 1/3 of walking speed (`allyPassSpeed` 0.333333333). Placeholders until the M1 bench:
-radius 0.3 m, fighter turn 360°/s, the formation spacings, `holdWeight` 3 (a holding man takes a quarter of a push
-against a moving one).
+allies squeezing through at 1/3 of walking speed (`allyPassSpeed` 0.333333333). The M1 bench gave no
+reason to change radius 0.3 m (the body's collision size, kept — decided 2026-11-21), fighter turn 360°/s, the
+formation spacings or `holdWeight` 3 (a holding man takes a quarter of a push against a moving one); they stay
+tunable in content. Fighting distance is separate from the body and from personal space (decided 2026-11-21): two
+men are in contact when their bodies are within 0.5 m — in M1 it only defines "engaged" for the bench; it becomes the
+default weapon reach in M3.
 
 The **scenario script** is orders the scenario gives by itself at fixed ticks (benchmarks, tests, set pieces). In
 tick order; each entry goes through the same validation as a player's `MoveSquad` at the start of its tick, before
@@ -269,7 +272,7 @@ their milestone. Scratch buffers live in `TickContext`, never in system fields.
   next tick. Measured: 0.22 ms for a 4 400-node search on a 60 × 40 m map, 1.9 ms for a 23 000-node flood of a
   120 × 100 m one — splitting searches over ticks waits for bigger maps. The grid (clearance, a corner value and 8 rays per cell) is built
   when the simulation is created or restored, only for maps with walls: about 0.47 s in Release (5.4 s in Debug) for a
-  250 × 250 m map with 64 walls, negligible at phase-1 sizes; restoring could reuse a built grid later. Known, for the bench: on a short diagonal leg
+  250 × 250 m map with 64 walls, negligible at phase-1 sizes; restoring could reuse a built grid later. Known (left for M2 playtests): on a short diagonal leg
   into a gap's mouth one man's slot can graze the wall's corner for a few ticks (sideways room is sampled at cell
   centres); no re-planning yet, so a squad shoved off its route marches on to the next waypoint.
 - **Move order (step 3; along the route since step 6; turning since step 7).** `OrderSystem` marches the anchor at the
@@ -293,7 +296,7 @@ their milestone. Scratch buffers live in `TickContext`, never in system fields.
   Wheels and face-abouts happen only on clear ground — the anchor after the turn clear of walls, its arc not crossing
   one, and the way on open — otherwise the squad pivots in place as before. The order is cleared once every living member stands within 30 cm of his slot (formed up; `formedUpReach` in
   `movement.json`), and the squad holds. Deep formations still wheel rigidly: a column's tail sweeps wide at a 90° route
-  corner (follow-the-leader columns: bench item).
+  corner (follow-the-leader columns: not hit by the bench; left for M2 playtests).
 - **Formation changes (step 7, decided 2026-11-21).** `SetFormation` switches the squad to another formation of the
   catalogue: its frontage is set for its living men, each new slot (front first) goes to the nearest man, and it keeps
   its order — a move order is re-planned for the new shape — marching at `reformPace` (half) until formed up, then at
@@ -363,8 +366,9 @@ their milestone. Scratch buffers live in `TickContext`, never in system fields.
   removes the part of a man's velocity heading into a wall within personal space. Spawns in or against a wall are
   content errors. Routes round walls came in step 6 (above). Known: a formation ordered so tight to a wall that its men
   with in-wall slots have no room on their squad's side (a line whose front rank is 0.5 m from a 1 m palisade; 0.6 m
-  forms up) shoves its own front rank and never forms up (re-forming around obstacles: bench item).
-- **Known, for the bench (step 8):** a push several squads deep beats `holdWeight` — three lines marching through a
+  forms up) shoves its own front rank and never forms up (re-forming around obstacles: left for M2 playtests).
+- **Known, not covered by the bench — moved to M3 (2026-11-21), where the melee lock and combat change pushing:** a
+  push several squads deep beats `holdWeight` — three lines marching through a
   holding line shove it back ~12 m (design question: may a mass of movers drive a holding line back? default: yes until
   M3's melee lock stops "march on" pushing), and a front line crushed between such a push and its own reserve overlaps
   heavily (~20 % of fighter-ticks, visible in the metric); squads ordered onto clashing slots (two formations
@@ -377,23 +381,49 @@ their milestone. Scratch buffers live in `TickContext`, never in system fields.
   (melee lock) and only shuffle to keep spacing.
 - Collision: relaxation passes in id order (6 since step 4), push apart overlapping circles, clamp to the map and out
   of walls (`Terrain.Constrain`).
-- If steering jams at 20 vs 30, upgrade to velocity obstacles (ORCA-like, fixed-point) — decide from the M1 bench.
+- Steering, not velocity obstacles: the M1 bench showed no jams at 20 vs 30 — only engaged presses, which stand by design until M3 (decided 2026-11-21).
 
-Benchmark scenarios (in `content/scenarios/bench/`):
+Benchmark scenarios (in `content/scenarios/bench/`, M1 step 8):
 
 | Id | Scenario | Watch for |
 |---|---|---|
-| S1 | open-field clash, 20 vs 30 | jams, orbiting, overlap, line breaking apart |
-| S2 | squad through a 3 m gate | deadlock at the choke |
-| S3 | two squads crossing at 90° | interpenetration, oscillation |
-| S4 | line wheels 90° | slot chaos, stragglers |
-| S5 | shield wall holds vs a charge | wall integrity, push-through |
+| S1 `s1-clash` | open-field clash, 20 vs 30 (two squads of 10 vs three) | jams, orbiting, overlap, line breaking apart |
+| S2 `s2-gate` | a line of 10 and a column of 8 through a 3 m gate | deadlock at the choke |
+| S3 `s3-crossing` | two lines of 10 crossing at 90°, a column following | interpenetration, oscillation |
+| S4 `s4-wheel` | a line and a shield wall wheel a quarter turn; a column wheels round a building | slot chaos, stragglers |
+| S5 `s5-shieldwall` | a holding shield wall of 10 charged by a line of 10 and a column of 8 | wall integrity, push-through |
 
-Metrics: *stuck fighter-ticks* (has a goal > 1 m away and speed < ε for > 2 s), mean slot error, overlap ratio
-(fighter-ticks in which a fighter is closer than r1 + r2 − 5 cm to another, `MovementMetrics.OverlappingFighters`;
-allies allowed through each other's ranks don't count), tick time p50/p99.
+Metrics (`Movement/MovementMeter.cs`, read-only, used by the CLI and tests): *engaged* — a squad any of whose men
+stands within fighting distance (bodies within 0.5 m) of an enemy; the whole squad counts, its rear ranks held by the
+press in front (decided 2026-11-21); *stuck* — a member of a squad that isn't engaged, more than 1 m from his slot and
+moving under 1 cm a tick (0.2 m/s), for more than 2 s; *longest spell more than 1 m from a slot*, moving or not
+(orbiting shows here); mean and worst slot error; overlap ratio (fighter-ticks in which a fighter is closer than
+r1 + r2 − 5 cm to another, `MovementMetrics.OverlappingFighters`; allies allowed through each other's ranks don't
+count); passing and in-walls ratios; the share of members' ticks engaged and the orders still open at the end (so an
+engaged press can't hide a jam); tick time p50/p99 (`bench`).
 M1 exit: no fighter stuck > 2 s in S1–S4, overlap < 1 % of fighter-ticks, p99 tick < 2 ms for 50 fighters on the
 dev Mac, and it looks right in the replay viewer.
+
+**Results (2026-11-21, Apple M4, Release):** `run <file> --ticks 900 --json` and `bench <file> --ticks 900 --runs 5`
+(after a 1 s warm-up; without it p99 measured the JIT, ~9× higher). Orders finish by ticks ~300–480, so p50 includes
+idle ticks.
+
+| | fighters | stuck > 2 s | overlap | engaged | open orders | slot error mean / worst | longest > 1 m off slot | tick p50 / p99 / max |
+|---|---|---|---|---|---|---|---|---|
+| S1 | 50 | 0 | 0.00 % | 32.5 % | 2 | 1.43 / 5.30 m | 33.4 s | 0.042 / 0.063 / 0.073 ms |
+| S2 | 18 | 0 | 0.00 % | 0 % | 0 | 0.043 / 2.52 m | 0.7 s | 0.004 / 0.017 / 0.071 ms |
+| S3 | 28 | 0 | 0.00 % | 0 % | 0 | 0.068 / 3.56 m | 4.8 s | 0.007 / 0.036 / 0.044 ms |
+| S4 | 28 | 0 | 0.00 % | 0 % | 0 | 0.004 / 1.08 m | 0.1 s | 0.008 / 0.012 / 0.085 ms |
+| S5 | 28 | 0 | 0.00 % | 13.8 % | 0 | 0.053 / 7.29 m | 7.8 s | 0.008 / 0.029 / 0.035 ms |
+
+S1's head-on pair (files lined up) presses and stands for the rest of the run — engaged, their two orders open by
+design until combat; its rear ranks are what the slot error and the 33 s spell measure. The measurable criteria hold
+with a wide margin (`BenchTests` pins stuck, overlap and "no open order outside an engaged press" for S1–S4, and S1's
+press); "looks right" is the user's call in the viewer. **Decided 2026-11-21: steering stays** — no jams or overlap
+that velocity obstacles (ORCA) would fix. **Known, left for M3 (decided 2026-11-21):** marching enemies that meet
+off-line slip round each other like allies jostling past (S1's shield wall and flank; S5's charge works through the
+shield wall, 7.3 m worst displacement): only a lined-up press or a holding line stops them. The melee lock in M3 makes
+men in contact hold.
 
 ## 11. Combat
 
@@ -477,13 +507,16 @@ Utility + FSM, no neural nets, inside the sim and deterministic:
   fighter-ticks with a fighter pressed more than 5 cm into someone, and the worst tick (JSON `overlap.ratio`,
   `overlap.worstTickFighters`) and, separately, the share of fighter-ticks spent passing through allied ranks
   (`overlap.passingRatio`), so an allowed overlap can't hide a failure, and the share with a fighter more than 5 cm
-  inside a wall (`overlap.inWallsRatio`; printed as "inside walls"). The replay viewer draws the map's walls and each squad's planned route. The list below is the target contract, built
-  through M1:
-  - `run <scenario> --seed N [--ticks N] [--out replay.json] [--frames frames.json]` → summary (winner, duration,
-    casualties, morale breaks, final hash);
-  - `batch <scenario> --seeds 1-200 [--json]` → aggregate metrics and win rate;
-  - `bench <scenario> [--fighters N]` → tick time p50/p99;
-  - `replay verify <replay.json>` → re-simulate and compare checkpoints.
+  inside a wall (`overlap.inWallsRatio`; printed as "inside walls"); since step 8 also stuck fighters (`stuck`: fighters
+  stuck > 2 s, longest spell, fighter-ticks past 2 s) and slot error (`slotError.mean`, `.worst`). The replay viewer
+  draws the map's walls and each squad's planned route.
+  - `batch <scenario> [--seeds A-B] [--ticks N] [--json]` (step 8): the scenario once per seed (default 1–20); prints
+    mean and worst-run overlap, the worst run's stuck fighters and longest spell, mean slot error, and how many
+    distinct final hashes. Win rate, duration and casualties join with combat (M3).
+  - `bench <scenario> [--runs N] [--ticks N] [--json]` (step 8): one warm-up run, then N timed runs (default 5); every
+    tick timed alone; p50, p99, max and mean, and the fighter count.
+  - Still to come: `run --out replay.json` and `replay verify <replay.json>` (re-simulate and compare checkpoints);
+    winner, casualties and morale breaks in `run` with combat.
 - Frames file (`--frames`, written by `FrameRecorder`; this is the only copy of the spec), format `knez-frames` v1:
   ```
   { "format": "knez-frames", "version": 1, "scenario", "description", "seed" (string), "ticksPerSecond",
@@ -531,8 +564,8 @@ Utility + FSM, no neural nets, inside the sim and deterministic:
 
 ## 19. Open questions
 
-- Fighter radius — decide from the M1 bench. (Grid cell size: 0.5 m, decided 2026-11-21.)
-- Steering vs ORCA-like avoidance — decide from the M1 bench.
+- (Fighter radius: 0.3 m body, kept; fighting distance body + 0.5 m; grid cells 0.5 m — all decided 2026-11-21.)
+- (Steering vs ORCA: steering, decided 2026-11-21 from the M1 bench.)
 - Exact formation set for phase 1 (proposal: Line, ShieldWall, Column).
 - Morale numbers, thresholds and rout rules — tune in M3 with playtests.
 - Hero ability list for the prototype.

@@ -68,6 +68,11 @@ public class CliAppTests
     [TestCase(new[] { "run", "x.json", "--seed", "-3" }, "--seed needs a positive whole number")]
     [TestCase(new[] { "run", "x.json", "--speed", "2" }, "unknown option")]
     [TestCase(new[] { "run", "no/such/scenario.json" }, "scenario file not found: no/such/scenario.json")]
+    [TestCase(new[] { "batch" }, "'batch' needs a scenario file")]
+    [TestCase(new[] { "batch", "x.json", "--seeds", "9-3" }, "--seeds needs a seed or a range like 1-200 (at most 100 000 seeds)")]
+    [TestCase(new[] { "batch", "x.json", "--runs", "3" }, "unknown option")]
+    [TestCase(new[] { "bench", "x.json", "--runs", "0" }, "--runs needs a positive whole number")]
+    [TestCase(new[] { "bench", "x.json", "--seeds", "1-2" }, "unknown option")]
     public void BadArguments_ExitWithUsageCodeAndExplain(string[] args, string message)
     {
         var (exit, _, stderr) = Invoke(args);
@@ -112,6 +117,57 @@ public class CliAppTests
         {
             Assert.That(exit, Is.EqualTo(CliApp.ExitOk));
             Assert.That(stdout, Does.Contain("Usage:"));
+        });
+    }
+
+    [Test]
+    public void Run_ReportsStuckAndSlotError()
+    {
+        var (exit, stdout, _) = Invoke("run", RepoPaths.Scenario("march"), "--ticks", "100");
+        var (_, json, _) = Invoke("run", RepoPaths.Scenario("march"), "--ticks", "100", "--json");
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        Assert.Multiple(() =>
+        {
+            Assert.That(exit, Is.EqualTo(CliApp.ExitOk));
+            Assert.That(stdout, Does.Contain("stuck:      0 fighters stuck > 2 s"));
+            Assert.That(stdout, Does.Contain("slot error: mean "));
+            Assert.That(stdout, Does.Contain("orders still open"));
+            Assert.That(root.GetProperty("stuck").GetProperty("fighters").GetInt32(), Is.Zero);
+            Assert.That(root.GetProperty("slotError").GetProperty("worst").GetDouble(), Is.GreaterThanOrEqualTo(0));
+            Assert.That(root.GetProperty("engaged").GetProperty("openOrders").GetInt32(), Is.GreaterThan(0), "100 ticks: still marching");
+            Assert.That(root.TryGetProperty("longestFarFromSlotTicks", out _), Is.True);
+        });
+    }
+
+    [Test]
+    public void Batch_RunsEverySeed_AndAggregates()
+    {
+        var (exit, stdout, _) = Invoke("batch", RepoPaths.Scenario("march"), "--seeds", "3-5", "--ticks", "60", "--json");
+        using var doc = System.Text.Json.JsonDocument.Parse(stdout);
+        var root = doc.RootElement;
+        Assert.Multiple(() =>
+        {
+            Assert.That(exit, Is.EqualTo(CliApp.ExitOk));
+            Assert.That(root.GetProperty("runs").GetInt32(), Is.EqualTo(3));
+            Assert.That(root.GetProperty("seeds").GetString(), Is.EqualTo("3-5"));
+            Assert.That(root.GetProperty("stuck").GetProperty("worstRunFighters").GetInt32(), Is.Zero);
+            Assert.That(root.GetProperty("distinctOutcomes").GetInt32(), Is.EqualTo(1), "movement draws no random numbers yet: every seed, the same battle");
+        });
+    }
+
+    [Test]
+    public void Bench_PrintsTickTimePercentiles()
+    {
+        var (exit, stdout, _) = Invoke("bench", RepoPaths.Scenario("march"), "--ticks", "50", "--runs", "2", "--json");
+        using var doc = System.Text.Json.JsonDocument.Parse(stdout);
+        var times = doc.RootElement.GetProperty("tickMs");
+        Assert.Multiple(() =>
+        {
+            Assert.That(exit, Is.EqualTo(CliApp.ExitOk));
+            Assert.That(doc.RootElement.GetProperty("fighters").GetInt32(), Is.GreaterThan(0));
+            Assert.That(times.GetProperty("p50").GetDouble(), Is.LessThanOrEqualTo(times.GetProperty("p99").GetDouble()));
+            Assert.That(times.GetProperty("p99").GetDouble(), Is.LessThanOrEqualTo(times.GetProperty("max").GetDouble()));
         });
     }
 

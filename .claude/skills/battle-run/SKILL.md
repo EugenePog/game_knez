@@ -18,8 +18,8 @@ metric (`crowding:` line; M1 target < 1 % of fighter-ticks) and the viewer rings
 allies passing through a holding ally's ranks are allowed and not ringed (decided 2026-11-21);
 `content/scenarios/crowding.json` shows a crossing, allies squeezing through a holding line, an enemy block and the
 map edge. After changing `tools/replay-viewer/` files, hard-reload the page (Cmd+Shift+R): `http.server` sends no
-cache headers and the browser may keep running the old script. `--out` (replay files), `batch`, `bench` and
-`replay verify` arrive in later M1 steps — those sections below describe the target. CLI code lives in
+cache headers and the browser may keep running the old script. `batch` and `bench` exist since M1 step 8;
+`--out` (replay files) and `replay verify` arrive later — those parts below describe the target. CLI code lives in
 `sim/tools/Knez.Sim.Cli/` (`CliApp.cs`, `ScenarioFiles.cs`, `FrameRecorder.cs`); its tests in
 `sim/tests/Knez.Sim.Tests/Cli/`. Frames format and viewer options: battle-sim.md §17.
 
@@ -63,7 +63,9 @@ dotnet run --project sim/tools/Knez.Sim.Cli -c Release -- batch content/scenario
   > artifacts/reports/<name>-<label>.json
 ```
 
-Metrics: win rate per side, mean/p90 duration, casualties, routs, stuck fighter-ticks, overlap ratio, mean slot error.
+Metrics today (M1): overlap (mean and worst run), stuck (worst run's fighters stuck > 2 s, longest spell), mean slot
+error, distinct outcomes. Win rate, duration, casualties and routs come with combat (M3). Movement draws no random
+numbers yet, so every seed plays the same battle; `run` prints the same metrics for one seed.
 
 **A/B comparison:** run the same scenario and seed range on the baseline commit and on the change (use a git
 worktree or stash for the baseline), then compare. Win-rate differences under ~5 points on 200 seeds are noise.
@@ -72,7 +74,7 @@ Long batches: hand them to the `battle-analyst` subagent so raw output stays out
 ## Benchmark (M1 criterion: p99 < 2 ms per tick for 50 fighters on the dev Mac)
 
 ```bash
-dotnet run --project sim/tools/Knez.Sim.Cli -c Release -- bench content/scenarios/bench/s1-open-clash.json --ticks 4000
+dotnet run --project sim/tools/Knez.Sim.Cli -c Release -- bench content/scenarios/bench/s1-clash.json --ticks 900 --runs 5
 ```
 
 Always Release, nothing else heavy running; report p50/p99 and the machine. Compare against the previous number

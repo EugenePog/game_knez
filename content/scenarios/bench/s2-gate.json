@@ -1,0 +1,19 @@
+{
+  "id": "s2-gate",
+  "description": "M1 bench S2: squads through a 3 m gate in a palisade. A line of 10 regroups to pass while a column of 8 arrives at the gate at the same time from the side. Watch for deadlock at the choke.",
+  "map": {
+    "width": 60, "height": 40,
+    "walls": [
+      { "from": [0, 19], "to": [28.5, 20] },
+      { "from": [31.5, 19], "to": [60, 20] }
+    ]
+  },
+  "squads": [
+    { "name": "Hird line",   "side": 0, "fighter": "warrior", "count": 10, "formation": "line",   "position": [30, 10], "facing": 90 },
+    { "name": "Hird column", "side": 0, "fighter": "warrior", "count": 8,  "formation": "column", "position": [23, 11],  "facing": 90 }
+  ],
+  "script": [
+    { "tick": 10, "order": "move", "squad": "Hird line",   "target": [30, 30] },
+    { "tick": 10, "order": "move", "squad": "Hird column", "target": [36, 34] }
+  ]
+}

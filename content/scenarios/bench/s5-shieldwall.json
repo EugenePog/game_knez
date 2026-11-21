@@ -1,0 +1,14 @@
+{
+  "id": "s5-shieldwall",
+  "description": "M1 bench S5: a shield wall of 10 holds its ground while an enemy line of 10 charges its left half and a column of 8 its right. Without combat (M3) there is no melee lock: the wall weighs its hold weight against each attacker, and marching men can work their way round and through it (left for M3). Watch its integrity: how far its men are pushed off their slots.",
+  "map": { "width": 60, "height": 40 },
+  "squads": [
+    { "name": "Shield wall",  "side": 0, "fighter": "warrior", "count": 10, "formation": "shieldwall", "position": [30, 18], "facing": 90 },
+    { "name": "Raider line",  "side": 1, "fighter": "warrior", "count": 10, "formation": "line",       "position": [27, 34], "facing": 270 },
+    { "name": "Raider column","side": 1, "fighter": "warrior", "count": 8,  "formation": "column",     "position": [31, 34], "facing": 270 }
+  ],
+  "script": [
+    { "tick": 10, "order": "move", "squad": "Raider line",   "target": [27, 10] },
+    { "tick": 30, "order": "move", "squad": "Raider column", "target": [31, 10] }
+  ]
+}
