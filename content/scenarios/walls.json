@@ -1,0 +1,27 @@
+{
+  "id": "walls",
+  "description": "M1 step 5: walls are rectangles no body enters. A palisade crosses the field with a 3 m gate: the column marches through it, then the line (wider than the gate) squeezes through and on through the column's ranks. East of it, the shield wall marches straight at a building: without paths (step 6) its men slide along the wall and stay pressed against it. The raiders are ordered onto the building's roof and go to the nearest open ground beside it. The wall guard stands with its back to the palisade: its rear rank's slots are inside the wall, so those men stand against it, and the squad still forms up.",
+  "map": {
+    "width": 60, "height": 40,
+    "walls": [
+      { "from": [0, 19],  "to": [18.5, 20] },
+      { "from": [21.5, 19], "to": [34, 20] },
+      { "from": [44, 24], "to": [50, 28] }
+    ]
+  },
+  "squads": [
+    { "name": "Hird column", "side": 0, "fighter": "warrior", "count": 6, "formation": "column",     "position": [20, 6],  "facing": 90 },
+    { "name": "Hird line",   "side": 0, "fighter": "warrior", "count": 8, "formation": "line",       "position": [12, 8],  "facing": 90 },
+    { "name": "Shield wall", "side": 0, "fighter": "warrior", "count": 8, "formation": "shieldwall", "position": [47, 12], "facing": 90 },
+    { "name": "Raiders",     "side": 1, "fighter": "warrior", "count": 8, "formation": "line",       "position": [53, 34], "facing": 270 },
+    { "name": "Wall guard",  "side": 1, "fighter": "warrior", "count": 8, "formation": "line",       "position": [8, 30],  "facing": 270 }
+  ],
+  "script": [
+    { "tick": 10,  "order": "move", "squad": "Hird column", "target": [20, 30] },
+    { "tick": 10,  "order": "move", "squad": "Hird line",   "target": [20, 15] },
+    { "tick": 10,  "order": "move", "squad": "Shield wall", "target": [47, 34] },
+    { "tick": 10,  "order": "move", "squad": "Raiders",     "target": [47, 27.2], "facing": 270 },
+    { "tick": 10,  "order": "move", "squad": "Wall guard",  "target": [8, 20.9], "facing": 90 },
+    { "tick": 300, "order": "move", "squad": "Hird line",   "target": [20, 35] }
+  ]
+}

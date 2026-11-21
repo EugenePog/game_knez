@@ -50,10 +50,12 @@ namespace Knez.Sim.Movement
         /// <summary>True when <paramref name="fighter"/> holds his ground this tick (see <see cref="Role"/>).</summary>
         public static bool Holding(BattleState state, Fighter fighter) => Role(state, fighter) == CrowdRole.Holding;
 
-        /// <summary>How far <paramref name="fighter"/> stands from his slot (the slot moved inside the map).</summary>
+        /// <summary>How far <paramref name="fighter"/> stands from his slot (the slot moved to where a body fits: on the
+        /// map, clear of walls, on the squad's side of a wall; see <see cref="Terrain.ConstrainToward"/>).</summary>
         public static Fix DistanceToSlot(BattleState state, Squad squad, Fighter fighter)
         {
-            FixVec2 slot = Inside(state.Scenario.Map, SlotTracking.Position(squad, SlotTracking.Offset(squad, fighter)), fighter.Radius);
+            FixVec2 raw = SlotTracking.Position(squad, SlotTracking.Offset(squad, fighter));
+            FixVec2 slot = Terrain.ConstrainToward(state.Scenario.Map, raw, fighter.Radius, squad.Anchor);
             return (slot - fighter.Position).Length;
         }
 
@@ -120,13 +122,6 @@ namespace Knez.Sim.Movement
                 self.PassingThrough = walkingInto || (self.PassingThrough && inside);
             }
         }
-
-        /// <summary>
-        /// <paramref name="point"/> moved inside the map far enough for a body of <paramref name="radius"/>. Slots past the
-        /// edge (a line ordered against it) are reached here instead, so nobody leans into the edge forever.
-        /// </summary>
-        public static FixVec2 Inside(MapDef map, FixVec2 point, Fix radius) =>
-            new FixVec2(FixMath.Clamp(point.X, radius, map.Width - radius), FixMath.Clamp(point.Y, radius, map.Height - radius));
 
         /// <summary>Fills <paramref name="weights"/> and <paramref name="roles"/> (both reused) per fighter, by list index.</summary>
         public static void Fill(BattleState state, List<int> weights, List<CrowdRole> roles)
@@ -271,8 +266,9 @@ namespace Knez.Sim.Movement
 
         /// <summary>
         /// Pushes overlapping living fighters apart until no pair overlaps (up to <see cref="MovementRules.CollisionPasses"/>
-        /// passes over all pairs in id order). Both bodies of a pushed pair are put back inside the map at once — clamping
-        /// only at the end would push men at the edge back into their neighbours — and finally every body is.
+        /// passes over all pairs in id order). Both bodies of a pushed pair are put back where they fit — on the map, out of
+        /// walls — at once (constraining only at the end would push men at an edge or wall back into their neighbours), and
+        /// finally every body is.
         /// </summary>
         public static void Resolve(BattleState state, List<int> weights, List<CrowdRole> roles)
         {
@@ -310,7 +306,7 @@ namespace Knez.Sim.Movement
                 Fighter fighter = fighters[i];
                 if (fighter.IsAlive)
                 {
-                    fighter.Position = Inside(map, fighter.Position, fighter.Radius);
+                    fighter.Position = Terrain.Constrain(map, fighter.Position, fighter.Radius);
                 }
             }
         }
@@ -349,8 +345,8 @@ namespace Knez.Sim.Movement
             Fix shareA = overlap * weightB / (weightA + weightB); // the heavier one moves less
             Fix shareB = overlap - shareA;
             // On the same spot Apart gives +X; the -= sends a (the lower id) west and the += sends b east.
-            a.Position = Inside(map, a.Position - Apart(apart, distance, shareA, negativeX: false), a.Radius);
-            b.Position = Inside(map, b.Position + Apart(apart, distance, shareB, negativeX: false), b.Radius);
+            a.Position = Terrain.Constrain(map, a.Position - Apart(apart, distance, shareA, negativeX: false), a.Radius);
+            b.Position = Terrain.Constrain(map, b.Position + Apart(apart, distance, shareB, negativeX: false), b.Radius);
             return true;
         }
 

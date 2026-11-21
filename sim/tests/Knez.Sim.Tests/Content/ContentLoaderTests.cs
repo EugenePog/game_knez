@@ -115,6 +115,32 @@ public class ContentLoaderTests
     }
 
     [Test]
+    public void ScenarioLoader_Parse_ReadsWalls()
+    {
+        string json = Scenario(GoodSquad).Replace("\"map\": { \"width\": 60, \"height\": 40 }",
+            "\"map\": { \"width\": 60, \"height\": 40, \"walls\": [ { \"from\": [40, 20.5], \"to\": [35, 22] } ] }");
+        var walls = ScenarioLoader.Parse(new SourceText("s.json", json), Defs()).Map.Walls;
+        Assert.Multiple(() =>
+        {
+            Assert.That(walls, Has.Count.EqualTo(1));
+            Assert.That(walls[0].Min, Is.EqualTo(new FixVec2(Fix.FromInt(35), Fix.Ratio(41, 2))));
+            Assert.That(walls[0].Max, Is.EqualTo(FixVec2.FromInts(40, 22)));
+        });
+    }
+
+    [TestCase("{ \"from\": [40, 20], \"to\": [35, 20.05] }", "map.walls[0]: a wall must be at least 0.1 m thick")]
+    [TestCase("{ \"from\": [40, 20], \"to\": [65, 22] }", "reaches past the")]
+    [TestCase("{ \"from\": [40, 20], \"to\": [45, 22], \"height\": 3 }", "map.walls[0].height: unknown member 'height' (allowed: from, to)")]
+    [TestCase("{ \"from\": [5, 8], \"to\": [35, 10] }", "squads[0] 'A': slot 4 at")]
+    public void ScenarioLoader_Parse_BadWall_LocatedError(string wall, string expected)
+    {
+        string json = Scenario(GoodSquad).Replace("\"map\": { \"width\": 60, \"height\": 40 }",
+            "\"map\": { \"width\": 60, \"height\": 40, \"walls\": [ " + wall + " ] }");
+        var ex = Assert.Throws<ContentException>(() => ScenarioLoader.Parse(new SourceText("s.json", json), Defs()));
+        Assert.That(ex!.Message, Does.Contain(expected));
+    }
+
+    [Test]
     public void ScenarioLoader_Parse_ReadsTheScriptInOrder()
     {
         string json = Scenario(GoodSquad).Replace("\n  ]\n}", """

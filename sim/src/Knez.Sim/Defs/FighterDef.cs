@@ -21,14 +21,23 @@ namespace Knez.Sim.Defs
                 throw new ArgumentException($"runSpeed must be at least walkSpeed (got {runSpeed} < {walkSpeed}).");
             }
 
+            // A body steps clean through a wall in one tick only if it moves more than its radius plus half the wall's
+            // thickness: past the middle, the wall pushes it out on the far side.
+            if (RunPerTick >= Radius + WallDef.MinThickness / 2)
+            {
+                throw new ArgumentException(
+                    $"runSpeed {runSpeed} m/s is too fast for radius {radius} m: under (radius + {WallDef.MinThickness / 2} m) per tick, or the fighter could step through a wall.");
+            }
+
             TurnRate = DefChecks.Positive(turnRate, MaxTurnRate, "°/s", nameof(turnRate));
         }
 
         /// <summary>Sanity bound for <see cref="Radius"/>, not a balance number.</summary>
         public const int MaxRadiusMetres = 2;
 
-        /// <summary>Sanity bound for speeds (m/s), not a balance number.</summary>
-        public const int MaxSpeed = 20;
+        /// <summary>Sanity bound for speeds (m/s), not a balance number. Also see the check against
+        /// <see cref="WallDef.MinThickness"/> in the constructor.</summary>
+        public const int MaxSpeed = 8;
 
         /// <summary>Slowest allowed speed: 0.1 m/s. Slower would round to (almost) nothing per tick and a squad would
         /// never arrive. A sanity bound, not a balance number.</summary>

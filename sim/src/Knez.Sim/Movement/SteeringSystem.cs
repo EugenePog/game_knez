@@ -10,8 +10,8 @@ namespace Knez.Sim.Movement
     /// it moves with the slot's own motion this tick (from the anchor's move and turn) plus a tenth of the lag it had
     /// before (a 10-tick time constant); anyone inside another man's personal space also eases away from him
     /// (<see cref="Crowding.Separation"/>). That is capped at run speed, and then the part heading into a neighbour is cut
-    /// (<see cref="Crowding.Slide"/>): men slide along bodies instead of walking into them. Passing through allied ranks
-    /// is slow (<see cref="Crowding.Squeeze"/>). When the squad stands still, nobody crowds the
+    /// (<see cref="Crowding.Slide"/>): men slide along bodies instead of walking into them, and along walls
+    /// (<see cref="Terrain.SlideAlongWalls"/>). Passing through allied ranks is slow (<see cref="Crowding.Squeeze"/>). When the squad stands still, nobody crowds the
     /// member and its gap is under 2 cm, it steps exactly onto the slot.
     /// </summary>
     public sealed class SteeringSystem : ISimSystem
@@ -47,6 +47,7 @@ namespace Knez.Sim.Movement
                 FixVec2 separation = Crowding.Separation(state, weights, roles, i);
                 FixVec2 desired = Follow(state, fighter, separation).ClampLength(fighter.Def.RunPerTick);
                 FixVec2 slid = Crowding.Slide(state, weights, roles, i, desired);
+                slid = Terrain.SlideAlongWalls(state.Scenario.Map, fighter.Position, fighter.Radius, slid);
                 fighter.Velocity = Crowding.Squeeze(state, roles, i, slid);
             }
         }
@@ -60,10 +61,11 @@ namespace Knez.Sim.Movement
                 return separation; // individual orders (heroes) come later
             }
 
-            // A slot past the map edge is reached at the edge (same rule as the collision clamp), so men don't lean into it.
+            // A slot past the map edge or inside a wall is reached as close as a body fits, on the squad's side of the
+            // wall, so men stand at the edge or against the wall instead of leaning into it (decided 2026-11-21).
             MapDef map = state.Scenario.Map;
             FixVec2 offset = SlotTracking.Offset(squad, fighter);
-            FixVec2 slot = Crowding.Inside(map, SlotTracking.Position(squad, offset), fighter.Radius);
+            FixVec2 slot = Terrain.ConstrainToward(map, SlotTracking.Position(squad, offset), fighter.Radius, squad.Anchor);
             FixVec2 gap = slot - fighter.Position;
 
             bool squadStill = squad.Velocity == FixVec2.Zero && squad.Spin == 0;
@@ -75,7 +77,7 @@ namespace Knez.Sim.Movement
             // A member moves with its slot when the squad marches or turns.
             FixVec2 slotMotion = squadStill
                 ? FixVec2.Zero
-                : slot - Crowding.Inside(map, SlotTracking.PreviousPosition(squad, offset), fighter.Radius);
+                : slot - Terrain.ConstrainToward(map, SlotTracking.PreviousPosition(squad, offset), fighter.Radius, squad.Anchor - squad.Velocity);
             FixVec2 lag = gap - slotMotion; // the gap already includes this tick's slot motion: don't count it twice
             return slotMotion + lag / MovementRules.SlotCatchUpTicks + separation;
         }

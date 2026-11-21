@@ -95,6 +95,12 @@ namespace Knez.Sim.Defs
                     throw new ArgumentException(
                         $"squads[{index}] '{squad.Name}': slot {slot} at {position} is off the {map} map; move the squad inward.");
                 }
+
+                if (Movement.Terrain.WallDepth(map, position, squad.Fighter.Radius) > Fix.Zero)
+                {
+                    throw new ArgumentException(
+                        $"squads[{index}] '{squad.Name}': slot {slot} at {position} is in or against a wall; move the squad clear of it.");
+                }
             }
         }
 

@@ -1,20 +1,48 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using Knez.Sim.Numerics;
 
 namespace Knez.Sim.Defs
 {
     /// <summary>
     /// Immutable battle map: a rectangle from (0, 0) to (<see cref="Width"/>, <see cref="Height"/>) in metres, X east,
-    /// Y north. Terrain (walkable grid, height, cover, line of sight) arrives in M1 step 5.
+    /// Y north, with <see cref="Walls"/> no body can enter. Height, cover and line of sight come with combat.
     /// </summary>
     public sealed class MapDef
     {
-        /// <summary>Creates a map; both sides positive and at most <see cref="MaxSideMetres"/>.</summary>
-        public MapDef(Fix width, Fix height)
+        /// <summary>Creates a map; both sides positive and at most <see cref="MaxSideMetres"/>; walls lie on the map.</summary>
+        public MapDef(Fix width, Fix height, IReadOnlyList<WallDef>? walls = null)
         {
             Width = DefChecks.PositiveMetres(width, MaxSideMetres, nameof(width));
             Height = DefChecks.PositiveMetres(height, MaxSideMetres, nameof(height));
+            walls ??= Array.Empty<WallDef>();
+            if (walls.Count > MaxWalls)
+            {
+                throw new ArgumentException($"at most {MaxWalls} walls (got {walls.Count}).");
+            }
+
+            var copy = new WallDef[walls.Count];
+            for (int i = 0; i < copy.Length; i++)
+            {
+                WallDef wall = walls[i] ?? throw new ArgumentNullException(nameof(walls), $"walls[{i}] is null.");
+                if (!Contains(wall.Min) || !Contains(wall.Max))
+                {
+                    throw new ArgumentException($"walls[{i}]: {wall} reaches past the {Width} × {Height} m map.");
+                }
+
+                copy[i] = wall;
+            }
+
+            Walls = new ReadOnlyCollection<WallDef>(copy);
         }
+
+        /// <summary>Sanity bound for <see cref="Walls"/>: every body checks every wall several times a tick, so tick time
+        /// grows with it (no grid until pathfinding). A sanity bound, not a design number.</summary>
+        public const int MaxWalls = 64;
+
+        /// <summary>Walls in file order.</summary>
+        public IReadOnlyList<WallDef> Walls { get; }
 
         /// <summary>Largest map side; keeps squared distances well inside <see cref="Fix"/> range.</summary>
         public const int MaxSideMetres = 2000;
@@ -33,6 +61,11 @@ namespace Knez.Sim.Defs
         {
             hash.Add(Width.Raw);
             hash.Add(Height.Raw);
+            hash.Add(Walls.Count);
+            for (int i = 0; i < Walls.Count; i++)
+            {
+                Walls[i].AddTo(ref hash);
+            }
         }
 
         /// <summary>"60 × 40 m"-style text for messages.</summary>

@@ -82,6 +82,24 @@ namespace Knez.Sim.Movement
             return count;
         }
 
+        /// <summary>Living fighters whose body is more than <see cref="OverlapTolerance"/> inside a wall.</summary>
+        public static int FightersInWalls(BattleState state)
+        {
+            List<Fighter> fighters = state.FighterList;
+            Defs.MapDef map = state.Scenario.Map;
+            int count = 0;
+            for (int i = 0; i < fighters.Count; i++)
+            {
+                Fighter f = fighters[i];
+                if (f.IsAlive && Terrain.WallDepth(map, f.Position, f.Radius) > OverlapTolerance)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
         /// <summary>
         /// True when <paramref name="fighter"/> holds his ground this tick (his squad has no order and he stands within
         /// 1.5 m of his slot): he weighs his formation's hold weight in pushes and opens his ranks to allied squads.

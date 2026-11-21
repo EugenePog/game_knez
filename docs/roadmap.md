@@ -85,7 +85,15 @@ Steps — one change each, each ending with build/tests/purity green and a `sim-
    so they can end. Checked on 19 edge scenarios; `run` now also prints the share of fighter-ticks spent passing
    through allied ranks. This removes the blocked-marchers jam between allies; against enemies it stays until M3.
 5. Terrain: walkable grid, circle–grid clamping, wall avoidance (decide the cell size).
-6. Pathfinding: A* for squad anchors with a per-tick budget, path following.
+   Decided 2026-11-21: walls are rectangles; an order into a wall goes to the nearest open ground; men whose slots are in
+   a wall stand as close as they can. Built 2026-11-21: exact circle–rectangle collision and sliding, `walls.json`, a gate
+   golden; the grid and cell size moved to step 6 (pathfinding). Reviewed by `sim-reviewer`: leaving a wall could land
+   off the map or inside a neighbouring wall, and the formed-up check counted slots no body fits on (on a face, in a
+   gap narrower than a body) and sent men to the far side of a palisade. Fixed: only open exits count, slots leave on
+   the squad's side, formed-up skips slots without room; at most 64 walls, speeds at most 8 m/s and under
+   radius + 5 cm per tick. 377 tests.
+6. Pathfinding: A* for squad anchors with a per-tick budget, path following. First decision: the grid's cell size
+   (0.5 m or 1 m), moved here from step 5.
 7. Formations in motion: `SetFormation` (Line, ShieldWall, Column), wheeling, slot reassignment after losses.
    First: `ScenarioDef` carries and fingerprints the whole def catalogue (battle-sim.md §7).
 8. Bench: scenarios S1–S5, metrics, `bench` and `batch`; tune; decide steering vs ORCA; check the exit criteria.

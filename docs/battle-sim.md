@@ -1,6 +1,6 @@
 # Battle simulation — technical design
 
-Status: **draft v0.5** (2026-11-21, M1 step 4 + allies open ranks). Owner: Eugene. Scope: phase 1 skirmish; the same sim later drives the 3D view
+Status: **draft v0.6** (2026-11-21, M1 step 5: walls). Owner: Eugene. Scope: phase 1 skirmish; the same sim later drives the 3D view
 and campaign battles. Code names follow the glossary in [AGENTS.md](../AGENTS.md#glossary-russian-design-term--code-name).
 
 When code and this document disagree, fix one of them in the same change.
@@ -132,9 +132,9 @@ def gets the fields its systems need when they arrive; M1 step 1 has:
 
 | Def | Fields |
 |---|---|
-| `FighterDef` | `id`, `radius` (m), `walkSpeed`, `runSpeed` (m/s), `turnRate` (°/s) |
+| `FighterDef` | `id`, `radius` (m), `walkSpeed`, `runSpeed` (m/s, at most 8, and under radius + 5 cm per tick so nobody steps through a 10 cm wall), `turnRate` (°/s) |
 | `FormationDef` | `id`, `spacing` (m between neighbours), `rankSpacing` (m between ranks), `ranks` *or* `width`, `turnRate` (°/s), `holdWeight` (how much harder men holding their ground are to push; moving men weigh 1), `allyPassSpeed` (fraction of walking speed at which allies squeeze through this formation while it holds) |
-| `MapDef` | `width`, `height` (m) |
+| `MapDef` | `width`, `height` (m), optional `walls[]` (at most 64): `from` `[x, y]`, `to` `[x, y]` (opposite corners of an axis-aligned rectangle, ≥ 0.1 m thick, on the map) |
 | `ScenarioDef` | `id`, `description`, `map`, `squads[]`: `name`, `side`, `fighter`, `count`, `formation`, `position` `[x, y]`, `facing` (degrees); optional `script[]`: `tick`, `order` (`"move"`), `squad` (name), `target` `[x, y]`, optional `facing` |
 
 Agreed values (2026-11-20): walk 1.4 m/s, run 3.5 m/s; squad turn rate column 90°/s, line 45°/s, shield wall 30°/s;
@@ -182,7 +182,8 @@ rank; an incomplete rank is the rearmost and is centred. Width = `width`, or ⌈
   The order lasts until the squad is **formed up** at the target: anchor there, facing reached, and every living member
   within 30 cm of his slot (decided 2026-11-21). A squad blocked short of its slots keeps its order. A target that
   would put part of the formation (at the arrival facing) off the map is moved inward until it all fits — otherwise
-  slots past an edge are pulled onto the same spot and the squad can never form up.
+  slots past an edge are pulled onto the same spot and the squad can never form up. A target inside a wall then moves
+  to the nearest open ground (M1 step 5, `Terrain.Constrain`, §10).
 
 ## 9. Tick pipeline (fixed order)
 
@@ -194,7 +195,7 @@ rank; an incomplete rank is the rearmost and is centred. Width = `width`, or ⌈
 | 3 | `OrderSystem` | squad orders → anchor goal, facing, formation slots, slot assignment |
 | 4 | `PathSystem` | A* requests for squad anchors and detached fighters, per-tick budget, FIFO queue |
 | 5 | `SteeringSystem` | desired velocity: slot seek/arrive, separation, obstacle avoidance |
-| 6 | `MovementSystem` | integrate, resolve collisions (circle–circle, circle–grid), update facing |
+| 6 | `MovementSystem` | integrate, resolve collisions (circle–circle, circle–wall), update facing |
 | 7 | `TargetingSystem` | engagement and target choice in reach; tie-break by distance, then id |
 | 8 | `CombatSystem` | advance actions (windup → strike → recovery), roll hits with `SimRng` |
 | 9 | `DamageSystem` | damage, wounds, deaths |
@@ -256,11 +257,27 @@ their milestone. Scratch buffers live in `TickContext`, never in system fields.
   - *collision relaxation* (movement): up to 6 passes push overlapping pairs apart by their overlap, shared by weight,
     stopping early once nothing overlaps (a push travels one link per pass against id order; 3 passes left pushes four
     men deep overlapping). Two bodies on exactly the same spot part along X, the lower id west. Both bodies of a pushed
-    pair are put back inside the map at once (clamping only at the end pushed men at the edge back into their
-    neighbours), and a slot past the map edge is aimed at the edge, so nobody leans into it.
+    pair are put back inside the map and out of walls at once (clamping only at the end pushed men at the edge back
+    into their neighbours), and a slot past the map edge is aimed at the edge, so nobody leans into it.
   Facing follows the intended velocity, not the shove. A marching squad that meets a holding line bends it (≈0.9 m
   at weight 3) and stays blocked in front of it — a jam the M1 bench (stuck metric) and M3 combat (engaged fighters
   hold) will address. `MovementMetrics.OverlappingFighters` is the overlap metric below.
+- **Walls (step 5, decided 2026-11-21).** Walls are axis-aligned rectangles (`map.walls: [{ "from": [x, y], "to": [x, y] }]`,
+  ≥ 0.1 m thick, on the map); bodies collide with them exactly and slide round their corners (`Movement/Terrain.cs`).
+  `Terrain.Constrain` (map edge + walls) replaces the edge-only clamp everywhere: the per-pair and final collision
+  clamps, order targets, slot targets. A body partly in a wall is pushed straight away from it; a centre inside a wall
+  (or exactly on its outline) leaves by one of the four sides, counting only sides where a body fits on the map and
+  whose exit is inside no other wall (a wall can be flush with the edge or abut another). Bodies and order targets
+  take the nearest such side, so an order aimed into a wall goes to the nearest open ground. Slot targets take the
+  side on the shortest way to the squad's anchor (`Terrain.ConstrainToward`): a man whose slot falls in a wall stands
+  as close as he can on his squad's side, not across a palisade from it, and counts as holding when he's there. The
+  squad is formed up without men whose slots have no room for a body (`Constrain` moves the slot: past the edge, in or
+  against a wall, in a gap narrower than a body), since several of them may be sent to the same spot. Steering
+  removes the part of a man's velocity heading into a wall within personal space. Spawns in or against a wall are
+  content errors. No grid yet: the A* grid and its cell size come with pathfinding (step 6). Known: without paths, a
+  squad marching at a building stays pressed against it (step 6); a formation ordered so tight to a wall that its men
+  with in-wall slots have no room on their squad's side (a line whose front rank is 0.5 m from a 1 m palisade; 0.6 m
+  forms up) shoves its own front rank and never forms up (re-forming around obstacles: step 7).
 - **Known, for the bench (step 8):** a push several squads deep beats `holdWeight` — three lines marching through a
   holding line shove it back ~12 m (design question: may a mass of movers drive a holding line back? default: yes until
   M3's melee lock stops "march on" pushing), and a front line crushed between such a push and its own reserve overlaps
@@ -272,7 +289,8 @@ their milestone. Scratch buffers live in `TickContext`, never in system fields.
   min-distance pass in id order. Ranks fill from the back.
 - Steering: arrive-at-slot + separation from neighbours + wall avoidance; engaged fighters are held in place
   (melee lock) and only shuffle to keep spacing.
-- Collision: relaxation passes in id order (6 since step 4), push apart overlapping circles, clamp to walkable cells.
+- Collision: relaxation passes in id order (6 since step 4), push apart overlapping circles, clamp to the map and out
+  of walls (`Terrain.Constrain`).
 - If steering jams at 20 vs 30, upgrade to velocity obstacles (ORCA-like, fixed-point) — decide from the M1 bench.
 
 Benchmark scenarios (in `content/scenarios/bench/`):
@@ -370,7 +388,8 @@ Utility + FSM, no neural nets, inside the sim and deterministic:
   without `--frames` (tested tick by tick on a moving battle). `run` also reports the M1 overlap metric: the share of
   fighter-ticks with a fighter pressed more than 5 cm into someone, and the worst tick (JSON `overlap.ratio`,
   `overlap.worstTickFighters`) and, separately, the share of fighter-ticks spent passing through allied ranks
-  (`overlap.passingRatio`), so an allowed overlap can't hide a failure. The list below is the target contract, built
+  (`overlap.passingRatio`), so an allowed overlap can't hide a failure, and the share with a fighter more than 5 cm
+  inside a wall (`overlap.inWallsRatio`; printed as "inside walls"). The replay viewer draws the map's walls. The list below is the target contract, built
   through M1:
   - `run <scenario> --seed N [--ticks N] [--out replay.json] [--frames frames.json]` → summary (winner, duration,
     casualties, morale breaks, final hash);
@@ -380,7 +399,7 @@ Utility + FSM, no neural nets, inside the sim and deterministic:
 - Frames file (`--frames`, written by `FrameRecorder`; this is the only copy of the spec), format `knez-frames` v1:
   ```
   { "format": "knez-frames", "version": 1, "scenario", "description", "seed" (string), "ticksPerSecond",
-    "map": { "width", "height" },
+    "map": { "width", "height", "walls": [[minX, minY, maxX, maxY]] },
     "squads":   [ { "id", "name", "side", "formation" } ],
     "fighters": [ { "id", "squad", "slot", "side", "def", "radius" } ],
     "frames":   [ { "tick", "hash", "squads": [[id, anchorX, anchorY, facing°, ordered 1|0, targetX, targetY, targetFacing°]],

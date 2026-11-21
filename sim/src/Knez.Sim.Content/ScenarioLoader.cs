@@ -11,7 +11,7 @@ namespace Knez.Sim.Content
     /// against a <see cref="DefLibrary"/>. Format (battle-sim.md §7):
     /// <code>
     /// { "id": "formations", "description": "…",
-    ///   "map": { "width": 60, "height": 40 },
+    ///   "map": { "width": 60, "height": 40, "walls": [ { "from": [0, 20], "to": [28, 21] } ] },
     ///   "squads": [ { "name": "Line", "side": 0, "fighter": "warrior", "count": 8, "formation": "line",
     ///                 "position": [20, 12], "facing": 90 } ],
     ///   "script": [ { "tick": 20, "order": "move", "squad": "Line", "target": [20, 24], "facing": 90 } ] }
@@ -23,7 +23,8 @@ namespace Knez.Sim.Content
     {
         private const string ScenarioMembers = "id, description, map, squads, script";
         private const string ScriptMembers = "tick, order, squad, target, facing";
-        private const string MapMembers = "width, height";
+        private const string MapMembers = "width, height, walls";
+        private const string WallMembers = "from, to";
         private const string SquadMembers = "name, side, fighter, count, formation, position, facing";
 
         /// <summary>Parses a scenario; throws <see cref="ContentException"/> on the first problem.</summary>
@@ -37,9 +38,20 @@ namespace Knez.Sim.Content
             var mapReader = root.RequireObject("map");
             Fix width = mapReader.RequireFix("width");
             Fix height = mapReader.RequireFix("height");
+            IReadOnlyList<JsonValue> wallItems = mapReader.OptionalArray("walls");
+            var walls = new List<WallDef>(wallItems.Count);
+            for (int i = 0; i < wallItems.Count; i++)
+            {
+                var wall = JsonObjectReader.Of(wallItems[i], $"map.walls[{i}]", source.Name);
+                FixVec2 from = wall.RequireVec2("from");
+                FixVec2 to = wall.RequireVec2("to");
+                wall.RejectUnknownMembers(WallMembers);
+                walls.Add(Build(wall, wallItems[i], () => new WallDef(from, to)));
+            }
+
             mapReader.RejectUnknownMembers(MapMembers);
             JsonValue mapValue = rootValue.Get("map")!;
-            MapDef map = Build(mapReader, mapValue, () => new MapDef(width, height));
+            MapDef map = Build(mapReader, mapValue, () => new MapDef(width, height, walls));
 
             IReadOnlyList<JsonValue> squadItems = root.RequireArray("squads");
             var squads = new List<SquadSpawnDef>(squadItems.Count);

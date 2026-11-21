@@ -63,7 +63,12 @@ namespace Knez.Sim.Commands
             // A target within arrival distance is no march: keep the facing rather than turn toward a sub-centimetre
             // offset, whose direction is noise (view clicks converted from float land there).
             Angle facing = Facing ?? (delta.Length <= MovementRules.ArriveDistance ? squad.Facing : FixMath.Atan2(delta.Y, delta.X));
-            squad.Order = SquadOrder.Move(FitInside(state, squad, Target, facing), facing);
+            // Past the edge: shift so the formation fits. Inside a wall: the nearest open ground for the anchor's man
+            // (decided 2026-11-21); slots that still fall in walls are stood next to.
+            FixVec2 target = FitInside(state, squad, Target, facing);
+            Fighter? any = state.FindFighter(squad.MemberList[0]);
+            target = Terrain.Constrain(state.Scenario.Map, target, any != null ? any.Radius : Fix.Zero);
+            squad.Order = SquadOrder.Move(target, facing);
         }
 
         /// <inheritdoc/>

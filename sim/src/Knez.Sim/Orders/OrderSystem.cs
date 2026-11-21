@@ -78,8 +78,11 @@ namespace Knez.Sim.Orders
         }
 
         /// <summary>
-        /// Every living member whose slot lies on the map stands within <see cref="MovementRules.FormedUpReach"/> of it.
-        /// Slots past the edge are skipped: several of them can be pulled onto the same edge spot, where not every man fits.
+        /// Every living member whose slot has room for his body stands within <see cref="MovementRules.FormedUpReach"/> of
+        /// it. Slots that don't (past the edge, in or against a wall, in a gap narrower than a body) are skipped: those men
+        /// stand as close as they can (decided 2026-11-21), and several of them may be pulled onto the same spot, where
+        /// not every man fits. The test is the same <see cref="Terrain.Constrain"/> bodies obey, so a slot counted here
+        /// is one a man can actually stand on.
         /// </summary>
         private static bool FormedUp(BattleState state, Squad squad)
         {
@@ -93,7 +96,8 @@ namespace Knez.Sim.Orders
                 }
 
                 FixVec2 slot = SlotTracking.Position(squad, SlotTracking.Offset(squad, fighter));
-                if (state.Scenario.Map.Contains(slot) && Crowding.DistanceToSlot(state, squad, fighter) > MovementRules.FormedUpReach)
+                if (Terrain.Constrain(state.Scenario.Map, slot, fighter.Radius) == slot
+                    && (slot - fighter.Position).Length > MovementRules.FormedUpReach)
                 {
                     return false;
                 }

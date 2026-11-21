@@ -231,6 +231,15 @@
       for (let y = 0; y <= height + 1e-9; y += 10) ctx.fillText(`${y}`, sx(0) - 5, sy(y));
     }
 
+    // Walls: [minX, minY, maxX, maxY] in metres (absent in older files).
+    for (const [x0, y0, x1, y1] of data.map.walls || []) {
+      ctx.fillStyle = '#6b5b45';
+      ctx.fillRect(sx(x0), sy(y1), (x1 - x0) * view.scale, (y1 - y0) * view.scale);
+      ctx.strokeStyle = '#3f3426';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(sx(x0), sy(y1), (x1 - x0) * view.scale, (y1 - y0) * view.scale);
+    }
+
     ctx.strokeStyle = '#8a7f66';
     ctx.lineWidth = 1.5;
     ctx.strokeRect(sx(0), sy(height), width * view.scale, height * view.scale);

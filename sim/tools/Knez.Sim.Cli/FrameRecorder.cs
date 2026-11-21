@@ -47,6 +47,18 @@ public sealed class FrameRecorder : IDisposable
         _json.WriteStartObject("map");
         _json.WriteNumber("width", Metres(initial.Scenario.Map.Width));
         _json.WriteNumber("height", Metres(initial.Scenario.Map.Height));
+        _json.WriteStartArray("walls");
+        foreach (var wall in initial.Scenario.Map.Walls)
+        {
+            _json.WriteStartArray();
+            _json.WriteNumberValue(Metres(wall.Min.X));
+            _json.WriteNumberValue(Metres(wall.Min.Y));
+            _json.WriteNumberValue(Metres(wall.Max.X));
+            _json.WriteNumberValue(Metres(wall.Max.Y));
+            _json.WriteEndArray();
+        }
+
+        _json.WriteEndArray();
         _json.WriteEndObject();
 
         _json.WriteStartArray("squads");

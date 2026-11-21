@@ -145,6 +145,18 @@ public static class TestDefs
         new ScriptedOrderDef(1, "C", new FixVec2(Fix.FromInt(10), Fix.Ratio(399, 10)), null),
     ]);
 
+    /// <summary>A wall across the 60 × 40 map at y 19–20 with a 3 m gate (x 28.5–31.5): benchmark S2 in miniature.</summary>
+    public static MapDef GateMap() => new(Fix.FromInt(60), Fix.FromInt(40),
+    [
+        new WallDef(FixVec2.FromInts(0, 19), new FixVec2(Fix.Ratio(57, 2), Fix.FromInt(20))),
+        new WallDef(new FixVec2(Fix.Ratio(63, 2), Fix.FromInt(19)), FixVec2.FromInts(60, 20)),
+    ]);
+
+    /// <summary>One squad of 8 (or 6 for a column) south of the gate, ordered through it to (30, 30).</summary>
+    public static ScenarioDef ThroughTheGate(FormationDef formation, int count = 8) => new("test-gate", "test", GateMap(),
+        [Squad("S", 0, count, FixVec2.FromInts(30, 10), 90, formation)],
+        [new ScriptedOrderDef(1, "S", FixVec2.FromInts(30, 30), null)]);
+
     /// <summary>A player line facing north and an enemy column facing south.</summary>
     public static ScenarioDef TwoSquads() => new("test-two-squads", "test", Map,
     [
