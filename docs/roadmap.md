@@ -270,9 +270,16 @@ Steps (planned 2026-11-21; each ends with the project compiling in batch mode an
    `game/Packages/manifest.json` gains `"com.knez.sim": "file:../../sim/src/Knez.Sim"` and
    `"com.knez.sim.content": "file:../../sim/src/Knez.Sim.Content"`; Unity's `.gitignore` entries; first commit with
    `.meta` files. Agent: check the packages compile in Unity (C# 9, nullable, no CS8632), fix what Unity rejects.
+   ✅ 2026-11-22: Unity 6000.6.10f1 (Apple Silicon), 2D URP template; `Knez.Sim` and `Knez.Sim.Content` compile in
+   Unity with no errors or warnings (no CS8632), their `.meta` files committed; generated `*.csproj`/`*.slnx` ignored.
 2. **Assemblies and the sim loop:** `Knez.Game.View`, `Knez.Game.Input`, `Knez.Game.Tests` asmdefs; a `BattleRunner`
    MonoBehaviour that loads a scenario from StreamingAssets (content text → `DefLibrary.Parse` / `ScenarioLoader.Parse`),
    steps the sim at 20 ticks/s from `Update` with an accumulator, pause and ×0.5–×4 speed.
+   ✅ 2026-11-22: `Assets/Knez/View` (`Knez.Game.View`: `SimClock` — 20 ticks/s, pause, ×0.25–×4, at most 8 ticks a
+   frame and the backlog dropped after a hitch; `ContentFiles` — the repo's `content/` in the editor, StreamingAssets
+   in builds; `BattleRunner` — loads a scenario, steps it from `Update`, stops on a sim fault) and `Assets/Knez/Tests`
+   (`Knez.Game.Tests`, EditMode: the clock, and drill.json loading and running to the end inside Unity). 6/6 green in
+   batch mode, no compile warnings. `Knez.Game.Input` waits for step 5.
 3. **Cross-runtime determinism:** an EditMode test that runs the golden scenarios in Unity (Mono) and compares the
    golden hashes and traces with the dotnet values; later the same under IL2CPP.
 4. **Drawing:** top-down 2D: walls, fighters as circles with a facing tick in squad colours, squad anchors and facing

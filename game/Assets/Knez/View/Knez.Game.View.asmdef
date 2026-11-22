@@ -1,0 +1,14 @@
+{
+  "name": "Knez.Game.View",
+  "rootNamespace": "Knez.Game.View",
+  "references": ["Knez.Sim", "Knez.Sim.Content"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
