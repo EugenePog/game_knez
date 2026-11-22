@@ -482,7 +482,10 @@ Utility + FSM, no neural nets, inside the sim and deterministic:
   value — the crossing settles exactly on its slots afterwards, so an end-state hash wouldn't notice a crowding change),
   `GoldenAlliesThroughTrace` (the same for a line squeezing through an allied holding line), `GoldenGateTrace` (the
   same for a line of 8 regrouping into 3 files for a 3 m gate, going through and widening again), `GoldenDrillTrace`
-  (the same for a wheel, a face-about, line → column → line on the march and ranks closing after a loss) and `ContentGoldenTests` (a test-owned JSON fixture: fingerprint and spawned state). `HashCoverageTests` checks that every state field moves its own hash section.
+  (the same for a wheel, a face-about, line → column → line on the march and ranks closing after a loss) and `ContentGoldenTests` (a test-owned JSON fixture: fingerprint and spawned state). `HashCoverageTests` checks that every state field moves its own hash section. Cross-runtime (M2 step 3): `sim/tests/Golden/content-traces.json`
+  lists every content scenario with its per-tick hash trace and final hash (seed 1, 600 ticks); .NET
+  (`ContentTraceGoldenTests`) and Unity EditMode (`CrossRuntimeGoldenTests`, Mono) check the same file, and a new
+  scenario must be added to it (a test enforces that).
 
 ## 16. Events and the view contract
 

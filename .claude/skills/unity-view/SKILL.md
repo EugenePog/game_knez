@@ -62,6 +62,7 @@ errors. Run in the background — the first import takes minutes.
 
 ## Cross-runtime determinism (M2 checkpoint)
 
-`Knez.Game.Tests` contains an EditMode test that loads every `sim/tests/Golden/*.replay.json`, re-simulates it
-under Unity's runtime and compares checkpoint hashes. If it fails while `dotnet test` passes, follow the
+`Knez.Game.Tests` contains `CrossRuntimeGoldenTests`: it runs every entry of `sim/tests/Golden/content-traces.json`
+(each content scenario, its per-tick hash trace and final hash) under Unity's runtime; `ContentTraceGoldenTests` checks
+the same file under .NET. Replay files (`*.replay.json`, with commands) join it when the CLI writes them. If it fails while `dotnet test` passes, follow the
 `determinism` skill — it is almost always a floating-point or ordering leak.

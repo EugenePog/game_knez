@@ -282,6 +282,9 @@ Steps (planned 2026-11-21; each ends with the project compiling in batch mode an
    batch mode, no compile warnings. `Knez.Game.Input` waits for step 5.
 3. **Cross-runtime determinism:** an EditMode test that runs the golden scenarios in Unity (Mono) and compares the
    golden hashes and traces with the dotnet values; later the same under IL2CPP.
+   ✅ 2026-11-22: `sim/tests/Golden/content-traces.json` — every content scenario (11), seed 1, 600 ticks: per-tick hash
+   trace and final hash. Checked by `ContentTraceGoldenTests` (.NET) and `CrossRuntimeGoldenTests` (Unity EditMode,
+   Mono): all 11 match bit for bit. IL2CPP comes with the first player build.
 4. **Drawing:** top-down 2D: walls, fighters as circles with a facing tick in squad colours, squad anchors and facing
    arrows, planned routes, interpolation between ticks (`Fix` → `float` only in the view).
 5. **Input:** select squads (click, box), right-click to move (drag for facing), formation hotkeys (`SetFormation`),
