@@ -287,10 +287,27 @@ Steps (planned 2026-11-21; each ends with the project compiling in batch mode an
    Mono): all 11 match bit for bit. IL2CPP comes with the first player build.
 4. **Drawing:** top-down 2D: walls, fighters as circles with a facing tick in squad colours, squad anchors and facing
    arrows, planned routes, interpolation between ticks (`Fix` → `float` only in the view).
+   ✅ 2026-11-22: `BattleView` (walls, ground, fighters as discs in squad colours with a facing tick, grey when fallen,
+   anchor bars along the front, routes ahead as lines; drawing runs one tick behind, interpolated by the clock's alpha,
+   the runner raising `Ticked` after every tick), `FixViewExtensions`, `ShapeSprites` (runtime shapes, no art). The
+   camera is fitted to the map. `BattleViewTests` render drill, walls and S1 to `artifacts/unity/*.png` in batch mode
+   (with graphics); 22/22 Unity tests green.
 5. **Input:** select squads (click, box), right-click to move (drag for facing), formation hotkeys (`SetFormation`),
    pause/speed keys, a camera that pans and zooms; every action becomes a command for the next tick.
+   ✅ 2026-11-22: `Assets/Knez/Input` (`Knez.Game.Input`): `SquadPicker` (click within a body + 0.4 m, box select,
+   own side only), `OrderBuilder` (click: move, facing the march; drag: face the drag; several squads side by side
+   across the facing, 2 m apart), `BattleInput` (left click/drag select, Shift adds, Esc clears; right click/drag
+   orders; 1/2/3 line/shield wall/column via `SetFormation`; Space pause, =/− speed; WASD/arrows/middle-drag pan, scroll
+   zoom); the view highlights selected squads. `InputTests`: picking, gestures, and two squads ordered together
+   arriving side by side. 26/26 Unity tests green.
 6. **HUD:** squad list with formation and state, order arrows, rejected-command feedback; morale bars as placeholders
    until M3.
+   ✅ 2026-11-22: `BattleHud` (immediate-mode GUI, no scene set-up): scenario, tick and time, speed or PAUSED; each
+   squad's name, formation, men left of spawned and state (`HudText.Status`: holding, marching, planning a route,
+   regrouping into N files, re-forming); a grey morale bar marked as M3's; refused orders in plain words naming the
+   squad, fading after 4 s; a line of controls. `HudTextTests`; 28/28 Unity tests green.
+   **M2 checkpoint built** (move squads, change formations, pause; golden traces match in Unity) — waiting on the
+   user's hands-on check in the editor.
 
 **Checkpoint:** you can move squads, change formations and pause; golden replays match in Unity.
 

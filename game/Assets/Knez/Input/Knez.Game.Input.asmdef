@@ -1,0 +1,14 @@
+{
+  "name": "Knez.Game.Input",
+  "rootNamespace": "Knez.Game.Input",
+  "references": ["Knez.Game.View", "Knez.Sim", "Unity.InputSystem"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

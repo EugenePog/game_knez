@@ -1,14 +1,27 @@
 {
   "name": "Knez.Game.Tests",
   "rootNamespace": "Knez.Game.Tests",
-  "references": ["Knez.Game.View", "Knez.Sim", "Knez.Sim.Content", "UnityEngine.TestRunner", "UnityEditor.TestRunner"],
-  "includePlatforms": ["Editor"],
+  "references": [
+    "Knez.Game.View",
+    "Knez.Game.Input",
+    "Knez.Sim",
+    "Knez.Sim.Content",
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
   "overrideReferences": true,
-  "precompiledReferences": ["nunit.framework.dll"],
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
   "autoReferenced": false,
-  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ],
   "versionDefines": [],
   "noEngineReferences": false
 }

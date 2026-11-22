@@ -34,8 +34,28 @@ namespace Knez.Game.View
         /// <summary>Why the battle didn't load or stopped, or null.</summary>
         public string? Error { get; private set; }
 
+        /// <summary>Raised after every tick stepped, with the state as it now stands (the view keeps the tick before).</summary>
+        public event Action<BattleState>? Ticked;
+
+        /// <summary>Steps <paramref name="ticks"/> ticks, raising <see cref="Ticked"/> after each.</summary>
+        public void Step(int ticks)
+        {
+            for (int i = 0; i < ticks && Simulation != null; i++)
+            {
+                Simulation.Step();
+                Ticked?.Invoke(Simulation.State);
+            }
+        }
+
         /// <summary>Pauses or resumes the battle.</summary>
         public void TogglePause() => Clock.Paused = !Clock.Paused;
+
+        /// <summary>Starts <paramref name="scenarioDef"/> from code (tests, menus) instead of the Inspector's file.</summary>
+        public void Load(Knez.Sim.Defs.ScenarioDef scenarioDef, ulong battleSeed)
+        {
+            Simulation = new BattleSimulation(BattleSetup.Create(scenarioDef, battleSeed));
+            Error = null;
+        }
 
         private void Awake()
         {
@@ -63,10 +83,7 @@ namespace Knez.Game.View
             int ticks = Clock.Advance(Time.unscaledDeltaTime);
             try
             {
-                for (int i = 0; i < ticks; i++)
-                {
-                    Simulation.Step();
-                }
+                Step(ticks);
             }
             catch (Exception ex)
             {
