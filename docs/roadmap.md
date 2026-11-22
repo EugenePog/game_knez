@@ -264,6 +264,24 @@ Unity 6 project in `game/`, sim as local package, top-down 2D: circles, facing, 
 pause/speed, issuing commands with the mouse. EditMode test that replays the golden replays inside Unity
 (cross-runtime determinism).
 
+Steps (planned 2026-11-21; each ends with the project compiling in batch mode and its tests green):
+
+1. **Setup (the user, in the editor):** Unity Hub + Unity 6 LTS; a new 2D project created as `game/` in this repo;
+   `game/Packages/manifest.json` gains `"com.knez.sim": "file:../../sim/src/Knez.Sim"` and
+   `"com.knez.sim.content": "file:../../sim/src/Knez.Sim.Content"`; Unity's `.gitignore` entries; first commit with
+   `.meta` files. Agent: check the packages compile in Unity (C# 9, nullable, no CS8632), fix what Unity rejects.
+2. **Assemblies and the sim loop:** `Knez.Game.View`, `Knez.Game.Input`, `Knez.Game.Tests` asmdefs; a `BattleRunner`
+   MonoBehaviour that loads a scenario from StreamingAssets (content text → `DefLibrary.Parse` / `ScenarioLoader.Parse`),
+   steps the sim at 20 ticks/s from `Update` with an accumulator, pause and ×0.5–×4 speed.
+3. **Cross-runtime determinism:** an EditMode test that runs the golden scenarios in Unity (Mono) and compares the
+   golden hashes and traces with the dotnet values; later the same under IL2CPP.
+4. **Drawing:** top-down 2D: walls, fighters as circles with a facing tick in squad colours, squad anchors and facing
+   arrows, planned routes, interpolation between ticks (`Fix` → `float` only in the view).
+5. **Input:** select squads (click, box), right-click to move (drag for facing), formation hotkeys (`SetFormation`),
+   pause/speed keys, a camera that pans and zooms; every action becomes a command for the next tick.
+6. **HUD:** squad list with formation and state, order arrows, rejected-command feedback; morale bars as placeholders
+   until M3.
+
 **Checkpoint:** you can move squads, change formations and pause; golden replays match in Unity.
 
 ### M3. Combat, wounds, morale (weeks 5–6)
