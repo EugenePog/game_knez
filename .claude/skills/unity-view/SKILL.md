@@ -41,6 +41,14 @@ inside the package folder (`Directory.Build.props` redirects it to `sim/artifact
 6. **Phase 1 look:** primitives only — circles, facing ticks, squad colours, order arrows, morale bars, a battle log.
    No art, no asset-store packages without asking.
 
+## Unity's null
+
+Never use `??`, `??=` or `?.` on `UnityEngine.Object` references (components, sprites, materials, cameras): a
+destroyed object, or an empty Inspector field in the editor, is a "fake null" that only Unity's `==` sees as null.
+This project enters Play mode without a domain reload, so statics survive between runs while the objects they cache
+are destroyed — re-create them behind `if (x == null)`. (Found in the M2 check: sprites vanished on the second Play,
+and input never ran because the camera field stayed "None".)
+
 ## Editor work is the human's
 
 Agents write C# and asmdefs. Creating scenes, prefabs, project settings and package installs is done in the editor:

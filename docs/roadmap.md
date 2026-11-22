@@ -306,8 +306,9 @@ Steps (planned 2026-11-21; each ends with the project compiling in batch mode an
    squad's name, formation, men left of spawned and state (`HudText.Status`: holding, marching, planning a route,
    regrouping into N files, re-forming); a grey morale bar marked as M3's; refused orders in plain words naming the
    squad, fading after 4 s; a line of controls. `HudTextTests`; 28/28 Unity tests green.
-   **M2 checkpoint built** (move squads, change formations, pause; golden traces match in Unity) — waiting on the
-   user's hands-on check in the editor.
+   ✅ **M2 checkpoint met 2026-11-22:** the user moved squads, changed formations and paused in the editor; golden
+   traces match in Unity. Found in that check and fixed: Unity's "fake null" objects (destroyed cached sprites across
+   Play runs with domain reload off; an empty Inspector field) slipped past `??` — the view now uses Unity's `==`.
 
 **Checkpoint:** you can move squads, change formations and pause; golden replays match in Unity.
 
