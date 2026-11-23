@@ -5,127 +5,127 @@
       "scenario": "scenarios/bench/s1-clash.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "2b9783c66754a635",
-      "final": "f76b9720bce7fc95"
+      "trace": "41cf8e3dce86bcaf",
+      "final": "1a886dad3056f7fe"
     },
     {
       "scenario": "scenarios/bench/s2-gate.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "61636ea6c4518c26",
-      "final": "e4720ccf75e6232e"
+      "trace": "ba184dd369676fc0",
+      "final": "67633fcef52e31d0"
     },
     {
       "scenario": "scenarios/bench/s3-crossing.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "bcf4394e4327535e",
-      "final": "20c6b7b4231673e8"
+      "trace": "15847c9421798596",
+      "final": "bfef9c4a639966d5"
     },
     {
       "scenario": "scenarios/bench/s4-wheel.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "eeccdc210c685dd3",
-      "final": "ccb4d1e69a22f1f6"
+      "trace": "6450d1e2c20a4334",
+      "final": "eb2a15381875a64a"
     },
     {
       "scenario": "scenarios/bench/s5-shieldwall.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "388036e12e22020c",
-      "final": "df653414125e9dad"
+      "trace": "cf3e7a27db47780d",
+      "final": "484d939d4bae5b12"
     },
     {
       "scenario": "scenarios/crowding.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "3ce9ca7546cf48f1",
-      "final": "ad6a20ad3e1dea82"
+      "trace": "2a54438fff93c9b1",
+      "final": "a48d0e3c8587f844"
     },
     {
       "scenario": "scenarios/drill.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "92962d37da172eb7",
-      "final": "c3f66676a1f724cf"
+      "trace": "5747ba7a13488e5d",
+      "final": "4f1698258436d51a"
     },
     {
       "scenario": "scenarios/formations.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "da645eace6d281c6",
-      "final": "fcafbcea55ade11c"
+      "trace": "e305791a356843a9",
+      "final": "52e5e77ffa604aef"
     },
     {
       "scenario": "scenarios/m3/m3-flank.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "2f60f6e2a4124c04",
-      "final": "510d022e06566ddf"
+      "trace": "f102c77a864cb04b",
+      "final": "0fffdae290532ba7"
     },
     {
       "scenario": "scenarios/m3/m3-lines.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "20b3b7f84a4b1bb7",
-      "final": "a3f0fb7c01336849"
+      "trace": "cb5f5647f88c2918",
+      "final": "7f16b2ecccd1a2cd"
     },
     {
       "scenario": "scenarios/m3/m3-rally.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "be246674d2013398",
-      "final": "cc323d4625671410"
+      "trace": "319179d1722f8bc8",
+      "final": "a55dbe3186752649"
     },
     {
       "scenario": "scenarios/m3/m3-shieldwall.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "3e0219abedfc43b3",
-      "final": "81e73f4c2d2dc30a"
+      "trace": "91444deab00ca6e1",
+      "final": "63f0d445010cfcbe"
     },
     {
       "scenario": "scenarios/m3/m3-spears.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "901672ed8cc47436",
-      "final": "1f6b594da09d448c"
+      "trace": "2c9eb719fcb15e8b",
+      "final": "50ac196256fed32f"
     },
     {
       "scenario": "scenarios/m3/m3-veterans.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "b9a37b79215469ba",
-      "final": "f1ddcda17bcdc076"
+      "trace": "46874b820b521bf5",
+      "final": "96d294e483136e24"
     },
     {
       "scenario": "scenarios/m3/m3-withdraw.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "01a5e25f908a4b6c",
-      "final": "d879c91a7808b092"
+      "trace": "ec978409fec3aaa0",
+      "final": "4489590d6d72b758"
     },
     {
       "scenario": "scenarios/march.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "22752cfeed0f3a15",
-      "final": "882976e57a15fc86"
+      "trace": "f88232ced70741ae",
+      "final": "96b859196373b89b"
     },
     {
       "scenario": "scenarios/paths.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "cdf4a2d2ae21268e",
-      "final": "df7d292a0c59e892"
+      "trace": "d7ceff3da4e4688e",
+      "final": "098d3e36e6be9484"
     },
     {
       "scenario": "scenarios/walls.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "de561b5a57e3089a",
-      "final": "61b0c42dfaef92dd"
+      "trace": "f8d31558545384a8",
+      "final": "aa6510eea8e65614"
     }
   ]
 }

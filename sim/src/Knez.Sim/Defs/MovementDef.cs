@@ -16,7 +16,7 @@ namespace Knez.Sim.Defs
         /// Times are seconds, rounded to the nearest whole tick (0.05 s), at least one.</summary>
         public MovementDef(Fix pivotTolerance, Fix slotCatchUpTime, Fix personalSpace, Fix separationTime, Fix holdingReach,
             Fix formedUpReach, int collisionPasses, Fix allyPartingDepth, int pathBudget, Fix regroupLead,
-            Fix regroupMaxWait, Fix regroupCost, Fix reformPace, Fix stepBackPace, Fix withdrawClearance)
+            Fix regroupMaxWait, Fix regroupCost, Fix reformPace, Fix stepBackPace, Fix withdrawClearance, Fix closeInRange)
         {
             PivotTolerance = DefChecks.Positive(pivotTolerance, 90, "°", nameof(pivotTolerance));
             SlotCatchUpTicks = DefChecks.Ticks(slotCatchUpTime, 5, nameof(slotCatchUpTime));
@@ -33,6 +33,7 @@ namespace Knez.Sim.Defs
             ReformPace = DefChecks.Fraction(reformPace, nameof(reformPace));
             StepBackPace = DefChecks.Fraction(stepBackPace, nameof(stepBackPace));
             WithdrawClearance = DefChecks.NonNegative(withdrawClearance, 20, "m", nameof(withdrawClearance));
+            CloseInRange = DefChecks.NonNegative(closeInRange, 20, "m", nameof(closeInRange));
         }
 
         /// <summary>
@@ -55,7 +56,8 @@ namespace Knez.Sim.Defs
             regroupCost: Fix.One,
             reformPace: Fix.Ratio(1, 2),
             stepBackPace: Fix.Ratio(1, 2),
-            withdrawClearance: Fix.FromInt(3));
+            withdrawClearance: Fix.FromInt(3),
+            closeInRange: Fix.FromInt(3));
 
         /// <summary>A squad turns in place until its target is within this many degrees of its front, then marches.</summary>
         public Fix PivotTolerance { get; }
@@ -116,6 +118,11 @@ namespace Knez.Sim.Defs
         /// reach plus this, metres; then it turns and marches (decided 2026-11-22: 3 m).</summary>
         public Fix WithdrawClearance { get; }
 
+        /// <summary>In a squad standing in melee, a man not yet fighting steps toward the nearest enemy whose body is within
+        /// this of his own (edge to edge, metres) until he reaches him; 0 = only the men who touch fight (asked for
+        /// 2026-11-23; 3 m is a proposal).</summary>
+        public Fix CloseInRange { get; }
+
         internal void AddTo(ref Fnv1a64 hash)
         {
             hash.Add(PivotTolerance.Raw);
@@ -133,6 +140,7 @@ namespace Knez.Sim.Defs
             hash.Add(ReformPace.Raw);
             hash.Add(StepBackPace.Raw);
             hash.Add(WithdrawClearance.Raw);
+            hash.Add(CloseInRange.Raw);
         }
     }
 }

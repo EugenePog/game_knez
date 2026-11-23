@@ -43,6 +43,9 @@ namespace Knez.Sim
         /// <summary>Per-fighter push weights for this tick (index = fighter list index), rebuilt by the systems that use it.</summary>
         internal List<int> FighterWeights { get; } = new List<int>();
 
+        /// <summary>Whether each squad (by its index in the list) has a man in melee this tick (scratch for steering).</summary>
+        internal List<bool> SquadInMelee { get; } = new List<bool>();
+
         /// <summary>Whether each fighter was safe (no threatening enemy within the safe distance) at the start of the
         /// morale stage, judged once so the order of transitions can't change it.</summary>
         internal List<bool> Safe { get; } = new List<bool>();

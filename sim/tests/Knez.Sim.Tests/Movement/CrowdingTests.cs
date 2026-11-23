@@ -551,7 +551,8 @@ public class CrowdingTests
     [Category("Scenario")]
     public void MarchingIntoAHoldingLine_MarchersStopInContact_TheLineHolds()
     {
-        var sim = new BattleSimulation(BattleSetup.Create(TestDefs.IntoAHoldingLine(), 1));
+        // Pushing, not closing in (CloseInTests): men who step toward an enemy leave their slots on purpose.
+        var sim = new BattleSimulation(BattleSetup.Create(TestDefs.WithoutCloseIn(TestDefs.IntoAHoldingLine()), 1));
         var holders = sim.State.Squads[0];
         var movers = sim.State.Squads[1];
         double holdersWorst = 0;

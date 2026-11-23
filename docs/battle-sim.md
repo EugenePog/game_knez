@@ -146,7 +146,7 @@ def gets the fields its systems need when they arrive; M1 step 1 has:
 | `FighterDef` | `id`, `radius` (m), `walkSpeed`, `runSpeed` (m/s, at most 8, and under radius + 5 cm per tick so nobody steps through a 10 cm wall), `turnRate` (°/s); optional kit (M3): `weapon`, `shield`, `bodyArmour`, `headCover`, `experience`, `type` — ids from `CombatDef`; parts left out come from its `defaultKit` |
 | `CombatDef` (`combat.json`, M3 step 1, numbers in §11) | `weapons[]`: `id`, `reach` (m, gap between bodies), `windup`, `recovery` (s, whole ticks), `wounds` {`light`, `heavy`, `down`} (‰, sum 1000); `shields[]`, `bodyArmour[]`, `headCover[]`: `id`, `protection` (‰); `experience[]` (lowest first): `id`, `defence` (‰), `morale` (start, 0..1000); `warriorTypes[]`: `id`, `defence` (‰); `hitChance` {weapon: {experience level: ‰}} — every cell required, keyed by id; `defaultKit` (all six parts); `hitLimits` {`min`, `max`}; `position` {`frontArc`, `rearArc` (°), `flank`, `rear`, `shieldFromFlank`, `shieldFromRear`, `shieldWall` (‰)}; `strikeArc` (°); `wounded` {`lightPenalty`, `heavyPenalty` (‰), `lightPace`, `heavyPace` (fractions)}. Catalogues keep file order; at most one def file holds it; code-built scenarios and fighters use `CombatDef.Standard`, which a test keeps equal to the file (by fingerprint). A scenario is refused when a squad's kit isn't drawn from its combat rules |
 | `FormationDef` | `id`, `spacing` (m between neighbours), `rankSpacing` (m between ranks), `ranks` *or* `width`, `turnRate` (°/s), `holdWeight` (how much harder men holding their ground are to push; moving men weigh 1), `allyPassSpeed` (fraction of walking speed at which allies squeeze through this formation while it holds), optional `shieldWall` (M3: frontal blows at men with shields get through less) |
-| `MovementDef` (`movement.json`, decided 2026-11-21: tunables in content, not code) | `pivotTolerance` (° off the heading a squad still marches at, 30), `slotCatchUpTime` (s, 0.5), `personalSpace` (m, 0.1), `separationTime` (s, 0.25), `holdingReach` (m, 1.5), `formedUpReach` (m, 0.3), `collisionPasses` (6), `allyPartingDepth` (m, 0.25), `pathBudget` (search nodes per tick, 4 000), `regroupLead` (m, 1), `regroupMaxWait` (s, 5), `regroupCost` (route metres per metre of extra depth, 1), `reformPace` (fraction of the pace while changing formation, 0.5), `stepBackPace` (fraction of the pace when stepping back onto a target just behind, and when withdrawing from melee, 0.5), `withdrawClearance` (m beyond each man's weapon reach a withdrawing squad keeps facing the enemy, 3; decided 2026-11-22). Times are rounded to the nearest whole tick (0.05 s). At most one def file holds it; scenarios built in code use `MovementDef.Standard`, which a test keeps equal to the file. A scenario is refused when `personalSpace` doesn't fit between two of its men side by side or rank behind rank |
+| `MovementDef` (`movement.json`, decided 2026-11-21: tunables in content, not code) | `pivotTolerance` (° off the heading a squad still marches at, 30), `slotCatchUpTime` (s, 0.5), `personalSpace` (m, 0.1), `separationTime` (s, 0.25), `holdingReach` (m, 1.5), `formedUpReach` (m, 0.3), `collisionPasses` (6), `allyPartingDepth` (m, 0.25), `pathBudget` (search nodes per tick, 4 000), `regroupLead` (m, 1), `regroupMaxWait` (s, 5), `regroupCost` (route metres per metre of extra depth, 1), `reformPace` (fraction of the pace while changing formation, 0.5), `stepBackPace` (fraction of the pace when stepping back onto a target just behind, and when withdrawing from melee, 0.5), `withdrawClearance` (m beyond each man's weapon reach a withdrawing squad keeps facing the enemy, 3; decided 2026-11-22), `closeInRange` (m, edge to edge: in a squad standing in melee a man not yet fighting steps toward an enemy this near, 3; asked for 2026-11-23, the number a proposal; 0 = off). Times are rounded to the nearest whole tick (0.05 s). At most one def file holds it; scenarios built in code use `MovementDef.Standard`, which a test keeps equal to the file. A scenario is refused when `personalSpace` doesn't fit between two of its men side by side or rank behind rank |
 | `MoraleDef` (`morale.json`, M3 step 5, numbers in §12) | thresholds `shaken`, `wavering`, `routing`, `hysteresis`; `lossWeight` (× 1000 / start size per fallen squadmate); costs `ownLightWound`, `ownHeavyWound`, `mateHeavyWound`, `flankBlow`, `rearBlow`, `mateFlankBlow`, `mateRearBlow`, `mateRouts`, `allySquadBroke`, `enemySquadBroke` (a gain), `nearby` (m); `recoveryPerSecond`, `safeDistance` (m), `rallyAt`; `breakShare`, `reformShare` (‰); `waveringHitPenalty` (‰). At most one def file holds it; code uses `MoraleDef.Standard`, kept equal by fingerprint. A scenario is refused when a squad's experience starts below `routing` |
 | `MapDef` | `width`, `height` (m, at most 250: 500 route cells), optional `walls[]` (at most 64): `from` `[x, y]`, `to` `[x, y]` (opposite corners of an axis-aligned rectangle, ≥ 0.1 m thick, on the map) |
 | `ScenarioDef` | `id`, `description`, `map`, `squads[]`: `name`, `side`, `fighter`, `count`, `formation`, `position` `[x, y]`, `facing` (degrees); optional `script[]`: `tick`, `order`, `squad` (name), then for `"move"` `target` `[x, y]` and optional `facing`, for `"formation"` `formation` (an id from the catalogue). Built from content it also carries the whole formation catalogue (`Formations`) |
@@ -217,7 +217,7 @@ rank; an incomplete rank is the rearmost and is centred. Width = `width`, or ⌈
 | 2 | `AiSystem` | side → squad → fighter decisions; squads evaluated staggered (every 5 ticks, offset by id) |
 | 3 | `OrderSystem` | squad orders → anchor goal, facing, formation slots, slot assignment |
 | 4 | `PathSystem` | A* for squads waiting for a route, first come first served (request tick, then id), 4 000 search nodes per tick; detached fighters later |
-| 5 | `SteeringSystem` | desired velocity: slot seek/arrive, separation, obstacle avoidance |
+| 5 | `SteeringSystem` | desired velocity: slot seek/arrive, separation, obstacle avoidance; routers flee; closing in (§11) |
 | 6 | `MovementSystem` | integrate, resolve collisions (circle–circle, circle–wall), update facing (engaged men face their target, M3) |
 | 7 | `TargetingSystem` | engagement and target choice in reach; tie-break by distance, then id |
 | 8 | `CombatSystem` | advance actions (windup → strike → recovery), roll hits with `SimRng` |
@@ -384,7 +384,8 @@ their milestone. Scratch buffers live in `TickContext`, never in system fields.
 - Slot assignment is stable: it changes only when men fall (ranks close from the back) and when the squad re-forms or
   faces about (nearest man per slot, front first) — see above.
 - Steering: arrive-at-slot + separation from neighbours + wall avoidance; engaged fighters are held in place
-  (melee lock) and only shuffle to keep spacing.
+  (melee lock) and only shuffle to keep spacing — except that, closing in (§11), men of a squad in melee step toward
+  the enemy until well inside their reach.
 - Collision: relaxation passes in id order (6 since step 4), push apart overlapping circles, clamp to the map and out
   of walls (`Terrain.Constrain`).
 - Steering, not velocity obstacles: the M1 bench showed no jams at 20 vs 30 — only engaged presses, which stand by design until M3 (decided 2026-11-21).
@@ -422,7 +423,7 @@ idle ticks.
 | S4 | 28 | 0 | 0.00 % | 0 % | 0 | 0.004 / 1.08 m | 0.1 s | 0.008 / 0.012 / 0.085 ms |
 | S5 | 28 | 0 | 0.00 % | 13.8 % | 0 | 0.053 / 7.29 m | 7.8 s | 0.008 / 0.029 / 0.035 ms |
 
-**After the melee lock (M3 step 2, 2026-11-22; the table above is M1's):** S1 — 0 stuck, 0 % overlap, engaged 60.9 %,
+**After the melee lock (M3 step 2, 2026-11-22, before combat, morale and closing in; the table above is M1's):** S1 — 0 stuck, 0 % overlap, engaged 60.9 %,
 4 orders open: both head-on pairs lock (the shield wall and the raider flank no longer slip through each other),
 p99 0.032 ms; S5 — the attackers stop at the wall and lock, engaged 74.7 %, 2 orders open; S2–S4 unchanged.
 
@@ -457,6 +458,18 @@ a wound. The numbers below were confirmed by the user on 2026-11-22 and live in 
   withdrawing narrow or widen the squad without stopping; a regroup wait starts over once out of contact. Engaged men
   weigh their formation's hold weight whatever their squad is doing. The bench's "engaged" squad (stuck excluded) is one
   with an engaged man. Spearmen engage from 1.8 m, so a spear line halts before a sword line reaches it.
+- **Closing in (asked for 2026-11-23):** in a squad standing in melee (a man engaged and not running; the squad
+  neither marching, turning nor stepping back — waiting for a route counts as standing), every man not yet fighting
+  steps at walking pace toward the nearest enemy *in the fight* (engaged, or of a squad in melee — closing in never
+  starts a second fight) and not running whose body is within `closeInRange` (3 m) of his own, stopping half his reach
+  short of touching; an engaged man likewise keeps stepping in until he is half his reach from his enemy, so the press
+  doesn't push him in and out of reach. Both only while he stands within `closeInRange` of his own slot: nobody chases a
+  withdrawing enemy or wanders off. More men fight than the first pairs: rear ranks step round their front men and a
+  longer line wraps round a shorter one's ends. **A formation that keeps its ranks** (`keepsRanks` in
+  `formations.json`, decided 2026-11-23 for the shield wall) doesn't close in at all: its men stay in their places and
+  only those in reach fight. Measured (10 seeds): the 8-man wall beats 10 raiders 7 times in 10; in S1 it wins 4 in 10,
+  often swept away when the Hird line beside it breaks. A man closing in may walk into a holding allied squad and pass
+  through it like any man on orders.
 - **Attacks (M3 step 3, built):** a blow is a windup, the strike, then a recovery (`CombatSystem`, stage 8, men in id
   order). An idle man starts a windup as soon as his `Target` is within reach and within his **strike arc** (60° either
   side of his facing); **engaged men turn to face their enemy** at their own turn rate (decided 2026-11-23; movement,

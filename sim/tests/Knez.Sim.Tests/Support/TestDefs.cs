@@ -20,6 +20,19 @@ public static class TestDefs
 
     public static readonly MapDef Map = new(Fix.FromInt(60), Fix.FromInt(40));
 
+    /// <summary>The standard movement rules with closing in off (only men who touch fight): for tests of pushing.</summary>
+    public static readonly MovementDef NoCloseIn = WithoutCloseIn(MovementDef.Standard);
+
+    private static MovementDef WithoutCloseIn(MovementDef s) => new(s.PivotTolerance, Fix.Ratio(s.SlotCatchUpTicks, 20),
+        s.PersonalSpace, Fix.Ratio(s.SeparationTicks, 20), s.HoldingReach, s.FormedUpReach, s.CollisionPasses, s.AllyPartingDepth,
+        s.PathBudget, s.RegroupLead, Fix.Ratio(s.RegroupMaxWaitTicks, 20), s.RegroupCost, s.ReformPace, s.StepBackPace,
+        s.WithdrawClearance, closeInRange: Fix.Zero);
+
+    /// <summary><paramref name="scenario"/> with <see cref="NoCloseIn"/> movement rules.</summary>
+    public static ScenarioDef WithoutCloseIn(ScenarioDef scenario) =>
+        new(scenario.Id, scenario.Description, scenario.Map, scenario.Squads, scenario.Script, NoCloseIn, scenario.Formations,
+            scenario.Combat, scenario.Morale);
+
     /// <summary>
     /// The standard combat rules with every hit chance 0 and no floor: men engage, lock and swing, but nobody is ever
     /// hurt — for tests of movement and the melee lock that must not turn into a fight (M3 step 5 onward).

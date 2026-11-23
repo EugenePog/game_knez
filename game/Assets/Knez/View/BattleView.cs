@@ -1,7 +1,9 @@
 #nullable enable
 using System.Collections.Generic;
 using Knez.Sim;
+using Knez.Sim.Combat;
 using Knez.Sim.Defs;
+using Knez.Sim.Events;
 using Knez.Sim.Orders;
 using Knez.Sim.Units;
 using UnityEngine;
@@ -13,7 +15,10 @@ namespace Knez.Game.View
     /// Draws a <see cref="BattleRunner"/>'s battle top-down (M2 step 4): walls, fighters as discs in their squad's colour
     /// with a tick for their facing (grey once fallen), each squad's anchor with a facing marker, and the route still
     /// ahead of a squad on the march. Reads the state only. Positions are interpolated between the last two ticks by the
-    /// clock's alpha, so motion is smooth at any frame rate. The camera is fitted to the map.
+    /// clock's alpha, so motion is smooth at any frame rate. The camera is fitted to the map. M3: a red dot on a wounded
+    /// man (bigger = heavily), white for a running man, a thin line in the striker's squad colour from a man winding up a
+    /// blow to his target, and when the blow falls a flash along it in the same colour plus a spark on the struck man —
+    /// red if it got through, white if it was turned aside.
     /// </summary>
     public sealed class BattleView : MonoBehaviour
     {
@@ -33,6 +38,13 @@ namespace Knez.Game.View
         private readonly List<Transform> _anchors = new List<Transform>();
         private readonly List<LineRenderer> _routes = new List<LineRenderer>();
         private readonly Dictionary<int, Color> _squadColours = new Dictionary<int, Color>(); // view-side cache keyed by id
+        private readonly Dictionary<int, int> _index = new Dictionary<int, int>(); // fighter id → position in the list
+        private readonly List<SpriteRenderer> _wounds = new List<SpriteRenderer>();
+        private readonly List<LineRenderer> _aims = new List<LineRenderer>();
+        private readonly List<Flash> _flashes = new List<Flash>();
+        private const float FlashSeconds = 0.35f;
+        private static readonly Color Landed = new Color(0.90f, 0.05f, 0.05f);
+        private static readonly Color Missed = new Color(1f, 1f, 1f);
         private Vector2[] _previous = new Vector2[0];
         private Vector2[] _current = new Vector2[0];
         private float[] _previousFacing = new float[0];
@@ -109,6 +121,13 @@ namespace Knez.Game.View
                 halo.transform.localPosition = Vector3.zero;
                 halo.transform.localScale = new Vector3(1.45f, 1.45f, 1);
                 halo.enabled = false;
+                SpriteRenderer wound = Make("Wound", ShapeSprites.Disc, new Color(0.80f, 0.08f, 0.08f), 4, Vector2.zero, Vector2.one);
+                wound.transform.SetParent(body.transform, false);
+                wound.transform.localPosition = Vector3.zero;
+                wound.enabled = false;
+                _wounds.Add(wound);
+                _aims.Add(Line("Aim " + fighter.Id.Value, 2));
+                _index[fighter.Id.Value] = i;
                 _bodies.Add(body.transform);
                 _bodyRenderers.Add(body);
                 _halos.Add(halo);
@@ -145,6 +164,76 @@ namespace Knez.Game.View
             (_previous, _current) = (_current, _previous);
             (_previousFacing, _currentFacing) = (_currentFacing, _previousFacing);
             Capture(state);
+            foreach (SimEvent simEvent in state.Events)
+            {
+                if (simEvent is BlowStruck blow && _index.TryGetValue(blow.Attacker.Value, out int a) && _index.TryGetValue(blow.Defender.Value, out int d))
+                {
+                    Flash flash = FreeFlash();
+                    flash.Attacker = a;
+                    flash.Defender = d;
+                    flash.Until = Time.unscaledTime + FlashSeconds;
+                    Fighter striker = state.Fighters[a];
+                    flash.Colour = _squadColours.TryGetValue(striker.SquadId.Value, out Color sc) ? sc : Color.grey; // who struck
+                    flash.Line.startWidth = 0.16f;
+                    flash.Line.endWidth = 0.05f; // thick at the striker, thin at the struck: the direction of the blow
+                    flash.Line.enabled = true;
+                    flash.Spark.color = blow.Landed ? Landed : Missed; // whether it got through
+                    flash.Spark.transform.localScale = blow.Landed ? new Vector3(0.45f, 0.45f, 1) : new Vector3(0.3f, 0.3f, 1);
+                    flash.Spark.enabled = true;
+                }
+            }
+        }
+
+        /// <summary>A blow's flash: a line from striker to struck, fading out (view-side only).</summary>
+        private sealed class Flash
+        {
+            public Flash(LineRenderer line, SpriteRenderer spark)
+            {
+                Line = line;
+                Spark = spark;
+            }
+
+            public LineRenderer Line { get; }
+
+            public SpriteRenderer Spark { get; }
+
+            public int Attacker { get; set; }
+
+            public int Defender { get; set; }
+
+            public float Until { get; set; }
+
+            public Color Colour { get; set; }
+        }
+
+        private Flash FreeFlash()
+        {
+            foreach (Flash flash in _flashes)
+            {
+                if (!flash.Line.enabled)
+                {
+                    return flash;
+                }
+            }
+
+            SpriteRenderer spark = Make("Spark", ShapeSprites.Disc, Missed, 6, Vector2.zero, new Vector2(0.3f, 0.3f));
+            spark.enabled = false;
+            var made = new Flash(Line("Blow", 5), spark);
+            _flashes.Add(made);
+            return made;
+        }
+
+        private LineRenderer Line(string name, int order)
+        {
+            var line = new GameObject(name).AddComponent<LineRenderer>();
+            line.transform.SetParent(transform, false);
+            line.material = ShapeSprites.LineMaterial;
+            line.startWidth = line.endWidth = 0.05f;
+            line.sortingOrder = order;
+            line.useWorldSpace = true;
+            line.positionCount = 2;
+            line.enabled = false;
+            return line;
         }
 
         private void LateUpdate()
@@ -173,6 +262,57 @@ namespace Knez.Game.View
                 _bodies[i].rotation = Quaternion.Euler(0, 0, Mathf.LerpAngle(_previousFacing[i], _currentFacing[i], t));
                 _bodyRenderers[i].color = Colour(fighter);
                 _halos[i].enabled = fighter.IsAlive && _selection.Contains(fighter.SquadId);
+                bool hurt = fighter.IsAlive && (fighter.Wound == WoundLevel.Light || fighter.Wound == WoundLevel.Heavy);
+                _wounds[i].enabled = hurt;
+                if (hurt)
+                {
+                    float size = fighter.Wound == WoundLevel.Heavy ? 0.55f : 0.3f; // local units: the body is one unit across
+                    _wounds[i].transform.localScale = new Vector3(size, size, 1);
+                }
+            }
+
+            // Aim lines: a man winding up a blow, to his target (both drawn where they are this frame).
+            for (int i = 0; i < _aims.Count; i++)
+            {
+                Fighter fighter = state.Fighters[i];
+                LineRenderer aim = _aims[i];
+                bool aiming = fighter.IsAlive && fighter.Action == FighterAction.Windup && _index.ContainsKey(fighter.Target.Value);
+                aim.enabled = aiming;
+                if (aiming)
+                {
+                    Color c = _squadColours.TryGetValue(fighter.SquadId.Value, out Color sc) ? sc : Color.grey;
+                    aim.startColor = new Color(c.r, c.g, c.b, 0.85f);
+                    aim.endColor = new Color(c.r, c.g, c.b, 0.25f);
+                    aim.startWidth = 0.08f;
+                    aim.endWidth = 0.03f;
+                    aim.SetPosition(0, _bodies[i].position);
+                    aim.SetPosition(1, _bodies[_index[fighter.Target.Value]].position);
+                }
+            }
+
+            float now = Time.unscaledTime;
+            foreach (Flash flash in _flashes)
+            {
+                if (!flash.Line.enabled)
+                {
+                    continue;
+                }
+
+                float left = (flash.Until - now) / FlashSeconds;
+                if (left <= 0)
+                {
+                    flash.Line.enabled = false;
+                    flash.Spark.enabled = false;
+                    continue;
+                }
+
+                Color c = flash.Colour;
+                flash.Line.startColor = flash.Line.endColor = new Color(c.r, c.g, c.b, left);
+                flash.Line.SetPosition(0, _bodies[flash.Attacker].position);
+                flash.Line.SetPosition(1, _bodies[flash.Defender].position);
+                Color k = flash.Spark.color;
+                flash.Spark.color = new Color(k.r, k.g, k.b, left);
+                flash.Spark.transform.position = _bodies[flash.Defender].position;
             }
 
             for (int s = 0; s < state.Squads.Count; s++)

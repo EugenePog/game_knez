@@ -68,6 +68,19 @@ UNITY="/Applications/Unity/Hub/Editor/<version>/Unity.app/Contents/MacOS/Unity"
 Find `<version>` with `ls /Applications/Unity/Hub/Editor/`. Read the XML for results and the log for compile
 errors. Run in the background — the first import takes minutes.
 
+### Typecheck while the editor is open
+
+Batch mode needs the editor closed. To check that view code compiles while the user has Unity open, build a throwaway
+`netstandard2.1` / C# 9 project in the scratchpad that compiles `game/Assets/Knez/{View,Input,Tests}/*.cs`, references
+Unity's own NUnit (`game/Library/PackageCache/com.unity.ext.nunit@*/net472/unity-custom/nunit.framework.dll` — it is
+NUnit 3.5: no `Assert.Multiple`, so never use it in `game/` tests; a newer NUnit package hides that) and
+`game/Library/ScriptAssemblies/Unity.InputSystem.dll`, references `sim/src/Knez.Sim` and `sim/src/Knez.Sim.Content` as projects, and
+references every DLL in `/Applications/Unity/Hub/Editor/<version>/Unity.app/Contents/Resources/Scripting/Managed/UnityEngine/`.
+Add `CS0649` to `NoWarn` (Unity fills `[SerializeField]` fields; its compiler doesn't flag them). Set
+`<Nullable>disable</Nullable>` and `TreatWarningsAsErrors`: Unity compiles with nullable off, so a `?` annotation in a
+file without `#nullable enable` warns (CS8632) — every `game/` file that uses `?` on a reference type needs the directive. It proves the code
+compiles, not that it behaves — the user's Play (or batch mode later) is still the test.
+
 ## Cross-runtime determinism (M2 checkpoint)
 
 `Knez.Game.Tests` contains `CrossRuntimeGoldenTests`: it runs every entry of `sim/tests/Golden/content-traces.json`

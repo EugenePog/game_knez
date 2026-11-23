@@ -22,13 +22,13 @@ namespace Knez.Sim.Content
             "mateHeavyWound, flankBlow, rearBlow, mateFlankBlow, mateRearBlow, mateRouts, allySquadBroke, enemySquadBroke, nearby, " +
             "recoveryPerSecond, safeDistance, rallyAt, breakShare, reformShare, waveringHitPenalty";
         private const string MovementMembers = "pivotTolerance, slotCatchUpTime, personalSpace, separationTime, holdingReach, " +
-            "formedUpReach, collisionPasses, allyPartingDepth, pathBudget, regroupLead, regroupMaxWait, regroupCost, reformPace, stepBackPace, withdrawClearance";
+            "formedUpReach, collisionPasses, allyPartingDepth, pathBudget, regroupLead, regroupMaxWait, regroupCost, reformPace, stepBackPace, withdrawClearance, closeInRange";
         private const string FighterMembers = "id, radius, walkSpeed, runSpeed, turnRate, weapon, shield, bodyArmour, headCover, experience, type";
         private const string CombatMembers = "weapons, shields, bodyArmour, headCover, experience, warriorTypes, hitChance, defaultKit, " +
             "hitLimits, position, strikeArc, wounded";
         private const string WeaponMembers = "id, reach, windup, recovery, wounds";
         private const string KitMembers = "weapon, shield, bodyArmour, headCover, experience, type";
-        private const string FormationMembers = "id, spacing, rankSpacing, ranks, width, turnRate, holdWeight, allyPassSpeed, shieldWall";
+        private const string FormationMembers = "id, spacing, rankSpacing, ranks, width, turnRate, holdWeight, allyPassSpeed, shieldWall, keepsRanks";
 
         private readonly Dictionary<string, FighterDef> _fighters;
         private readonly Dictionary<string, FormationDef> _formations;
@@ -118,11 +118,12 @@ namespace Knez.Sim.Content
                     int holdWeight = item.RequireInt("holdWeight");
                     var allyPassSpeed = item.RequireFix("allyPassSpeed");
                     bool shieldWall = item.OptionalBool("shieldWall", false);
+                    bool keepsRanks = item.OptionalBool("keepsRanks", false);
                     item.RejectUnknownMembers(FormationMembers);
                     Claim(seen, "formation", id, item, formationItems[i], file.Name);
                     formations.Add(Build(item, formationItems[i],
                         () => new FormationDef(id, spacing, rankSpacing, ranks, width, formationTurnRate, holdWeight, allyPassSpeed,
-                        shieldWall)));
+                        shieldWall, keepsRanks)));
                 }
 
                 JsonObjectReader? movementReader = root.OptionalObject("movement");
@@ -146,10 +147,12 @@ namespace Knez.Sim.Content
                     var reformPace = item.RequireFix("reformPace");
                     var stepBackPace = item.RequireFix("stepBackPace");
                     var withdrawClearance = item.RequireFix("withdrawClearance");
+                    var closeInRange = item.RequireFix("closeInRange");
                     item.RejectUnknownMembers(MovementMembers);
                     movement = Build(item, movementValue, () => new MovementDef(pivotTolerance, slotCatchUpTime, personalSpace,
                         separationTime, holdingReach, formedUpReach, collisionPasses, allyPartingDepth, pathBudget, regroupLead,
-                        regroupMaxWait, regroupCost, reformPace, stepBackPace, withdrawClearance));
+                        regroupMaxWait, regroupCost, reformPace, stepBackPace, withdrawClearance,
+                        closeInRange));
                 }
 
                 JsonObjectReader? combatReader = root.OptionalObject("combat");

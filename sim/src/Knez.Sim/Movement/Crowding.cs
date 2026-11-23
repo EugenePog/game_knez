@@ -9,7 +9,8 @@ namespace Knez.Sim.Movement
     /// <summary>
     /// Bodies don't overlap (battle-sim.md §10). Every living fighter is solid to every other — enemies always, allies
     /// too, with one exception (decided 2026-11-21): a man holding his ground opens his ranks to a man of another allied
-    /// squad who is passing through on orders (<see cref="Fighter.PassingThrough"/>). That pair ignores each other — no
+    /// squad who is passing through on orders (<see cref="Fighter.PassingThrough"/>) — walking to his slot, or closing in on an
+    /// enemy (battle-sim.md §11). That pair ignores each other — no
     /// separation, no slide, no collision — and while their bodies overlap the passing man squeezes through at most at the
     /// holder formation's <see cref="FormationDef.AllyPassSpeed"/> of his walking pace. Passing starts only when he walks
     /// into a holder who stands between him and his slot, so men shoved backwards, or off their slots without orders,
