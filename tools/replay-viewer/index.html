@@ -11,7 +11,7 @@
   <!--
     Plays a frames file written by `knez-sim run <scenario> --frames FILE` (battle-sim.md §17).
     Open with ?frames=<url> through a local server (see the battle-run skill), or pick/drop a file.
-    URL options: tick=N (start there), speed=0.25|0.5|1|2|4, play=1, labels=0, anchors=0, grid=0, ids=1, overlaps=0.
+    URL options: tick=N (start there), speed=0.25|0.5|1|2|4, play=1, labels=0, anchors=0, grid=0, ids=1, overlaps=0, morale=0.
     No dependencies, no build step: plain HTML, CSS and one classic script.
   -->
   <header class="bar">
@@ -35,6 +35,7 @@
           <dt>Time</dt><dd id="time">–</dd>
           <dt>Hash</dt><dd id="hash" class="mono">–</dd>
           <dt>Seed</dt><dd id="seed">–</dd>
+          <dt>Result</dt><dd id="result">–</dd>
         </dl>
         <p id="faulted" class="faulted" hidden></p>
       </section>
@@ -72,6 +73,7 @@
     <label><input id="grid" type="checkbox" checked> Grid</label>
     <label><input id="ids" type="checkbox"> Ids</label>
     <label title="Red ring: pressed more than 5 cm into someone (the M1 overlap metric)"><input id="overlaps" type="checkbox" checked> Overlaps</label>
+    <label title="Bar under each man: morale (green steady, yellow shaken, orange wavering, red about to run). White with a coloured ring: running. Dashed ring: rallying. Red dot: wounded (bigger = heavily)"><input id="morale" type="checkbox" checked> Morale</label>
     <button id="fit" title="Fit the map (F)">Fit</button>
   </footer>
 

@@ -62,6 +62,18 @@ public class RepoContentTests
     }
 
     [Test]
+    public void Repo_MoraleRules_ComeFromContent_AndEqualTheCodesStandardCopy()
+    {
+        var morale = ScenarioFiles.Load(Path.Combine(RepoPaths.Content, "scenarios", "march.json")).Morale;
+        Assert.Multiple(() =>
+        {
+            Assert.That(morale, Is.Not.SameAs(Knez.Sim.Defs.MoraleDef.Standard));
+            Assert.That(morale.Fingerprint, Is.EqualTo(Knez.Sim.Defs.MoraleDef.Standard.Fingerprint),
+                "morale.json and MoraleDef.Standard differ; change both together");
+        });
+    }
+
+    [Test]
     public void Repo_HasAtLeastOneScenario()
     {
         Assert.That(ScenarioFilesInRepo(), Is.Not.Empty);

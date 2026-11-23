@@ -45,7 +45,8 @@ namespace Knez.Sim.Movement
                 // Cap first, then slide: the slide only removes speed, and cutting an uncapped request (a man 10 m behind
                 // his slot asks for ~1 m/tick) would still leave more than run speed, straight into the body in front.
                 FixVec2 separation = Crowding.Separation(state, weights, roles, i);
-                FixVec2 desired = Follow(state, fighter, separation).ClampLength(fighter.Def.RunPerTick);
+                Fix run = fighter.Def.RunPerTick * Combat.Wounds.Pace(state.Scenario.Combat, fighter.Wound); // wounds slow him
+                FixVec2 desired = Follow(state, fighter, separation).ClampLength(run);
                 FixVec2 slid = Crowding.Slide(state, weights, roles, i, desired);
                 slid = Terrain.SlideAlongWalls(state.Scenario.Map, state.Scenario.Movement.PersonalSpace, fighter.Position, fighter.Radius, slid);
                 fighter.Velocity = Crowding.Squeeze(state, roles, i, slid);
@@ -55,10 +56,22 @@ namespace Knez.Sim.Movement
         /// <summary>Velocity toward the formation slot, plus <paramref name="separation"/>.</summary>
         private static FixVec2 Follow(BattleState state, Fighter fighter, FixVec2 separation)
         {
+            if (fighter.IsRouting)
+            {
+                // Routing (battle-sim.md §12): run for his side's map edge, ignoring his squad and its orders.
+                FixVec2 away = Morale.MoraleRules.FleeTarget(state, fighter) - fighter.Position;
+                return (away == FixVec2.Zero ? FixVec2.Zero : away.WithLength(fighter.Def.RunPerTick)) + separation;
+            }
+
             Squad? squad = fighter.SquadId.IsNone ? null : state.FindSquad(fighter.SquadId);
             if (squad == null || fighter.SlotIndex < 0)
             {
                 return separation; // individual orders (heroes) come later
+            }
+
+            if (squad.Broken)
+            {
+                return separation; // a man who rallied while his squad is broken stands where he stopped, until it re-forms
             }
 
             // A slot past the map edge or inside a wall is reached as close as a body fits, on the squad's side of the

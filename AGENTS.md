@@ -140,7 +140,7 @@ Playbooks for common tasks are in `.claude/skills/*/SKILL.md` (`sim-feature`, `d
 | мораль | `Morale` | per fighter, 0..1000 |
 | сплочённость | `Cohesion` | squad-level, from leadership and bonds |
 | усталость | `Fatigue` | |
-| ранение | `Wound` | Light / Heavy / Mortal |
+| ранение | `Wound` | Light / Heavy / Down (`WoundLevel`); Down = out of the fight, life or death settled after the battle |
 | бегство | `Rout` | |
 | лидерство | `Leadership` | hero aura / attached leader |
 | побратим / соперник | `SwornBrother` / `Rival` | relationship tags (morale modifiers) |

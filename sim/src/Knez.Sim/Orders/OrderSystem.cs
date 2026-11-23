@@ -208,7 +208,7 @@ namespace Knez.Sim.Orders
             for (int i = 0; i < members.Count; i++)
             {
                 Fighter? fighter = state.FindFighter(members[i]);
-                if (fighter != null && fighter.IsAlive && fighter.IsEngaged)
+                if (fighter != null && fighter.IsAlive && fighter.IsEngaged && !fighter.IsRouting)
                 {
                     return true;
                 }
@@ -229,7 +229,7 @@ namespace Knez.Sim.Orders
             for (int m = 0; m < members.Count; m++)
             {
                 Fighter? man = state.FindFighter(members[m]);
-                if (man == null || !man.IsAlive)
+                if (man == null || !man.IsAlive || man.IsRouting)
                 {
                     continue;
                 }
@@ -238,7 +238,7 @@ namespace Knez.Sim.Orders
                 for (int j = 0; j < fighters.Count; j++)
                 {
                     Fighter enemy = fighters[j];
-                    if (!enemy.IsAlive || enemy.SideId == squad.SideId)
+                    if (!enemy.IsAlive || enemy.IsRouting || enemy.SideId == squad.SideId) // a running enemy is no threat
                     {
                         continue;
                     }
@@ -507,7 +507,7 @@ namespace Knez.Sim.Orders
             for (int i = 0; i < members.Count; i++)
             {
                 Fighter? fighter = state.FindFighter(members[i]);
-                if (fighter == null || !fighter.IsAlive)
+                if (fighter == null || !fighter.IsAlive || fighter.IsRouting) // a running man is no longer the squad's
                 {
                     continue;
                 }
@@ -527,13 +527,21 @@ namespace Knez.Sim.Orders
         private static Fix SlowestRun(BattleState state, Squad squad)
         {
             Fix slowest = Fix.Zero;
+            bool any = false;
             List<EntityId> members = squad.MemberList;
             for (int i = 0; i < members.Count; i++)
             {
                 Fighter? fighter = state.FindFighter(members[i]);
-                if (fighter != null && fighter.IsAlive && (slowest == Fix.Zero || fighter.Def.RunPerTick < slowest))
+                if (fighter == null || !fighter.IsAlive || fighter.IsRouting) // a running man is no longer the squad's
                 {
-                    slowest = fighter.Def.RunPerTick;
+                    continue;
+                }
+
+                Fix run = fighter.Def.RunPerTick * Combat.Wounds.Pace(state.Scenario.Combat, fighter.Wound);
+                if (!any || run < slowest)
+                {
+                    slowest = run;
+                    any = true;
                 }
             }
 
@@ -544,23 +552,26 @@ namespace Knez.Sim.Orders
         private static Fix SlowestWalk(BattleState state, Squad squad)
         {
             Fix slowest = Fix.Zero;
+            bool any = false;
             List<EntityId> members = squad.MemberList;
             for (int i = 0; i < members.Count; i++)
             {
                 Fighter? fighter = state.FindFighter(members[i]);
-                if (fighter == null || !fighter.IsAlive)
+                if (fighter == null || !fighter.IsAlive || fighter.IsRouting) // a running man is no longer the squad's
                 {
                     continue;
                 }
 
-                Fix walk = fighter.Def.WalkPerTick;
-                if (slowest == Fix.Zero || walk < slowest)
+                Fix walk = fighter.Def.WalkPerTick * Combat.Wounds.Pace(state.Scenario.Combat, fighter.Wound); // wounded men slow the squad
+                if (!any || walk < slowest)
                 {
                     slowest = walk;
+                    any = true;
                 }
             }
 
-            return slowest;
+            // At least one raw unit while anyone lives: zero means "nobody left" to the caller.
+            return any && slowest <= Fix.Zero ? Fix.FromRaw(1) : slowest;
         }
     }
 }

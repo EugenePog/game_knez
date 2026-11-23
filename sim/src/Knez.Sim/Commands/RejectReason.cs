@@ -23,6 +23,9 @@ namespace Knez.Sim.Commands
         /// <summary>The command points at a place outside the map.</summary>
         public static readonly RejectReason OffMap = new RejectReason("off-map");
 
+        /// <summary>The squad is broken: its men are running and take no orders until it re-forms.</summary>
+        public static readonly RejectReason SquadBroken = new RejectReason("squad-broken");
+
         private RejectReason(string code)
         {
             Code = code;

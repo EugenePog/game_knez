@@ -23,7 +23,8 @@ public sealed class FrameRecorder : IDisposable
 
     /// <summary>Event types whose fields <see cref="WriteEvent"/> writes; any other type is written as its name only.
     /// A test fails when a <see cref="SimEvent"/> subclass is missing here.</summary>
-    public static readonly IReadOnlyList<Type> DescribedEventTypes = [typeof(CommandRejected)];
+    public static readonly IReadOnlyList<Type> DescribedEventTypes = [typeof(CommandRejected), typeof(BlowStruck), typeof(Wounded),
+        typeof(MoraleChanged), typeof(MoraleStateChanged), typeof(SquadBroke), typeof(BattleEnded)];
 
     /// <summary>Flush to the stream once this much is buffered, so long battles don't sit in memory.</summary>
     private const int FlushThresholdBytes = 64 * 1024;
@@ -121,6 +122,7 @@ public sealed class FrameRecorder : IDisposable
             _json.WriteNumberValue(moving ? Degrees(squad.Order.Facing) : 0);
             _json.WriteStringValue(squad.Formation.Id); // changes with SetFormation (step 7)
             _json.WriteNumberValue(squad.Files); // narrowed for a gap, 0 = its own width
+            _json.WriteNumberValue(squad.Broken ? 1 : 0); // M3: its men are running
             _json.WriteEndArray();
         }
 
@@ -161,6 +163,9 @@ public sealed class FrameRecorder : IDisposable
             _json.WriteNumberValue(fighter.PassingThrough ? 1 : 0);
             _json.WriteNumberValue(fighter.SquadId.Value); // 0 once he falls (step 7)
             _json.WriteNumberValue(fighter.SlotIndex); // changes as ranks close and squads re-form
+            _json.WriteNumberValue(fighter.Morale); // M3: 0..1000
+            _json.WriteStringValue(fighter.MoraleState.ToString().ToLowerInvariant());
+            _json.WriteStringValue(fighter.Wound.ToString().ToLowerInvariant());
             _json.WriteEndArray();
         }
 
@@ -223,6 +228,37 @@ public sealed class FrameRecorder : IDisposable
                 _json.WriteString("command", rejected.Command.GetType().Name);
                 _json.WriteNumber("side", rejected.Command.SideId);
                 _json.WriteString("reason", rejected.Reason.Code);
+                break;
+            case BlowStruck blow:
+                _json.WriteNumber("attacker", blow.Attacker.Value);
+                _json.WriteNumber("defender", blow.Defender.Value);
+                _json.WriteString("sector", blow.Sector.ToString().ToLowerInvariant());
+                _json.WriteNumber("chance", blow.Chance);
+                _json.WriteBoolean("landed", blow.Landed);
+                break;
+            case Wounded wounded:
+                _json.WriteNumber("fighter", wounded.Fighter.Value);
+                _json.WriteNumber("by", wounded.By.Value);
+                _json.WriteString("blow", wounded.Blow.ToString().ToLowerInvariant());
+                _json.WriteString("now", wounded.Now.ToString().ToLowerInvariant());
+                break;
+            case MoraleChanged morale:
+                _json.WriteNumber("fighter", morale.Fighter.Value);
+                _json.WriteString("reason", morale.Reason.ToString());
+                _json.WriteNumber("delta", morale.Delta);
+                _json.WriteNumber("now", morale.Now);
+                break;
+            case MoraleStateChanged changed:
+                _json.WriteNumber("fighter", changed.Fighter.Value);
+                _json.WriteString("from", changed.From.ToString().ToLowerInvariant());
+                _json.WriteString("to", changed.To.ToString().ToLowerInvariant());
+                break;
+            case SquadBroke broke:
+                _json.WriteNumber("squad", broke.Squad.Value);
+                _json.WriteBoolean("reformed", broke.Reformed);
+                break;
+            case BattleEnded ended:
+                _json.WriteNumber("winner", ended.Winner);
                 break;
         }
 

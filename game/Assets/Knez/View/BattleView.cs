@@ -207,8 +207,10 @@ namespace Knez.Game.View
             }
         }
 
+        // M3: a running man is drawn white until the view gets morale bars (M3 step 7).
         private Color Colour(Fighter fighter) =>
-            !fighter.IsAlive ? Fallen : _squadColours.TryGetValue(fighter.SquadId.Value, out Color c) ? c : Fallen;
+            !fighter.IsAlive ? Fallen : fighter.IsRouting ? Color.white
+            : _squadColours.TryGetValue(fighter.SquadId.Value, out Color c) ? c : Fallen;
 
         private void FitCamera(MapDef map)
         {

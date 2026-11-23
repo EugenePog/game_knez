@@ -1,0 +1,12 @@
+{
+  "id": "m3-shieldwall",
+  "description": "M3 test: your shield wall of 8 holds its ground; a raider line of 10 charges it. Frontal blows at the wall get through 80 per mille less.",
+  "map": {"width": 60, "height": 40},
+  "squads": [
+    {"name": "Shield wall", "side": 0, "fighter": "warrior", "count": 8, "formation": "shieldwall", "position": [30, 14], "facing": 90},
+    {"name": "Raider line", "side": 1, "fighter": "warrior", "count": 10, "formation": "line", "position": [30, 30], "facing": 270}
+  ],
+  "script": [
+    {"tick": 10, "order": "move", "squad": "Raider line", "target": [30, 6], "facing": 270}
+  ]
+}

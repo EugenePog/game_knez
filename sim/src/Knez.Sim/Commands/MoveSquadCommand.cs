@@ -52,6 +52,11 @@ namespace Knez.Sim.Commands
                 return RejectReason.NotAlive;
             }
 
+            if (squad.Broken)
+            {
+                return RejectReason.SquadBroken; // its men are running (battle-sim.md §12)
+            }
+
             return state.Scenario.Map.Contains(Target) ? RejectReason.None : RejectReason.OffMap;
         }
 
@@ -80,7 +85,7 @@ namespace Knez.Sim.Commands
         /// stands wholly on the map with room for its bodies. Without it, slots past an edge get pulled onto the same edge
         /// spot, the men can't all reach them, and the order never ends. A formation wider than the map is centred.
         /// </summary>
-        private static FixVec2 FitInside(BattleState state, Squad squad, FixVec2 target, Angle facing)
+        internal static FixVec2 FitInside(BattleState state, Squad squad, FixVec2 target, Angle facing)
         {
             int count = squad.MemberList.Count;
             Fighter? any = state.FindFighter(squad.MemberList[0]);

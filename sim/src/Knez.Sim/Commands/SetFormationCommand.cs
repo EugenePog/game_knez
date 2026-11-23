@@ -53,6 +53,11 @@ namespace Knez.Sim.Commands
                 return RejectReason.NotAlive;
             }
 
+            if (squad.Broken)
+            {
+                return RejectReason.SquadBroken; // its men are running (battle-sim.md §12)
+            }
+
             return state.Scenario.FindFormation(FormationId) == null ? UnknownFormation : RejectReason.None;
         }
 

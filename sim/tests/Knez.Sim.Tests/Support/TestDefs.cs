@@ -20,6 +20,22 @@ public static class TestDefs
 
     public static readonly MapDef Map = new(Fix.FromInt(60), Fix.FromInt(40));
 
+    /// <summary>
+    /// The standard combat rules with every hit chance 0 and no floor: men engage, lock and swing, but nobody is ever
+    /// hurt — for tests of movement and the melee lock that must not turn into a fight (M3 step 5 onward).
+    /// </summary>
+    public static readonly CombatDef Harmless = MakeHarmless();
+
+    private static CombatDef MakeHarmless()
+    {
+        var s = CombatDef.Standard;
+        var zeros = s.Weapons.Select(_ => (IReadOnlyList<int>)new int[s.ExperienceLevels.Count]).ToArray();
+        return new CombatDef(s.Weapons, s.Shields, s.BodyArmours, s.HeadCovers, s.ExperienceLevels, s.WarriorTypes, zeros,
+            s.DefaultKit, minHit: 0, maxHit: s.MaxHit, s.FlankBonus, s.RearBonus, s.ShieldFromFlank, s.ShieldFromRear,
+            s.ShieldWallBonus, s.LightWoundPenalty, s.HeavyWoundPenalty, s.LightWoundPace, s.HeavyWoundPace, s.FrontArc,
+            s.RearArc, s.StrikeArc);
+    }
+
     public static SquadSpawnDef Squad(string name, int side, int count, FixVec2 position, int facingDegrees,
         FormationDef? formation = null) =>
         new(name, side, Warrior, count, formation ?? Line, position, Angle.FromDegrees(facingDegrees));

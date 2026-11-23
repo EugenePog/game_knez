@@ -19,8 +19,9 @@ namespace Knez.Sim.Defs
         /// </summary>
         public ScenarioDef(string id, string description, MapDef map, IReadOnlyList<SquadSpawnDef> squads,
             IReadOnlyList<ScriptedOrderDef>? script = null, MovementDef? movement = null,
-            IReadOnlyList<FormationDef>? formations = null, CombatDef? combat = null)
+            IReadOnlyList<FormationDef>? formations = null, CombatDef? combat = null, MoraleDef? morale = null)
         {
+            Morale = morale ?? MoraleDef.Standard;
             Id = DefChecks.Id(id, nameof(id));
             Movement = movement ?? MovementDef.Standard;
             Combat = combat ?? CombatDef.Standard;
@@ -52,6 +53,12 @@ namespace Knez.Sim.Defs
                     {
                         throw new ArgumentException($"squads[{i}]: a different formation def with id '{squad.Formation.Id}' is used by squads[{j}].");
                     }
+                }
+
+                if (squad.Fighter.Kit.Experience.Morale < Morale.Routing)
+                {
+                    throw new ArgumentException(
+                        $"squads[{i}] '{squad.Name}': experience '{squad.Fighter.Kit.Experience.Id}' starts at morale {squad.Fighter.Kit.Experience.Morale}, below the routing threshold {Morale.Routing}: they would run at once.");
                 }
 
                 string? stranger = Combat.Stranger(squad.Fighter.Kit);
@@ -107,6 +114,9 @@ namespace Knez.Sim.Defs
 
         /// <summary>Movement rules (content's <c>movement.json</c>; <see cref="MovementDef.Standard"/> when built in code).</summary>
         public MovementDef Movement { get; }
+
+        /// <summary>Morale rules (content's <c>morale.json</c>; <see cref="MoraleDef.Standard"/> when built in code).</summary>
+        public MoraleDef Morale { get; }
 
         /// <summary>Combat rules (content's <c>combat.json</c>; <see cref="CombatDef.Standard"/> when built in code). Every
         /// squad's fighter kit is drawn from them.</summary>
@@ -269,6 +279,7 @@ namespace Knez.Sim.Defs
             Map.AddTo(ref hash);
             Movement.AddTo(ref hash);
             Combat.AddTo(ref hash);
+            Morale.AddTo(ref hash);
             hash.Add(Formations.Count);
             for (int i = 0; i < Formations.Count; i++)
             {

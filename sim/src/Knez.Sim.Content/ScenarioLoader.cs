@@ -71,7 +71,7 @@ namespace Knez.Sim.Content
 
             // Whole-scenario checks (unique names, slots on the map, script order and squads) name the entry themselves.
             return Build(root, rootValue.Get("squads")!, () => new ScenarioDef(id, description, map, squads, script, defs.Movement, defs.Formations,
-                defs.Combat));
+                defs.Combat, defs.Morale));
         }
 
         private static ScriptedOrderDef ReadScriptedOrder(JsonValue value, string path, string sourceName)

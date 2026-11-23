@@ -51,6 +51,8 @@ namespace Knez.Sim.Units
             Frontage = source.Frontage;
             Reforming = source.Reforming;
             Withdrawing = source.Withdrawing;
+            StartCount = source.StartCount;
+            Broken = source.Broken;
         }
 
         /// <summary>Identity; squads are kept sorted by it.</summary>
@@ -114,6 +116,13 @@ namespace Knez.Sim.Units
         /// an engaged squad steps back; cleared once clear, or by a new order.
         /// </summary>
         public bool Withdrawing { get; internal set; }
+
+        /// <summary>Men the squad started the battle with: a fallen man costs morale in proportion (battle-sim.md §12).</summary>
+        public int StartCount { get; internal set; }
+
+        /// <summary>Broken: more than half its men were routing, so all of them run; its order is dropped. It re-forms
+        /// where its rallied men stand once more than half are back (battle-sim.md §12).</summary>
+        public bool Broken { get; internal set; }
 
         /// <summary>Files the squad is narrowed to for a gap, or 0 when it stands in its formation's own width.</summary>
         public int Files { get; internal set; }

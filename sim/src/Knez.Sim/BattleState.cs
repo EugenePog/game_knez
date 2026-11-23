@@ -51,6 +51,7 @@ namespace Knez.Sim
             Seed = source.Seed;
             Tick = source.Tick;
             _nextEntityId = source._nextEntityId;
+            Winner = source.Winner;
             _rng = new SimRng[RngStreams.Count];
             for (int i = 0; i < RngStreams.Count; i++)
             {
@@ -71,6 +72,13 @@ namespace Knez.Sim
 
             _events = new List<SimEvent>(source._events);
         }
+
+        /// <summary>The side that won (only it has men in the fight who aren't routing), −1 for nobody left, or
+        /// <see cref="Undecided"/> while the battle goes on (battle-sim.md §12).</summary>
+        public int Winner { get; internal set; } = Undecided;
+
+        /// <summary><see cref="Winner"/> while the battle is undecided.</summary>
+        public const int Undecided = -2;
 
         /// <summary>The scenario the battle was built from: map, starting squads and the defs they use. Immutable.</summary>
         public ScenarioDef Scenario { get; }
@@ -134,6 +142,7 @@ namespace Knez.Sim
             fighter.SquadId = squad.Id;
             fighter.SlotIndex = slot;
             squad.MemberList.Add(fighter.Id); // the newest id is the largest: members stay sorted
+            squad.StartCount++; // setup only: a fallen man costs morale in proportion to what the squad started with
             return fighter;
         }
 

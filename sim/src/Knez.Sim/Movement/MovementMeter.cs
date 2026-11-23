@@ -138,6 +138,13 @@ namespace Knez.Sim.Movement
                     continue;
                 }
 
+                if (fighter.MoraleState != Morale.MoraleState.Steady && fighter.MoraleState != Morale.MoraleState.Shaken
+                    && fighter.MoraleState != Morale.MoraleState.Wavering || squads[squadIndex].Broken)
+                {
+                    _still[i] = 0; // running, rallying or in a broken squad: far from his slot on purpose, not stuck
+                    continue;
+                }
+
                 _still[i] = error > StuckGoal && moved.Length < StuckSpeed ? _still[i] + 1 : 0;
                 if (_still[i] > StuckTicks)
                 {

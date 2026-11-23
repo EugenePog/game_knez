@@ -1,4 +1,6 @@
+using Knez.Sim.Combat;
 using Knez.Sim.Defs;
+using Knez.Sim.Morale;
 using Knez.Sim.Numerics;
 
 namespace Knez.Sim.Units
@@ -19,6 +21,7 @@ namespace Knez.Sim.Units
             SquadId = EntityId.None;
             SlotIndex = NoSlot;
             IsAlive = true;
+            Morale = def.Kit.Experience.Morale;
         }
 
         /// <summary><see cref="SlotIndex"/> of a fighter outside any squad.</summary>
@@ -61,10 +64,29 @@ namespace Knez.Sim.Units
         /// </summary>
         public EntityId Target { get; internal set; }
 
+        /// <summary>His morale, 0..1000 (battle-sim.md §12); starts at his experience level's.</summary>
+        public int Morale { get; internal set; }
+
+        /// <summary>His state of mind: steady, shaken, wavering, routing, rallying or fled.</summary>
+        public MoraleState MoraleState { get; internal set; }
+
+        /// <summary>True while he runs: he flees, ignores orders and strikes no one.</summary>
+        public bool IsRouting => MoraleState == MoraleState.Routing;
+
+        /// <summary>How badly he is hurt; <see cref="WoundLevel.Down"/> means he has fallen (<see cref="IsAlive"/> false).</summary>
+        public WoundLevel Wound { get; internal set; }
+
+        /// <summary>What his weapon is doing: idle, winding up a blow, or recovering from one (battle-sim.md §11).</summary>
+        public FighterAction Action { get; internal set; }
+
+        /// <summary>Ticks left in <see cref="Action"/> (0 when idle).</summary>
+        public int ActionTicks { get; internal set; }
+
         /// <summary>True while he has a <see cref="Target"/>: in melee, he holds his ground and his squad stops its march.</summary>
         public bool IsEngaged => !Target.IsNone;
 
-        /// <summary>False once the fighter has died; dead fighters stay in the list until cleanup.</summary>
+        /// <summary>False once the fighter is out of the fight — fallen (<see cref="Wound"/> Down) or fled the field
+        /// (<see cref="MoraleState"/> Fled); "alive" predates morale and means "in the fight". Such fighters stay in the list for the view.</summary>
         public bool IsAlive { get; internal set; }
 
         /// <summary>Collision radius in metres, from <see cref="Def"/>.</summary>

@@ -30,7 +30,7 @@
   let lastTime = null;
   let hoverId = null;
   const view = { scale: 10, ox: 0, oy: 0, fitted: true };
-  const show = { labels: true, anchors: true, grid: true, ids: false, overlaps: true };
+  const show = { labels: true, anchors: true, grid: true, ids: false, overlaps: true, morale: true };
   const OVERLAP_TOLERANCE = 0.05; // metres; the sim's MovementMetrics.OverlapTolerance
   let drag = null;
 
@@ -67,7 +67,15 @@
       if (squad) squad.size++; // the starting strength: totals don't shrink when dead fighters are compacted away
     }
 
+    // The battle's result, if the file has one (M3): the tick a BattleEnded event came and the winning side.
+    let ended = null;
+    for (const f of d.frames) {
+      const e = (f.events || []).find((ev) => ev.type === 'BattleEnded');
+      if (e) { ended = { tick: f.tick, winner: e.winner }; break; }
+    }
+
     data = d;
+    data.ended = ended;
     fighterInfo = fighters;
     squadInfo = squads;
     rowCache = { index: -1, rows: null };
@@ -385,10 +393,17 @@
     const pressed = show.overlaps ? overlapping(fighters) : new Set();
     // The dead first, so they never cover the living.
     const ordered = fighters.filter((r) => !r[4]).concat(fighters.filter((r) => r[4]));
-    for (const [id, x, y, facing, alive] of ordered) {
+    for (const row of ordered) {
+      const [id, x, y, facing, alive] = row;
+      // M3 rows end with morale (9), its state (10) and the wound (11); older files have none.
+      const morale = row.length > 11 ? row[9] : null;
+      const state = row.length > 11 ? row[10] : 'steady';
+      const wound = row.length > 11 ? row[11] : 'none';
+      if (state === 'fled') continue; // he left the field
       const info = fighterInfo.get(id);
       const squad = info && squadInfo.get(info.squad);
-      const color = alive ? (squad ? squad.color : '#555') : DEAD;
+      const routing = alive && state === 'routing';
+      const color = alive ? (routing ? '#ffffff' : squad ? squad.color : '#555') : DEAD;
       const r = Math.max(2, (info ? info.radius : 0.3) * view.scale);
       const px = sx(x);
       const py = sy(y);
@@ -399,9 +414,34 @@
       ctx.arc(px, py, r, 0, Math.PI * 2);
       ctx.fillStyle = color;
       ctx.fill();
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+      ctx.lineWidth = routing ? 2.5 : 1;
+      ctx.strokeStyle = routing ? (squad ? squad.color : '#555') : 'rgba(0,0,0,0.55)';
       ctx.stroke();
+      if (alive && state === 'rallying') {
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.arc(px, py, r + 2, 0, Math.PI * 2);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      if (alive && (wound === 'light' || wound === 'heavy')) {
+        ctx.beginPath();
+        ctx.arc(px, py, r * (wound === 'heavy' ? 0.45 : 0.25), 0, Math.PI * 2);
+        ctx.fillStyle = '#c62828';
+        ctx.fill();
+      }
+
+      if (alive && show.morale && morale !== null) {
+        const w = r * 2;
+        const top = py + r + 2;
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fillRect(px - r, top, w, 3);
+        ctx.fillStyle = morale >= 600 ? '#2e7d32' : morale >= 400 ? '#f9a825' : morale >= 200 ? '#ef6c00' : '#c62828';
+        ctx.fillRect(px - r, top, (w * Math.max(0, Math.min(1000, morale))) / 1000, 3);
+      }
 
       if (alive) {
         ctx.beginPath();
@@ -499,9 +539,23 @@
     $('hash').textContent = frame.hash;
 
     const alive = new Map();
-    for (const [id, , , , isAlive] of frame.fighters) {
+    const moraleSum = new Map();
+    const running = new Map();
+    for (const row of frame.fighters) {
+      const [id, , , , isAlive] = row;
       const info = fighterInfo.get(id);
-      if (info && isAlive) alive.set(info.squad, (alive.get(info.squad) || 0) + 1);
+      if (!info || !isAlive) continue;
+      alive.set(info.squad, (alive.get(info.squad) || 0) + 1);
+      if (row.length > 11) {
+        moraleSum.set(info.squad, (moraleSum.get(info.squad) || 0) + row[9]);
+        if (row[10] === 'routing') running.set(info.squad, (running.get(info.squad) || 0) + 1);
+      }
+    }
+    const result = $('result');
+    if (result) {
+      const e = data.ended;
+      result.textContent = !e ? 'undecided' : frame.tick < e.tick ? `decided at ${(e.tick / tps).toFixed(1)} s`
+        : e.winner < 0 ? 'nobody holds the field' : `side ${e.winner} holds the field (${(e.tick / tps).toFixed(1)} s)`;
     }
     const current = new Map(frame.squads.map((r) => [r[0], r])); // rows gain [formation, files] in step 7 files
     for (const meta of document.querySelectorAll('#squads .meta')) {
@@ -510,7 +564,11 @@
       const row = current.get(id);
       const formation = row && row.length > 8 ? row[8] : s.formation;
       const files = row && row.length > 9 && row[9] > 0 ? ` (${row[9]} files for a gap)` : '';
-      meta.textContent = `side ${s.side} · ${formation}${files} · ${alive.get(id) || 0}/${s.size}`;
+      const n = alive.get(id) || 0;
+      const morale = moraleSum.has(id) && n > 0 ? ` · morale ${Math.round(moraleSum.get(id) / n)}` : '';
+      const run = running.get(id) ? ` · ${running.get(id)} running` : '';
+      const broken = row && row.length > 10 && row[10] === 1 ? ' · BROKEN' : '';
+      meta.textContent = `side ${s.side} · ${formation}${files} · ${n}/${s.size}${morale}${run}${broken}`;
     }
 
     const events = $('events');
@@ -556,8 +614,10 @@
         : squad ? `Squad ${squad.name} (#${squad.id}), slot ${info.slot}` : 'No squad',
       `Position ${row[1].toFixed(3)}, ${row[2].toFixed(3)} m`,
       `Facing ${row[3].toFixed(2)}°, radius ${info.radius} m`,
-      row[4] ? (row[5] === 1 ? 'Alive, holding his ground' : row[6] === 1 ? 'Alive, passing through allied ranks' : 'Alive') : 'Dead',
+      row[4] ? (row[5] === 1 ? 'In the fight, holding his ground' : row[6] === 1 ? 'In the fight, passing through allied ranks' : 'In the fight')
+        : row.length > 11 && row[10] === 'fled' ? 'Fled the field' : 'Fallen',
     ];
+    if (row.length > 11) lines.push(`Morale ${row[9]} (${row[10]}), wound: ${row[11]}`);
     for (const text of lines) {
       const div = document.createElement('div');
       div.textContent = text;
@@ -653,7 +713,7 @@
   $('speed').addEventListener('change', (e) => { speed = Number(e.target.value); });
   $('fit').addEventListener('click', () => { view.fitted = true; fit(); });
 
-  for (const key of ['labels', 'anchors', 'grid', 'ids', 'overlaps']) {
+  for (const key of ['labels', 'anchors', 'grid', 'ids', 'overlaps', 'morale']) {
     const box = $(key);
     if (params.has(key)) box.checked = params.get(key) !== '0';
     show[key] = box.checked;

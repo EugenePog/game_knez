@@ -25,7 +25,7 @@ namespace Knez.Sim.Defs
             IReadOnlyList<ExperienceDef> experienceLevels, IReadOnlyList<WarriorTypeDef> warriorTypes,
             IReadOnlyList<IReadOnlyList<int>> hitChance, FighterKit defaultKit, int minHit, int maxHit, int flankBonus,
             int rearBonus, int shieldFromFlank, int shieldFromRear, int shieldWallBonus, int lightWoundPenalty,
-            int heavyWoundPenalty, Fix lightWoundPace, Fix heavyWoundPace)
+            int heavyWoundPenalty, Fix lightWoundPace, Fix heavyWoundPace, Fix frontArc, Fix rearArc, Fix strikeArc)
         {
             Weapons = Catalogue(weapons, "weapon");
             Shields = Catalogue(shields, "shield");
@@ -58,6 +58,14 @@ namespace Knez.Sim.Defs
             HeavyWoundPenalty = DefChecks.Permille(heavyWoundPenalty, "wounded.heavyPenalty");
             LightWoundPace = DefChecks.Fraction(lightWoundPace, "wounded.lightPace");
             HeavyWoundPace = DefChecks.Fraction(heavyWoundPace, "wounded.heavyPace");
+            FrontArc = DefChecks.Positive(frontArc, 180, "°", "position.frontArc");
+            RearArc = DefChecks.Positive(rearArc, 180, "°", "position.rearArc");
+            if (rearArc < frontArc)
+            {
+                throw new ArgumentException($"position.rearArc must be at least position.frontArc (got {rearArc} < {frontArc}).");
+            }
+
+            StrikeArc = DefChecks.Positive(strikeArc, 180, "°", "strikeArc");
             Fingerprint = ComputeFingerprint();
         }
 
@@ -121,6 +129,27 @@ namespace Knez.Sim.Defs
 
         /// <summary>A heavily wounded man moves at this fraction of his pace.</summary>
         public Fix HeavyWoundPace { get; }
+
+        /// <summary>A blow comes from the defender's front when the attacker stands within this many degrees of where the
+        /// defender faces (decided 2026-11-23: 60).</summary>
+        public Fix FrontArc { get; }
+
+        /// <summary>Beyond <see cref="FrontArc"/> and up to this many degrees it comes from his flank; beyond, from his
+        /// rear (decided 2026-11-23: 120).</summary>
+        public Fix RearArc { get; }
+
+        /// <summary>A man strikes an enemy only within this many degrees of where he faces; engaged men turn toward their
+        /// enemy (decided 2026-11-23: 60, the same as the front).</summary>
+        public Fix StrikeArc { get; }
+
+        /// <summary><see cref="FrontArc"/> in <see cref="Angle"/> units.</summary>
+        public int FrontArcUnits => ToUnits(FrontArc);
+
+        /// <summary><see cref="RearArc"/> in <see cref="Angle"/> units.</summary>
+        public int RearArcUnits => ToUnits(RearArc);
+
+        /// <summary><see cref="StrikeArc"/> in <see cref="Angle"/> units.</summary>
+        public int StrikeArcUnits => ToUnits(StrikeArc);
 
         /// <summary>FNV-1a hash of every id and number above, in order; part of the scenario's fingerprint.</summary>
         public ulong Fingerprint { get; }
@@ -317,6 +346,9 @@ namespace Knez.Sim.Defs
             hash.Add(HeavyWoundPenalty);
             hash.Add(LightWoundPace.Raw);
             hash.Add(HeavyWoundPace.Raw);
+            hash.Add(FrontArc.Raw);
+            hash.Add(RearArc.Raw);
+            hash.Add(StrikeArc.Raw);
             return hash.Value;
         }
 
@@ -328,6 +360,10 @@ namespace Knez.Sim.Defs
                 pieces[i].AddTo(ref hash);
             }
         }
+
+        /// <summary>Degrees → <see cref="Angle"/> units, rounded like <see cref="Angle.FromDegrees(int)"/> (Raw·65536/360/65536
+        /// = Raw/360), so "within 60°" includes an angle made from exactly 60°.</summary>
+        private static int ToUnits(Fix degrees) => (int)((degrees.Raw + 180) / 360);
 
         private static Fix Seconds(int tenths) => DefChecks.Decimal(tenths, 10);
 
@@ -345,8 +381,8 @@ namespace Knez.Sim.Defs
             var head = new[] { new ProtectionDef("none", 0), new ProtectionDef("cap", 30), new ProtectionDef("helm", 60) };
             var levels = new[]
             {
-                new ExperienceDef("new", 0), new ExperienceDef("experienced", 40), new ExperienceDef("professional", 80),
-                new ExperienceDef("elite", 120),
+                new ExperienceDef("new", 0, 600), new ExperienceDef("experienced", 40, 750),
+                new ExperienceDef("professional", 80, 850), new ExperienceDef("elite", 120, 950),
             };
             var types = new[] { new WarriorTypeDef("default", 0), new WarriorTypeDef("spearman", 30), new WarriorTypeDef("mounted", 50) };
             var hitChance = new IReadOnlyList<int>[]
@@ -360,7 +396,8 @@ namespace Knez.Sim.Defs
             return new CombatDef(weapons, shields, body, head, levels, types, hitChance, kit, minHit: 20, maxHit: 950,
                 flankBonus: 100, rearBonus: 200, shieldFromFlank: 500, shieldFromRear: 0, shieldWallBonus: 80,
                 lightWoundPenalty: 40, heavyWoundPenalty: 120, lightWoundPace: DefChecks.Decimal(9, 10),
-                heavyWoundPace: DefChecks.Decimal(7, 10));
+                heavyWoundPace: DefChecks.Decimal(7, 10), frontArc: Fix.FromInt(60), rearArc: Fix.FromInt(120),
+                strikeArc: Fix.FromInt(60));
         }
     }
 }

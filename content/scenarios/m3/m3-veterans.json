@@ -1,0 +1,12 @@
+{
+  "id": "m3-veterans",
+  "description": "M3 test: 6 veterans (elite, mail and helm) hold against 12 levies (new, axes, no armour) charging. Veterans start with morale 950, levies with 600.",
+  "map": {"width": 60, "height": 40},
+  "squads": [
+    {"name": "Veterans", "side": 0, "fighter": "veteran", "count": 6, "formation": "line", "position": [30, 14], "facing": 90},
+    {"name": "Levy", "side": 1, "fighter": "levy", "count": 12, "formation": "line", "position": [30, 30], "facing": 270}
+  ],
+  "script": [
+    {"tick": 10, "order": "move", "squad": "Levy", "target": [30, 6], "facing": 270}
+  ]
+}

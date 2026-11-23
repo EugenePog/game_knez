@@ -97,7 +97,7 @@ public class EngagementTests
         [
             TestDefs.Squad("Blue", 0, 4, FixVec2.FromInts(20, 10), 90),
             TestDefs.Squad("Red", 1, 4, FixVec2.FromInts(20, 16), 270),
-        ]);
+        ], combat: TestDefs.Harmless); // the lock, not the fight: nobody gets hurt, so nobody breaks
         var sim = new BattleSimulation(BattleSetup.Create(scenario, seed: 1));
         sim.Enqueue(new MoveSquadCommand(0, sim.State.Squads[0].Id, FixVec2.FromInts(20, 20), Angle.FromDegrees(90)));
         sim.Enqueue(new MoveSquadCommand(1, sim.State.Squads[1].Id, FixVec2.FromInts(20, 6), Angle.FromDegrees(270)));
@@ -267,7 +267,7 @@ public class EngagementTests
         [
             TestDefs.Squad("Blue", 0, 4, FixVec2.FromInts(20, 10), 90),
             TestDefs.Squad("Red", 1, 4, FixVec2.FromInts(20, 16), 270),
-        ]);
+        ], combat: TestDefs.Harmless);
         var sim = new BattleSimulation(BattleSetup.Create(scenario, seed: 1));
         var blue = sim.State.Squads[0];
         sim.Enqueue(new MoveSquadCommand(0, blue.Id, FixVec2.FromInts(20, 20), Angle.FromDegrees(90)));

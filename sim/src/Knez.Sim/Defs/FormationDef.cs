@@ -13,8 +13,9 @@ namespace Knez.Sim.Defs
         /// <summary>Creates a def; exactly one of <paramref name="ranks"/> and <paramref name="width"/> is positive (at most
         /// <see cref="SquadSpawnDef.MaxCount"/>), the other 0.</summary>
         public FormationDef(string id, Fix spacing, Fix rankSpacing, int ranks, int width, Fix turnRate, int holdWeight,
-            Fix allyPassSpeed)
+            Fix allyPassSpeed, bool shieldWall = false)
         {
+            ShieldWall = shieldWall;
             TurnRate = DefChecks.Positive(turnRate, FighterDef.MaxTurnRate, "°/s", nameof(turnRate));
             HoldWeight = DefChecks.Range(holdWeight, 1, MaxHoldWeight, nameof(holdWeight));
             AllyPassSpeed = DefChecks.Fraction(allyPassSpeed, nameof(allyPassSpeed));
@@ -68,6 +69,10 @@ namespace Knez.Sim.Defs
         /// </summary>
         public Fix AllyPassSpeed { get; }
 
+        /// <summary>Men in this formation stand shield to shield: a frontal blow at a man with a shield gets through less
+        /// (<see cref="CombatDef.ShieldWallBonus"/>, battle-sim.md §11).</summary>
+        public bool ShieldWall { get; }
+
         internal void AddTo(ref Fnv1a64 hash)
         {
             hash.Add(Id);
@@ -78,6 +83,7 @@ namespace Knez.Sim.Defs
             hash.Add(TurnRate.Raw);
             hash.Add(HoldWeight);
             hash.Add(AllyPassSpeed.Raw);
+            hash.Add(ShieldWall);
         }
     }
 }

@@ -43,6 +43,16 @@ namespace Knez.Sim
         /// <summary>Per-fighter push weights for this tick (index = fighter list index), rebuilt by the systems that use it.</summary>
         internal List<int> FighterWeights { get; } = new List<int>();
 
+        /// <summary>Whether each fighter was safe (no threatening enemy within the safe distance) at the start of the
+        /// morale stage, judged once so the order of transitions can't change it.</summary>
+        internal List<bool> Safe { get; } = new List<bool>();
+
+        /// <summary>Each fighter's morale state at the start of the morale stage (scratch for <see cref="Morale.MoraleSystem"/>).</summary>
+        internal List<Morale.MoraleState> MoraleBefore { get; } = new List<Morale.MoraleState>();
+
+        /// <summary>Blows that got through this tick, from combat (stage 8) to damage (stage 9); empty between ticks.</summary>
+        internal List<Combat.PendingHit> Hits { get; } = new List<Combat.PendingHit>();
+
         /// <summary>Per-fighter intent for this tick: where formation-following alone would take him (before crowding).</summary>
         internal List<Numerics.FixVec2> FighterIntents { get; } = new List<Numerics.FixVec2>();
 

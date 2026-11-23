@@ -1,0 +1,13 @@
+{
+  "id": "m3-lines",
+  "description": "M3 test: two equal lines of 8 warriors march into each other. Watch the lock, the blows, the first falls and which line breaks first (around a quarter lost). In Unity you command the Hird line (side 0); the raiders are scripted.",
+  "map": {"width": 60, "height": 40},
+  "squads": [
+    {"name": "Hird line", "side": 0, "fighter": "warrior", "count": 8, "formation": "line", "position": [30, 12], "facing": 90},
+    {"name": "Raider line", "side": 1, "fighter": "warrior", "count": 8, "formation": "line", "position": [30, 28], "facing": 270}
+  ],
+  "script": [
+    {"tick": 10, "order": "move", "squad": "Hird line", "target": [30, 30], "facing": 90},
+    {"tick": 10, "order": "move", "squad": "Raider line", "target": [30, 4], "facing": 270}
+  ]
+}

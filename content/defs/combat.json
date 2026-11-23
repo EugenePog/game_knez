@@ -1,5 +1,5 @@
 {
-  "description": "Combat rules (battle-sim.md §11). No hit points: every blow that gets through leaves a wound. Chances are permille (‰). A blow gets through with hitChance[weapon][attacker's experience] minus the defender's shield, body armour, head cover, experience and warrior type, plus position (flank, rear; a shield wall in front protects more), minus the attacker's own wound penalty, kept within hitLimits. shieldFromFlank / shieldFromRear: the share (‰) of the shield's protection that still counts from the flank / rear. reach: gap between bodies a weapon fights across (m); windup and recovery: seconds before and after the blow (whole 0.05 s ticks). wounds: how a blow that gets through lands (light + heavy + down = 1000). Fighters (fighters.json) take defaultKit for anything they don't name. Every number is a proposal of 2026-11-22, tuned on the M3 bench.",
+  "description": "Combat rules (battle-sim.md §11). No hit points: every blow that gets through leaves a wound. Chances are permille (‰). A blow gets through with hitChance[weapon][attacker's experience] minus the defender's shield, body armour, head cover, experience and warrior type, plus position (flank, rear; a shield wall in front protects more), minus the attacker's own wound penalty, kept within hitLimits. position.frontArc / rearArc: from the defender's facing to the attacker, within frontArc degrees is his front, up to rearArc his flank, beyond his rear (decided 2026-11-23). strikeArc: a man strikes only an enemy within this many degrees of his facing; engaged men turn toward their enemy (decided 2026-11-23). shieldFromFlank / shieldFromRear: the share (‰) of the shield's protection that still counts from the flank / rear. reach: gap between bodies a weapon fights across (m); windup and recovery: seconds before and after the blow (whole 0.05 s ticks). wounds: how a blow that gets through lands (light + heavy + down = 1000). experience.morale: the morale a man of that level starts with (morale.json, decided 2026-11-23). Fighters (fighters.json) take defaultKit for anything they don't name. Every number is a proposal of 2026-11-22, tuned on the M3 bench.",
   "combat": {
     "weapons": [
       { "id": "sword", "reach": 0.5, "windup": 0.7, "recovery": 0.8, "wounds": { "light": 650, "heavy": 280, "down": 70 } },
@@ -22,10 +22,10 @@
       { "id": "helm", "protection": 60 }
     ],
     "experience": [
-      { "id": "new", "defence": 0 },
-      { "id": "experienced", "defence": 40 },
-      { "id": "professional", "defence": 80 },
-      { "id": "elite", "defence": 120 }
+      { "id": "new", "defence": 0, "morale": 600 },
+      { "id": "experienced", "defence": 40, "morale": 750 },
+      { "id": "professional", "defence": 80, "morale": 850 },
+      { "id": "elite", "defence": 120, "morale": 950 }
     ],
     "warriorTypes": [
       { "id": "default", "defence": 0 },
@@ -40,7 +40,8 @@
     },
     "defaultKit": { "weapon": "sword", "shield": "round", "bodyArmour": "padded", "headCover": "cap", "experience": "experienced", "type": "default" },
     "hitLimits": { "min": 20, "max": 950 },
-    "position": { "flank": 100, "rear": 200, "shieldFromFlank": 500, "shieldFromRear": 0, "shieldWall": 80 },
+    "position": { "frontArc": 60, "rearArc": 120, "flank": 100, "rear": 200, "shieldFromFlank": 500, "shieldFromRear": 0, "shieldWall": 80 },
+    "strikeArc": 60,
     "wounded": { "lightPenalty": 40, "heavyPenalty": 120, "lightPace": 0.9, "heavyPace": 0.7 }
   }
 }

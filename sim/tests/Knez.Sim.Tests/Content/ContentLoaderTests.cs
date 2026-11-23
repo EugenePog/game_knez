@@ -80,9 +80,13 @@ public class ContentLoaderTests
     [TestCase("""{ "fighters": [ { "id": "w", "radius": 0.3, "walkSpeed": 1 } ] }""",
         "f.json:1:17: fighters[0]: missing member 'runSpeed'")]
     [TestCase("""{ "fighter": [] }""",
-        "f.json:1:14: fighter: unknown member 'fighter' (allowed: description, fighters, formations, movement, combat)")]
+        "f.json:1:14: fighter: unknown member 'fighter' (allowed: description, fighters, formations, movement, combat, morale)")]
     [TestCase("""[]""",
         "f.json:1:1: expected an object, got an array")]
+    [TestCase("""{ "formations": [ { "id": "w", "spacing": 1, "rankSpacing": 1, "ranks": 2, "turnRate": 45, "holdWeight": 3, "allyPassSpeed": 0.5, "shieldWall": 1 } ] }""",
+        "f.json:1:145: formations[0].shieldWall: expected a boolean, got a number")]
+    [TestCase("""{ "formations": [ { "id": "w", "spacing": 1, "rankSpacing": 1, "ranks": 2, "turnRate": 45, "holdWeight": 3, "allyPassSpeed": 0.5, "shieldWall": "true" } ] }""",
+        "f.json:1:145: formations[0].shieldWall: expected a boolean, got a string")]
     public void DefLibrary_Parse_BadDef_LocatedError(string json, string expected)
     {
         var ex = Assert.Throws<ContentException>(() => DefLibrary.Parse([new SourceText("f.json", json)]));
@@ -315,6 +319,11 @@ public class ContentLoaderTests
     [TestCase("\"shieldWall\": 80", "\"shieldWall\": 80, \"shieldwall\": 1", "combat.position.shieldwall: unknown member 'shieldwall'")]
     [TestCase("\"elite\": 660", "\"elite\": 1660", "combat.hitChance.sword.elite: must be 0..1000 (got 1660)")]
     [TestCase("\"shieldWall\": 80", "\"shieldWall\": 1080", "combat.position.shieldWall: must be 0..1000 (got 1080)")]
+    [TestCase("\"strikeArc\": 60,", "", "combat: missing member 'strikeArc'")]
+    [TestCase("\"frontArc\": 60, ", "", "combat.position: missing member 'frontArc'")]
+    [TestCase("\"rearArc\": 120", "\"rearArc\": 50", "combat: position.rearArc must be at least position.frontArc")]
+    [TestCase("\"strikeArc\": 60", "\"strikeArc\": 0", "combat: strikeArc must be > 0 and <= 180")]
+    [TestCase("\"rearArc\": 120", "\"rearArc\": 181", "combat: position.rearArc must be > 0 and <= 180")]
     [TestCase("{ \"id\": \"mail\"", "{ \"id\": \"padded\"", "combat.bodyArmour[2].id: body armour 'padded' is listed twice")]
     [TestCase("{ \"id\": \"seax\"", "{ \"id\": \"axe\"", "combat.weapons[3].id: weapon 'axe' is listed twice")]
     public void DefLibrary_Parse_BadCombatRules_LocatedError(string from, string to, string expected)

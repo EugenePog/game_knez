@@ -16,7 +16,8 @@ public class CombatDefTests
         int minHit = 20, int maxHit = 950) =>
         new CombatDef(weapons ?? S.Weapons, S.Shields, S.BodyArmours, S.HeadCovers, S.ExperienceLevels, S.WarriorTypes,
             hitChance ?? Matrix(), defaultKit ?? S.DefaultKit, minHit, maxHit, S.FlankBonus, S.RearBonus, S.ShieldFromFlank,
-            S.ShieldFromRear, S.ShieldWallBonus, S.LightWoundPenalty, S.HeavyWoundPenalty, S.LightWoundPace, S.HeavyWoundPace);
+            S.ShieldFromRear, S.ShieldWallBonus, S.LightWoundPenalty, S.HeavyWoundPenalty, S.LightWoundPace, S.HeavyWoundPace,
+            S.FrontArc, S.RearArc, S.StrikeArc);
 
     [Test]
     public void BaseHit_Standard_ReadsWeaponRowAndExperienceColumn()
@@ -180,7 +181,7 @@ public class CombatDefTests
             IReadOnlyList<ExperienceDef>? levels = null, IReadOnlyList<WarriorTypeDef>? types = null, FighterKit? kit = null,
             IReadOnlyList<ProtectionDef>? body = null, IReadOnlyList<ProtectionDef>? head = null, int minHit = 20,
             int flank = 100, int rear = 200, int fromFlank = 500, int fromRear = 0, int wall = 80, int light = 40, int heavy = 120,
-            Fix? lightPace = null, Fix? heavyPace = null)
+            Fix? lightPace = null, Fix? heavyPace = null, Fix? frontArc = null, Fix? rearArc = null, Fix? strikeArc = null)
         {
             var newShields = shields ?? S.Shields;
             var newLevels = levels ?? S.ExperienceLevels;
@@ -190,7 +191,8 @@ public class CombatDefTests
             var newHead = head ?? S.HeadCovers;
             var defaultKit = kit ?? new FighterKit(newWeapons.First(x => x.Id == "sword"), newShields[1], newBody[1], newHead[1], newLevels[1], newTypes[0]);
             return new CombatDef(newWeapons, newShields, newBody, newHead, newLevels, newTypes, Matrix(), defaultKit, minHit, 950,
-                flank, rear, fromFlank, fromRear, wall, light, heavy, lightPace ?? S.LightWoundPace, heavyPace ?? S.HeavyWoundPace);
+                flank, rear, fromFlank, fromRear, wall, light, heavy, lightPace ?? S.LightWoundPace, heavyPace ?? S.HeavyWoundPace,
+                frontArc ?? S.FrontArc, rearArc ?? S.RearArc, strikeArc ?? S.StrikeArc);
         }
 
         WeaponDef[] Swap(WeaponDef replacement) => w.Select(x => x.Id == replacement.Id ? replacement : x).ToArray();
@@ -211,6 +213,8 @@ public class CombatDefTests
             ["kit"] = Rules(kit: new FighterKit(S.Weapons[2], S.Shields[1], S.BodyArmours[1], S.HeadCovers[1], S.ExperienceLevels[1], S.WarriorTypes[0])),
             ["flank"] = Rules(flank: 101), ["rear"] = Rules(rear: 201), ["fromFlank"] = Rules(fromFlank: 501),
             ["fromRear"] = Rules(fromRear: 1), ["wall"] = Rules(wall: 81), ["light"] = Rules(light: 41), ["heavy"] = Rules(heavy: 121),
+            ["frontArc"] = Rules(frontArc: Fix.FromInt(45)), ["rearArc"] = Rules(rearArc: Fix.FromInt(135)),
+            ["strikeArc"] = Rules(strikeArc: Fix.FromInt(90)),
             ["lightPace"] = Rules(lightPace: Fix.Ratio(1, 2)), ["heavyPace"] = Rules(heavyPace: Fix.Ratio(1, 2)),
         };
         Assert.Multiple(() =>

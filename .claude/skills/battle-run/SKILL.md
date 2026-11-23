@@ -46,7 +46,10 @@ renders at once, `knezViewer.tick` reads the position, and `knezViewer.error` is
 `loaded` forever). A hidden browser pane runs no animation frames: playback stalls there, so seek instead of playing,
 and take a screenshot to see the canvas. A run that crashed still leaves a readable file — the viewer shows
 "Faulted in tick N" — so look at the ticks just before it. Hovering a fighter shows its id, squad, slot,
-position and facing in the side panel. Take screenshots at the moments that matter (first contact, a wheel, a choke,
+position and facing in the side panel, and from M3 his morale, its state and his wound. M3 marks: a bar under each
+man shows morale (green steady, yellow shaken, orange wavering, red about to run), a red dot a wound (bigger = heavy),
+white with a coloured ring a running man, a dashed ring a rallying one; the squad panel shows average morale, how many
+run and BROKEN, the Tick panel the battle's result. The Morale toggle (or `morale=0`) hides the bars. Take screenshots at the moments that matter (first contact, a wheel, a choke,
 the first rout). Describe what you see in terms of the M1/M3 criteria; don't claim behaviour you didn't observe. Stop
 the server when done.
 
@@ -83,6 +86,10 @@ in `docs/roadmap.md` or the last report, not against a guess.
 ## Scenarios
 
 `content/scenarios/*.json` — playable skirmishes; `content/scenarios/bench/` — the S1–S5 movement benchmarks
-(battle-sim.md §10). A new mechanic usually deserves a small focused scenario; name it after what it tests. The file
+(battle-sim.md §10); `content/scenarios/m3/` — combat and morale setups (lines, flank, shield wall, spears, veterans,
+rally, withdraw). `bash tools/record-replays.sh [folder] [seed] [seconds]` records a replay of every scenario in a
+folder (default the M3 ones, seed 1, 150 s), prints each run's combat, morale and result lines, and a viewer link.
+`run` prints the same lines (`combat:`, `morale:`, `result:`, `sides:`). A new scenario must also get an entry in
+`sim/tests/Golden/content-traces.json` (the cross-runtime goldens list every content scenario). A new mechanic usually deserves a small focused scenario; name it after what it tests. The file
 format is in battle-sim.md §7; a scenario's `id` must equal its file name, and `RepoContentTests` loads every
 scenario in the repo, so a broken one fails the tests.

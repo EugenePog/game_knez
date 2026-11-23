@@ -18,6 +18,7 @@ namespace Knez.Sim
             core.Add(state.Seed);
             core.Add(state.NextEntityIdValue);
             core.Add(state.Scenario.Fingerprint); // the immutable content: map, squads, defs
+            core.Add(state.Winner);
 
             var rng = Fnv1a64.Start();
             for (int i = 0; i < RngStreams.Count; i++)
@@ -63,6 +64,8 @@ namespace Knez.Sim
                 squads.Add(squad.Frontage);
                 squads.Add(squad.Reforming);
                 squads.Add(squad.Withdrawing);
+                squads.Add(squad.StartCount);
+                squads.Add(squad.Broken);
                 squads.Add(squad.RegroupSince);
 
                 List<EntityId> members = squad.MemberList;
@@ -92,6 +95,11 @@ namespace Knez.Sim
                 fighters.Add(fighter.SlotIndex);
                 fighters.Add(fighter.PassingThrough);
                 fighters.Add(fighter.Target.Value);
+                fighters.Add((int)fighter.Action);
+                fighters.Add(fighter.ActionTicks);
+                fighters.Add((int)fighter.Wound);
+                fighters.Add(fighter.Morale);
+                fighters.Add((int)fighter.MoraleState);
             }
 
             return new StateHash(core.Value, rng.Value, squads.Value, fighters.Value);

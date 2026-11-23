@@ -158,6 +158,7 @@ public static class CliApp
             FrameRecorder? recorder = null;
             var clock = new Stopwatch(); // only stepping is timed; writing frames is not part of the sim's cost
             var meter = new MovementMeter();
+            var log = new BattleLog();
             try
             {
                 sim = new BattleSimulation(BattleSetup.Create(scenario, seed));
@@ -171,6 +172,7 @@ public static class CliApp
                     recorder?.Capture(sim.State);
 
                     meter.Observe(sim.State); // the M1 movement criteria (battle-sim.md §10)
+                    log.Observe(sim.State); // what happened, for people (M3)
                 }
 
                 recorder?.Complete();
@@ -229,6 +231,21 @@ public static class CliApp
                 stdout.WriteLine(string.Format(inv, "stuck:      {0} fighters stuck > 2 s (longest {1:0.0} s, {2} fighter-ticks past 2 s)", meter.FightersStuck, meter.LongestStuck / (double)BattleState.TicksPerSecond, meter.StuckFighterTicks));
                 stdout.WriteLine(string.Format(inv, "engaged:    {0:0.00}% of squad members' ticks in a squad in melee (not counted as stuck); {1} orders still open", m.Engaged * 100, OpenOrders(state)));
                 stdout.WriteLine(string.Format(inv, "slot error: mean {0:0.000} m, worst {1:0.00} m; longest spell > 1 m from a slot {2:0.0} s", m.MeanSlotError, m.WorstSlotError, meter.LongestFarFromSlot / (double)BattleState.TicksPerSecond));
+                if (log.Blows > 0)
+                {
+                    stdout.WriteLine(string.Format(inv, "combat:     {0} blows, {1} got through ({2:0.0}%); wounds: {3} light, {4} heavy; {5} fell",
+                        log.Blows, log.Landed, log.Landed * 100.0 / log.Blows, log.Light, log.Heavy, log.Fell));
+                }
+
+                if (log.MoraleLines.Count > 0)
+                {
+                    stdout.WriteLine($"morale:     {string.Join("; ", log.MoraleLines)}");
+                }
+
+                stdout.WriteLine(log.EndTick < 0 ? "result:     undecided"
+                    : string.Format(inv, "result:     {0} at {1:0.0} s", log.Winner < 0 ? "nobody holds the field" : $"side {log.Winner} holds the field",
+                        log.EndTick / (double)BattleState.TicksPerSecond));
+                stdout.WriteLine($"sides:      {BattleLog.Sides(state)}");
                 stdout.WriteLine($"final hash: {hash}");
                 stdout.WriteLine(string.Format(inv, "elapsed:    {0:0.###} ms ({1:0.####} ms/tick)", elapsedMs, elapsedMs / state.Tick));
                 if (recorder != null)

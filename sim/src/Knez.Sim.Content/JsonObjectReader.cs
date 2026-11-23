@@ -66,6 +66,19 @@ namespace Knez.Sim.Content
             return value == null ? (Fix?)null : ToFix(value, MemberPath(name));
         }
 
+        /// <summary>The named boolean, or <paramref name="fallback"/> when it is absent.</summary>
+        public bool OptionalBool(string name, bool fallback)
+        {
+            JsonValue? value = Optional(name);
+            if (value == null)
+            {
+                return fallback;
+            }
+
+            ExpectKind(value, name, JsonKind.Boolean);
+            return string.Equals(value.Text, "true", StringComparison.Ordinal);
+        }
+
         public int RequireInt(string name) => ToInt(Require(name), MemberPath(name));
 
         public int OptionalInt(string name, int fallback)

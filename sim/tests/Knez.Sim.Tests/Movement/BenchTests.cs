@@ -47,27 +47,27 @@ public class BenchTests
 
     [Test]
     [Category("Scenario")]
-    public void S1_HeadOnLines_LockInMelee_EngagedNotStuck()
+    public void S1_HeadOnLines_FightItOut_NobodyStuck()
     {
-        // Both head-on pairs meet and lock (M3 step 2; before the lock the shield wall and the raider flank slipped through
-        // each other). The whole squad in contact is engaged (decided 2026-11-21); no blows until step 3.
+        // Both head-on pairs meet and lock (M3 step 2), fight (steps 3–4) and break (step 5). Movement must stay sound
+        // through all of it: no stuck men, no overlap, and every open order belongs to a squad in melee.
         var scenario = ScenarioFiles.Load(Path.Combine(RepoPaths.Content, "scenarios", "bench", "s1-clash.json"));
         var sim = new BattleSimulation(BattleSetup.Create(scenario, 1));
         var meter = new MovementMeter();
-        sim.StepTicks(600);
-        for (int i = 0; i < 300; i++)
+        bool broke = false;
+        for (int i = 0; i < 1800; i++)
         {
             sim.Step();
             meter.Observe(sim.State);
+            broke |= sim.State.Events.OfType<Events.SquadBroke>().Any();
         }
 
-        var open = sim.State.Squads.Where(s => s.Order.Kind == Orders.SquadOrderKind.Move).Select(s => s.Name).ToArray();
         Assert.Multiple(() =>
         {
-            Assert.That(open, Is.EquivalentTo(new[] { "Hird line", "Shield wall", "Raider line", "Raider flank" }),
-                "both head-on pairs stand locked, their orders waiting");
-            Assert.That(meter.EngagedTicks, Is.EqualTo(300 * 40), "four squads of 10 engaged every tick");
-            Assert.That(meter.FightersStuck, Is.Zero);
+            Assert.That(meter.FightersStuck, Is.Zero, $"longest stuck spell {meter.LongestStuck} ticks");
+            Assert.That(meter.OverlappingTicks * 100, Is.LessThan(meter.FighterTicks), "overlap under 1 %");
+            Assert.That(OpenOrdersNotEngaged(sim.State), Is.Empty);
+            Assert.That(broke, Is.True, "the fights were decided by morale");
         });
     }
 

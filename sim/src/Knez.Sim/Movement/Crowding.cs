@@ -28,9 +28,10 @@ namespace Knez.Sim.Movement
         /// </summary>
         public static CrowdRole Role(BattleState state, Fighter fighter)
         {
-            if (!fighter.IsAlive)
+            if (!fighter.IsAlive || fighter.IsRouting)
             {
-                return CrowdRole.Loose; // never pushed, and a dead man's slot may no longer exist once squads are compacted (M3)
+                // The running are on nobody's orders; the fallen are never pushed, and their slots may be gone.
+                return CrowdRole.Loose;
             }
 
             Squad? squad = fighter.SquadId.IsNone || fighter.SlotIndex < 0 ? null : state.FindSquad(fighter.SquadId);
@@ -259,7 +260,8 @@ namespace Knez.Sim.Movement
                 }
 
                 // A holder always has a squad (see Holding).
-                Fix holderCap = self.Def.WalkPerTick * state.FindSquad(other.SquadId)!.Formation.AllyPassSpeed;
+                Fix holderCap = self.Def.WalkPerTick * Combat.Wounds.Pace(state.Scenario.Combat, self.Wound)
+                    * state.FindSquad(other.SquadId)!.Formation.AllyPassSpeed;
                 cap = FixMath.Min(cap, holderCap);
             }
 

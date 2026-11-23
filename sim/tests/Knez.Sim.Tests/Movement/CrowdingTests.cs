@@ -524,6 +524,11 @@ public class CrowdingTests
         for (int i = 0; i < 900; i++)
         {
             sim.Step();
+            if (sim.State.Fighters.Any(f => !f.IsAlive))
+            {
+                break; // from the first fall (M3 step 4) the fight, not the press, decides where men stand
+            }
+
             foreach (var f in front.Members.Select(id => sim.State.FindFighter(id)!))
             {
                 everPassing |= f.PassingThrough;
@@ -552,18 +557,33 @@ public class CrowdingTests
         double holdersWorst = 0;
         double moversWorst = 0;
         int overlapWorst = 0;
-        double holdersAt600 = 0;
+        int contactTick = -1;
+        int lastTick = 0;
+        double holdersSettled = -1;
         for (int i = 0; i < 1200; i++)
         {
             sim.Step();
+            if (sim.State.Fighters.Any(f => !f.IsAlive))
+            {
+                break; // from the first fall the ranks close up (M3 step 4): shape is the cleanup's business then
+            }
+
+            lastTick = sim.State.Tick;
+            if (contactTick < 0 && sim.State.Fighters.Any(f => f.IsEngaged))
+            {
+                contactTick = sim.State.Tick;
+            }
+
             holdersWorst = Math.Max(holdersWorst, WorstSlotError(sim.State, holders));
             moversWorst = Math.Max(moversWorst, WorstSlotError(sim.State, movers));
             overlapWorst = Math.Max(overlapWorst, MovementMetrics.OverlappingFighters(sim.State));
-            if (sim.State.Tick == 600)
+            if (contactTick >= 0 && sim.State.Tick == contactTick + BattleState.TicksPerSecond)
             {
-                holdersAt600 = holdersWorst;
+                holdersSettled = holdersWorst; // a second after contact the lock has stopped every push
             }
         }
+
+        bool engaged = contactTick >= 0;
 
         Assert.Multiple(() =>
         {
@@ -571,9 +591,10 @@ public class CrowdingTests
             // The melee lock (M3 step 2): the march stops at contact instead of the anchor marching on through the enemy.
             Assert.That(movers.Anchor.Y, Is.LessThan(Fix.FromInt(32)), "the movers' march stopped short of its target");
             Assert.That(movers.Order.Kind, Is.EqualTo(SquadOrderKind.Move), "its order waits for contact to end");
-            Assert.That(sim.State.Fighters.Count(f => f.IsEngaged), Is.GreaterThan(0), "they stand in melee");
+            Assert.That(engaged, Is.True, "they stood in melee before anyone fell");
+            Assert.That(lastTick - contactTick, Is.GreaterThanOrEqualTo(3 * BattleState.TicksPerSecond), "a few seconds of contact to judge");
             Assert.That(holdersWorst, Is.LessThan(1.0), "the holding line bends but holds (m)");
-            Assert.That(holdersWorst, Is.EqualTo(holdersAt600).Within(0.01), "and stops bending once contact is made");
+            Assert.That(holdersWorst, Is.EqualTo(holdersSettled).Within(0.01), "and stops bending once the lock holds");
             Assert.That(moversWorst, Is.LessThan(1.0), "the movers keep their shape too: nobody presses on into the enemy (m)");
         });
     }

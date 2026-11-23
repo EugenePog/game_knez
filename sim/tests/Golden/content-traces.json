@@ -5,78 +5,127 @@
       "scenario": "scenarios/bench/s1-clash.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "3f9018cbebdb2ca8",
-      "final": "c4d6df5ff1d25056"
+      "trace": "2b9783c66754a635",
+      "final": "f76b9720bce7fc95"
     },
     {
       "scenario": "scenarios/bench/s2-gate.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "7ac983627d2a4980",
-      "final": "7b5d4e132dbe9e27"
+      "trace": "61636ea6c4518c26",
+      "final": "e4720ccf75e6232e"
     },
     {
       "scenario": "scenarios/bench/s3-crossing.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "c19d04d8980eefe5",
-      "final": "d663b54f88f5f46f"
+      "trace": "bcf4394e4327535e",
+      "final": "20c6b7b4231673e8"
     },
     {
       "scenario": "scenarios/bench/s4-wheel.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "a9c39cc38835eac6",
-      "final": "e7f336f997525389"
+      "trace": "eeccdc210c685dd3",
+      "final": "ccb4d1e69a22f1f6"
     },
     {
       "scenario": "scenarios/bench/s5-shieldwall.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "7a7db79617ab3b25",
-      "final": "992e7d650e905b76"
+      "trace": "388036e12e22020c",
+      "final": "df653414125e9dad"
     },
     {
       "scenario": "scenarios/crowding.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "4d45a2731b54b684",
-      "final": "c72c3f038c56fa75"
+      "trace": "3ce9ca7546cf48f1",
+      "final": "ad6a20ad3e1dea82"
     },
     {
       "scenario": "scenarios/drill.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "1ddc11cb53c9cbfe",
-      "final": "f1b6e1eef568c50b"
+      "trace": "92962d37da172eb7",
+      "final": "c3f66676a1f724cf"
     },
     {
       "scenario": "scenarios/formations.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "866e5ca5e5953c05",
-      "final": "35ae0f57004113fc"
+      "trace": "da645eace6d281c6",
+      "final": "fcafbcea55ade11c"
+    },
+    {
+      "scenario": "scenarios/m3/m3-flank.json",
+      "seed": 1,
+      "ticks": 600,
+      "trace": "2f60f6e2a4124c04",
+      "final": "510d022e06566ddf"
+    },
+    {
+      "scenario": "scenarios/m3/m3-lines.json",
+      "seed": 1,
+      "ticks": 600,
+      "trace": "20b3b7f84a4b1bb7",
+      "final": "a3f0fb7c01336849"
+    },
+    {
+      "scenario": "scenarios/m3/m3-rally.json",
+      "seed": 1,
+      "ticks": 600,
+      "trace": "be246674d2013398",
+      "final": "cc323d4625671410"
+    },
+    {
+      "scenario": "scenarios/m3/m3-shieldwall.json",
+      "seed": 1,
+      "ticks": 600,
+      "trace": "3e0219abedfc43b3",
+      "final": "81e73f4c2d2dc30a"
+    },
+    {
+      "scenario": "scenarios/m3/m3-spears.json",
+      "seed": 1,
+      "ticks": 600,
+      "trace": "901672ed8cc47436",
+      "final": "1f6b594da09d448c"
+    },
+    {
+      "scenario": "scenarios/m3/m3-veterans.json",
+      "seed": 1,
+      "ticks": 600,
+      "trace": "b9a37b79215469ba",
+      "final": "f1ddcda17bcdc076"
+    },
+    {
+      "scenario": "scenarios/m3/m3-withdraw.json",
+      "seed": 1,
+      "ticks": 600,
+      "trace": "01a5e25f908a4b6c",
+      "final": "d879c91a7808b092"
     },
     {
       "scenario": "scenarios/march.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "38204064204dbe3e",
-      "final": "459c3e4dcc9d11f8"
+      "trace": "22752cfeed0f3a15",
+      "final": "882976e57a15fc86"
     },
     {
       "scenario": "scenarios/paths.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "7782f250dfe45f91",
-      "final": "6cd6808abd2386b4"
+      "trace": "cdf4a2d2ae21268e",
+      "final": "df7d292a0c59e892"
     },
     {
       "scenario": "scenarios/walls.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "411112ab30fc15c4",
-      "final": "ad75e9ba0d2f6cea"
+      "trace": "de561b5a57e3089a",
+      "final": "61b0c42dfaef92dd"
     }
   ]
 }

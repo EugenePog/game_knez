@@ -31,7 +31,13 @@ namespace Knez.Sim.Movement
                 Squad? squad = fighter.SquadId.IsNone || fighter.SlotIndex < 0 ? null : state.FindSquad(fighter.SquadId);
                 FixVec2 relative = squad == null ? velocity : velocity - SlotMotion(squad, fighter);
                 Angle look;
-                if (relative.Length > fighter.Def.WalkPerTick || (squad == null && velocity != FixVec2.Zero))
+                Fighter? enemy = fighter.IsEngaged ? state.FindFighter(fighter.Target) : null;
+                FixVec2 toEnemy = enemy == null ? FixVec2.Zero : enemy.Position - fighter.Position;
+                if (toEnemy != FixVec2.Zero)
+                {
+                    look = FixMath.Atan2(toEnemy.Y, toEnemy.X); // in melee he faces his enemy (decided 2026-11-23)
+                }
+                else if (relative.Length > fighter.Def.WalkPerTick || (squad == null && velocity != FixVec2.Zero))
                 {
                     look = FixMath.Atan2(velocity.Y, velocity.X);
                 }

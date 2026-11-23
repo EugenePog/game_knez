@@ -1,0 +1,13 @@
+{
+  "id": "m3-withdraw",
+  "description": "M3 test: two shield walls lock (frontal blows get through rarely, so the fight is slow). At 10 s your wall is ordered 10 m back: it steps back facing the enemy at half pace while the raiders follow, until no raider is within reach + 3 m, then it turns and marches.",
+  "map": {"width": 60, "height": 40},
+  "squads": [
+    {"name": "Hird line", "side": 0, "fighter": "warrior", "count": 8, "formation": "shieldwall", "position": [30, 16], "facing": 90},
+    {"name": "Raider line", "side": 1, "fighter": "warrior", "count": 8, "formation": "shieldwall", "position": [30, 28], "facing": 270}
+  ],
+  "script": [
+    {"tick": 10, "order": "move", "squad": "Raider line", "target": [30, 4], "facing": 270},
+    {"tick": 200, "order": "move", "squad": "Hird line", "target": [30, 6], "facing": 90}
+  ]
+}

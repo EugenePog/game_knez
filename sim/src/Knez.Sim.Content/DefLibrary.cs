@@ -17,22 +17,27 @@ namespace Knez.Sim.Content
     /// </summary>
     public sealed class DefLibrary
     {
-        private const string FileMembers = "description, fighters, formations, movement, combat";
+        private const string FileMembers = "description, fighters, formations, movement, combat, morale";
+        private const string MoraleMembers = "shaken, wavering, routing, hysteresis, lossWeight, ownLightWound, ownHeavyWound, " +
+            "mateHeavyWound, flankBlow, rearBlow, mateFlankBlow, mateRearBlow, mateRouts, allySquadBroke, enemySquadBroke, nearby, " +
+            "recoveryPerSecond, safeDistance, rallyAt, breakShare, reformShare, waveringHitPenalty";
         private const string MovementMembers = "pivotTolerance, slotCatchUpTime, personalSpace, separationTime, holdingReach, " +
             "formedUpReach, collisionPasses, allyPartingDepth, pathBudget, regroupLead, regroupMaxWait, regroupCost, reformPace, stepBackPace, withdrawClearance";
         private const string FighterMembers = "id, radius, walkSpeed, runSpeed, turnRate, weapon, shield, bodyArmour, headCover, experience, type";
         private const string CombatMembers = "weapons, shields, bodyArmour, headCover, experience, warriorTypes, hitChance, defaultKit, " +
-            "hitLimits, position, wounded";
+            "hitLimits, position, strikeArc, wounded";
         private const string WeaponMembers = "id, reach, windup, recovery, wounds";
         private const string KitMembers = "weapon, shield, bodyArmour, headCover, experience, type";
-        private const string FormationMembers = "id, spacing, rankSpacing, ranks, width, turnRate, holdWeight, allyPassSpeed";
+        private const string FormationMembers = "id, spacing, rankSpacing, ranks, width, turnRate, holdWeight, allyPassSpeed, shieldWall";
 
         private readonly Dictionary<string, FighterDef> _fighters;
         private readonly Dictionary<string, FormationDef> _formations;
 
-        private DefLibrary(List<FighterDef> fighters, List<FormationDef> formations, MovementDef? movement, CombatDef? combat)
+        private DefLibrary(List<FighterDef> fighters, List<FormationDef> formations, MovementDef? movement, CombatDef? combat,
+            MoraleDef? morale)
         {
             Movement = movement;
+            Morale = morale;
             Combat = combat;
             fighters.Sort((a, b) => string.CompareOrdinal(a.Id, b.Id));
             formations.Sort((a, b) => string.CompareOrdinal(a.Id, b.Id));
@@ -60,6 +65,9 @@ namespace Knez.Sim.Content
         /// <summary>The movement rules, or null when no def file has a <c>movement</c> object.</summary>
         public MovementDef? Movement { get; }
 
+        /// <summary>The morale rules, or null when no def file has a <c>morale</c> object.</summary>
+        public MoraleDef? Morale { get; }
+
         /// <summary>The combat rules, or null when no def file has a <c>combat</c> object.</summary>
         public CombatDef? Combat { get; }
 
@@ -71,6 +79,7 @@ namespace Knez.Sim.Content
             var seen = new Dictionary<string, string>(StringComparer.Ordinal); // "kind:id" → where it was defined
             MovementDef? movement = null;
             CombatDef? combat = null;
+            MoraleDef? morale = null;
             var pendingFighters = new List<PendingFighter>(); // built once every file is read: kits need the combat rules
 
             for (int f = 0; f < files.Count; f++)
@@ -108,10 +117,12 @@ namespace Knez.Sim.Content
                     var formationTurnRate = item.RequireFix("turnRate");
                     int holdWeight = item.RequireInt("holdWeight");
                     var allyPassSpeed = item.RequireFix("allyPassSpeed");
+                    bool shieldWall = item.OptionalBool("shieldWall", false);
                     item.RejectUnknownMembers(FormationMembers);
                     Claim(seen, "formation", id, item, formationItems[i], file.Name);
                     formations.Add(Build(item, formationItems[i],
-                        () => new FormationDef(id, spacing, rankSpacing, ranks, width, formationTurnRate, holdWeight, allyPassSpeed)));
+                        () => new FormationDef(id, spacing, rankSpacing, ranks, width, formationTurnRate, holdWeight, allyPassSpeed,
+                        shieldWall)));
                 }
 
                 JsonObjectReader? movementReader = root.OptionalObject("movement");
@@ -149,6 +160,14 @@ namespace Knez.Sim.Content
                     combat = ReadCombat(combatReader, combatValue);
                 }
 
+                JsonObjectReader? moraleReader = root.OptionalObject("morale");
+                if (moraleReader != null)
+                {
+                    JsonValue moraleValue = rootValue.Get("morale")!;
+                    Claim(seen, "morale", "rules", moraleReader, moraleValue, file.Name);
+                    morale = ReadMorale(moraleReader, moraleValue);
+                }
+
                 root.RejectUnknownMembers(FileMembers);
             }
 
@@ -160,7 +179,7 @@ namespace Knez.Sim.Content
                 fighters.Add(Build(pending.Item, pending.At, () => pending.Create(kit)));
             }
 
-            return new DefLibrary(fighters, formations, movement, combat);
+            return new DefLibrary(fighters, formations, movement, combat, morale);
         }
 
         private static CombatDef ReadCombat(JsonObjectReader item, JsonValue at)
@@ -187,7 +206,7 @@ namespace Knez.Sim.Content
             List<ProtectionDef> shields = ReadPieces(item, "shields", "shield", "protection", (id, v) => new ProtectionDef(id, v), d => d.Id);
             List<ProtectionDef> bodyArmours = ReadPieces(item, "bodyArmour", "body armour", "protection", (id, v) => new ProtectionDef(id, v), d => d.Id);
             List<ProtectionDef> headCovers = ReadPieces(item, "headCover", "head cover", "protection", (id, v) => new ProtectionDef(id, v), d => d.Id);
-            List<ExperienceDef> levels = ReadPieces(item, "experience", "experience level", "defence", (id, v) => new ExperienceDef(id, v), d => d.Id);
+            List<ExperienceDef> levels = ReadExperience(item);
             List<WarriorTypeDef> types = ReadPieces(item, "warriorTypes", "warrior type", "defence", (id, v) => new WarriorTypeDef(id, v), d => d.Id);
 
             // The matrix: one object per weapon, one value per experience level, keyed by ids so a tuner can't shift a
@@ -231,7 +250,10 @@ namespace Knez.Sim.Content
             int shieldFromFlank = Permille(position, "shieldFromFlank");
             int shieldFromRear = Permille(position, "shieldFromRear");
             int shieldWall = Permille(position, "shieldWall");
-            position.RejectUnknownMembers("flank, rear, shieldFromFlank, shieldFromRear, shieldWall");
+            Fix frontArc = position.RequireFix("frontArc");
+            Fix rearArc = position.RequireFix("rearArc");
+            position.RejectUnknownMembers("frontArc, rearArc, flank, rear, shieldFromFlank, shieldFromRear, shieldWall");
+            Fix strikeArc = item.RequireFix("strikeArc");
             var wounded = item.RequireObject("wounded");
             int lightPenalty = Permille(wounded, "lightPenalty");
             int heavyPenalty = Permille(wounded, "heavyPenalty");
@@ -243,11 +265,61 @@ namespace Knez.Sim.Content
             // Catalogue checks (duplicates, matrix shape) first, so the default kit resolves against sound lists.
             CombatDef draft = Build(item, at, () => new CombatDef(weapons, shields, bodyArmours, headCovers, levels, types, rows,
                 new FighterKit(weapons[0], shields[0], bodyArmours[0], headCovers[0], levels[0], types[0]), minHit, maxHit, flank,
-                rear, shieldFromFlank, shieldFromRear, shieldWall, lightPenalty, heavyPenalty, lightPace, heavyPace));
+                rear, shieldFromFlank, shieldFromRear, shieldWall, lightPenalty, heavyPenalty, lightPace, heavyPace,
+                frontArc, rearArc, strikeArc));
             FighterKit defaultKit = kitIds.Resolve(draft, null, kitReader);
             return Build(item, at, () => new CombatDef(draft.Weapons, draft.Shields, draft.BodyArmours, draft.HeadCovers,
                 draft.ExperienceLevels, draft.WarriorTypes, rows, defaultKit, minHit, maxHit, flank, rear, shieldFromFlank,
-                shieldFromRear, shieldWall, lightPenalty, heavyPenalty, lightPace, heavyPace));
+                shieldFromRear, shieldWall, lightPenalty, heavyPenalty, lightPace, heavyPace,
+                frontArc, rearArc, strikeArc));
+        }
+
+        private static MoraleDef ReadMorale(JsonObjectReader m, JsonValue at)
+        {
+            int shaken = m.RequireInt("shaken");
+            int wavering = m.RequireInt("wavering");
+            int routing = m.RequireInt("routing");
+            int hysteresis = m.RequireInt("hysteresis");
+            Fix lossWeight = m.RequireFix("lossWeight");
+            int ownLight = m.RequireInt("ownLightWound");
+            int ownHeavy = m.RequireInt("ownHeavyWound");
+            int mateHeavy = m.RequireInt("mateHeavyWound");
+            int flank = m.RequireInt("flankBlow");
+            int rear = m.RequireInt("rearBlow");
+            int mateFlank = m.RequireInt("mateFlankBlow");
+            int mateRear = m.RequireInt("mateRearBlow");
+            int mateRouts = m.RequireInt("mateRouts");
+            int allyBroke = m.RequireInt("allySquadBroke");
+            int enemyBroke = m.RequireInt("enemySquadBroke");
+            Fix nearby = m.RequireFix("nearby");
+            int recovery = m.RequireInt("recoveryPerSecond");
+            Fix safe = m.RequireFix("safeDistance");
+            int rallyAt = m.RequireInt("rallyAt");
+            int breakShare = m.RequireInt("breakShare");
+            int reformShare = m.RequireInt("reformShare");
+            int waveringPenalty = m.RequireInt("waveringHitPenalty");
+            m.RejectUnknownMembers(MoraleMembers);
+            return Build(m, at, () => new MoraleDef(shaken, wavering, routing, hysteresis, lossWeight, ownLight, ownHeavy, mateHeavy,
+                flank, rear, mateFlank, mateRear, mateRouts, allyBroke, enemyBroke, nearby, recovery, safe, rallyAt, breakShare,
+                reformShare, waveringPenalty));
+        }
+
+        private static List<ExperienceDef> ReadExperience(JsonObjectReader combat)
+        {
+            var list = new List<ExperienceDef>();
+            IReadOnlyList<JsonValue> items = NonEmpty(combat, "experience", "experience level");
+            for (int i = 0; i < items.Count; i++)
+            {
+                var level = JsonObjectReader.Of(items[i], combat.MemberPath($"experience[{i}]"), combat.Source);
+                string id = level.RequireString("id");
+                UniqueId(list, id, "experience level", level, d => d.Id);
+                int defence = Permille(level, "defence");
+                int morale = Permille(level, "morale");
+                level.RejectUnknownMembers("id, defence, morale");
+                list.Add(Build(level, items[i], () => new ExperienceDef(id, defence, morale)));
+            }
+
+            return list;
         }
 
         private static List<T> ReadPieces<T>(JsonObjectReader combat, string name, string kind, string valueName,
