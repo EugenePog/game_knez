@@ -121,6 +121,20 @@
       "final": "098d3e36e6be9484"
     },
     {
+      "scenario": "scenarios/sandbox/villages-assault.json",
+      "seed": 1,
+      "ticks": 600,
+      "trace": "5b6ac9eb8271e7ba",
+      "final": "47613a85376ceccc"
+    },
+    {
+      "scenario": "scenarios/sandbox/villages.json",
+      "seed": 1,
+      "ticks": 600,
+      "trace": "9304f1698ce19e5c",
+      "final": "e9f01d58b6c0ba70"
+    },
+    {
       "scenario": "scenarios/walls.json",
       "seed": 1,
       "ticks": 600,

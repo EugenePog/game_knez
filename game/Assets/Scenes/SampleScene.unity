@@ -435,7 +435,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4d01e931103694aec96b0bf888c15ce6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Knez.Game.View::Knez.Game.View.BattleRunner
-  scenario: scenarios/formations.json
+  scenario: scenarios/m3/m3-flank.json
   seed: 1
   speed: 1
   startPaused: 0
