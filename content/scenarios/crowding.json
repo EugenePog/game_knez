@@ -1,6 +1,6 @@
 {
   "id": "crowding",
-  "description": "M1 step 4: bodies are solid. Two of your squads (side 0) cross and jostle past each other. The raider column (side 1) marches through the raider line of its own side, which holds its ground and opens its ranks: the column squeezes through at a third of walking pace. Your spearmen march into the raider rearguard, an enemy line that holds: enemies are solid, so the spearmen stay blocked against it (fighting comes in M3). The flankers march to the east edge, where the map stops them.",
+  "description": "M1 step 4: bodies are solid. Two of your squads (side 0) cross and jostle past each other. The raider column (side 1) marches through the raider line of its own side, which holds its ground and opens its ranks: the column squeezes through at a third of walking pace. Your spearmen march into the raider rearguard, an enemy line that holds: enemies are solid, and on contact both lock in melee (M3 step 2; blows come in step 3). The flankers march to the east edge, where the map stops them.",
   "map": { "width": 60, "height": 40 },
   "squads": [
     { "name": "Hird line",        "side": 0, "fighter": "warrior", "count": 8, "formation": "line",       "position": [8, 14],  "facing": 0 },

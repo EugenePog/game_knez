@@ -66,7 +66,7 @@ public class ContentLoaderTests
     }
 
     [TestCase("""{ "fighters": [ { "id": "w", "radius": 0.3, "walkSpeed": 1, "runSpeed": 2, "turnRate": 90, "radiu": 1 } ] }""",
-        "f.json:1:101: fighters[0].radiu: unknown member 'radiu' (allowed: id, radius, walkSpeed, runSpeed, turnRate)")]
+        "f.json:1:101: fighters[0].radiu: unknown member 'radiu' (allowed: id, radius, walkSpeed, runSpeed, turnRate, weapon, shield, bodyArmour, headCover, experience, type)")]
     [TestCase("""{ "fighters": [ { "id": "w" } ] }""",
         "f.json:1:17: fighters[0]: missing member 'radius'")]
     [TestCase("""{ "fighters": [ { "id": "w", "radius": "0.3" } ] }""",
@@ -80,7 +80,7 @@ public class ContentLoaderTests
     [TestCase("""{ "fighters": [ { "id": "w", "radius": 0.3, "walkSpeed": 1 } ] }""",
         "f.json:1:17: fighters[0]: missing member 'runSpeed'")]
     [TestCase("""{ "fighter": [] }""",
-        "f.json:1:14: fighter: unknown member 'fighter' (allowed: description, fighters, formations, movement)")]
+        "f.json:1:14: fighter: unknown member 'fighter' (allowed: description, fighters, formations, movement, combat)")]
     [TestCase("""[]""",
         "f.json:1:1: expected an object, got an array")]
     public void DefLibrary_Parse_BadDef_LocatedError(string json, string expected)
@@ -212,7 +212,7 @@ public class ContentLoaderTests
     private const string Movement = """
         { "movement": { "pivotTolerance": 45, "slotCatchUpTime": 0.35, "personalSpace": 0.12, "separationTime": 0.25,
           "holdingReach": 1.5, "formedUpReach": 0.4, "collisionPasses": 4, "allyPartingDepth": 0.25, "pathBudget": 2000,
-          "regroupLead": 2, "regroupMaxWait": 4, "regroupCost": 0.5, "reformPace": 0.5, "stepBackPace": 0.5 } }
+          "regroupLead": 2, "regroupMaxWait": 4, "regroupCost": 0.5, "reformPace": 0.5, "stepBackPace": 0.5, "withdrawClearance": 3 } }
         """;
 
     [Test]
@@ -251,5 +251,93 @@ public class ContentLoaderTests
     {
         var ex = Assert.Throws<ContentException>(() => DefLibrary.Parse([new SourceText("a.json", Movement), new SourceText("b.json", Movement)]));
         Assert.That(ex!.Message, Does.Contain("movement 'rules' is already defined at a.json"));
+    }
+
+    private static string RepoCombat() => File.ReadAllText(Path.Combine(Support.RepoPaths.Content, "defs", "combat.json"));
+
+    private static DefLibrary WithCombat(string combat, string fighters = Fighters) =>
+        DefLibrary.Parse([new SourceText("formations.json", Formations), new SourceText("fighters.json", fighters),
+            new SourceText("combat.json", combat)]);
+
+    [Test]
+    public void DefLibrary_Parse_CombatRules_ReachTheScenarioAndItsFingerprint()
+    {
+        var defs = WithCombat(RepoCombat().Replace("\"elite\": 660", "\"elite\": 661"));
+        var scenario = ScenarioLoader.Parse(new SourceText("s.json", Scenario(GoodSquad)), defs);
+        var standard = ScenarioLoader.Parse(new SourceText("s.json", Scenario(GoodSquad)), Defs());
+        var combat = scenario.Combat;
+        Assert.Multiple(() =>
+        {
+            Assert.That(combat.BaseHit(combat.FindWeapon("sword")!, combat.FindExperience("elite")!), Is.EqualTo(661));
+            Assert.That(combat.FindWeapon("spear")!.Reach.Raw, Is.EqualTo(117965L), "1.8 rounded to the nearest raw unit");
+            Assert.That(combat.FindWeapon("axe")!.WindupTicks, Is.EqualTo(18));
+            Assert.That(combat.LightWoundPace.Raw, Is.EqualTo(58982L), "0.9 rounded to the nearest raw unit");
+            Assert.That(scenario.Squads[0].Fighter.Kit, Is.SameAs(combat.DefaultKit), "the fighter names no kit: the default");
+            Assert.That(standard.Combat, Is.SameAs(CombatDef.Standard), "no combat file: the standard rules");
+            Assert.That(standard.Squads[0].Fighter.Kit, Is.SameAs(CombatDef.Standard.DefaultKit));
+            Assert.That(scenario.Fingerprint, Is.Not.EqualTo(standard.Fingerprint));
+        });
+    }
+
+    [Test]
+    public void DefLibrary_Parse_FighterNamesPartOfHisKit_RestFromTheDefault()
+    {
+        const string fighters = """
+            { "fighters": [ { "id": "levy", "radius": 0.3, "walkSpeed": 1.4, "runSpeed": 3.5, "turnRate": 360,
+                              "weapon": "spear", "shield": "none", "experience": "new", "type": "spearman" } ] }
+            """;
+        var defs = WithCombat(RepoCombat(), fighters);
+        var kit = defs.FindFighter("levy")!.Kit;
+        Assert.Multiple(() =>
+        {
+            Assert.That(new[] { kit.Weapon.Id, kit.Shield.Id, kit.BodyArmour.Id, kit.HeadCover.Id, kit.Experience.Id, kit.Type.Id },
+                Is.EqualTo(new[] { "spear", "none", "padded", "cap", "new", "spearman" }));
+            Assert.That(defs.Combat!.Contains(kit), Is.True);
+        });
+    }
+
+    [TestCase("\"weapon\": \"pike\"", "fighters[0].weapon: no weapon 'pike' (known: sword, axe, spear, seax)")]
+    [TestCase("\"headCover\": \"crown\"", "fighters[0].headCover: no head cover 'crown' (known: none, cap, helm)")]
+    [TestCase("\"experience\": \"veteran\"", "fighters[0].experience: no experience level 'veteran' (known: new, experienced, professional, elite)")]
+    [TestCase("\"type\": \"archer\"", "fighters[0].type: no warrior type 'archer' (known: default, spearman, mounted)")]
+    public void DefLibrary_Parse_FighterKitUnknownId_LocatedError(string member, string expected)
+    {
+        string fighters = $$"""{ "fighters": [ { "id": "w", "radius": 0.3, "walkSpeed": 1, "runSpeed": 2, "turnRate": 90, {{member}} } ] }""";
+        var ex = Assert.Throws<ContentException>(() => WithCombat(RepoCombat(), fighters));
+        Assert.That(ex!.Message, Does.StartWith("fighters.json:").And.Contain(expected));
+    }
+
+    [TestCase("\"professional\": 560, \"elite\": 640", "\"professional\": 560", "combat.hitChance.axe: missing member 'elite'")]
+    [TestCase("\"seax\":  { \"new\"", "\"pike\": { \"new\": 1 }, \"seax\":  { \"new\"", "combat.hitChance.pike: unknown member 'pike' (allowed: sword, axe, spear, seax)")]
+    [TestCase("\"down\": 170", "\"down\": 160", "combat.weapons[1]: wounds: light + heavy + down must be 1000 (got 990)")]
+    [TestCase("\"weapon\": \"sword\", \"shield\"", "\"weapon\": \"club\", \"shield\"", "combat.defaultKit.weapon: no weapon 'club'")]
+    [TestCase("\"min\": 20", "\"min\": 960", "combat: hitLimits.min must be 0..hitLimits.max (950) (got 960)")]
+    [TestCase("\"shieldWall\": 80", "\"shieldWall\": 80, \"shieldwall\": 1", "combat.position.shieldwall: unknown member 'shieldwall'")]
+    [TestCase("\"elite\": 660", "\"elite\": 1660", "combat.hitChance.sword.elite: must be 0..1000 (got 1660)")]
+    [TestCase("\"shieldWall\": 80", "\"shieldWall\": 1080", "combat.position.shieldWall: must be 0..1000 (got 1080)")]
+    [TestCase("{ \"id\": \"mail\"", "{ \"id\": \"padded\"", "combat.bodyArmour[2].id: body armour 'padded' is listed twice")]
+    [TestCase("{ \"id\": \"seax\"", "{ \"id\": \"axe\"", "combat.weapons[3].id: weapon 'axe' is listed twice")]
+    public void DefLibrary_Parse_BadCombatRules_LocatedError(string from, string to, string expected)
+    {
+        string text = RepoCombat();
+        Assert.That(text, Does.Contain(from), "the test's anchor is still in combat.json");
+        var ex = Assert.Throws<ContentException>(() => DefLibrary.Parse([new SourceText("combat.json", text.Replace(from, to))]));
+        Assert.That(ex!.Message, Does.StartWith("combat.json:").And.Contain(expected));
+    }
+
+    [Test]
+    public void DefLibrary_Parse_EmptyCatalogue_LocatedError()
+    {
+        string text = System.Text.RegularExpressions.Regex.Replace(RepoCombat(), "\"experience\": \\[[^\\]]*\\]", "\"experience\": []");
+        var ex = Assert.Throws<ContentException>(() => DefLibrary.Parse([new SourceText("combat.json", text)]));
+        Assert.That(ex!.Message, Does.StartWith("combat.json:").And.Contain("combat.experience: the rules need at least one experience level"));
+    }
+
+    [Test]
+    public void DefLibrary_Parse_CombatRulesInTwoFiles_IsAnError()
+    {
+        var ex = Assert.Throws<ContentException>(() =>
+            DefLibrary.Parse([new SourceText("a.json", RepoCombat()), new SourceText("b.json", RepoCombat())]));
+        Assert.That(ex!.Message, Does.Contain("combat 'rules' is already defined at a.json"));
     }
 }

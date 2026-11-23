@@ -50,6 +50,7 @@ namespace Knez.Sim.Units
             RegroupSince = source.RegroupSince;
             Frontage = source.Frontage;
             Reforming = source.Reforming;
+            Withdrawing = source.Withdrawing;
         }
 
         /// <summary>Identity; squads are kept sorted by it.</summary>
@@ -107,6 +108,13 @@ namespace Knez.Sim.Units
         /// <summary>Changing formation: men are moving to their new places and the squad marches at reduced pace.</summary>
         public bool Reforming { get; internal set; }
 
+        /// <summary>
+        /// Stepping back out of melee (battle-sim.md §11, decided 2026-11-22): it keeps facing the enemy and steps back at
+        /// step-back pace until no enemy is within reach + <c>withdrawClearance</c>; then it marches on as usual. Set when
+        /// an engaged squad steps back; cleared once clear, or by a new order.
+        /// </summary>
+        public bool Withdrawing { get; internal set; }
+
         /// <summary>Files the squad is narrowed to for a gap, or 0 when it stands in its formation's own width.</summary>
         public int Files { get; internal set; }
 
@@ -119,9 +127,11 @@ namespace Knez.Sim.Units
         /// <summary>The waypoint actions list itself, for systems (same length as <see cref="PathList"/>).</summary>
         internal List<int> PathFilesList => _pathFiles;
 
-        /// <summary>Forgets the route (the order ended or was replaced). The squad keeps its current width.</summary>
+        /// <summary>Forgets the route (the order ended or was replaced), and with it any withdrawal. The squad keeps its
+        /// current width.</summary>
         internal void ClearPath()
         {
+            Withdrawing = false;
             _path.Clear();
             _pathFiles.Clear();
             PathIndex = 0;

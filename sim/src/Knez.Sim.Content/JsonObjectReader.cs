@@ -115,6 +115,21 @@ namespace Knez.Sim.Content
             return value == null ? null : Of(value, MemberPath(name), Source);
         }
 
+        /// <summary>The named member's value (for locating errors about it), or null; does not count as reading it.</summary>
+        public JsonValue? Member(string name)
+        {
+            IReadOnlyList<JsonMember> members = _object.Members;
+            for (int i = 0; i < members.Count; i++)
+            {
+                if (string.Equals(members[i].Name, name, StringComparison.Ordinal))
+                {
+                    return members[i].Value;
+                }
+            }
+
+            return null;
+        }
+
         /// <summary>Throws for the first member no getter asked for.</summary>
         public void RejectUnknownMembers(string allowed)
         {

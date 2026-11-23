@@ -42,9 +42,9 @@ public class ContentGoldenTests
         """;
 
     /// <summary>A change means content parsing, def hashing or slot placement changed: on purpose → re-record and say why.</summary>
-    private const ulong GoldenFingerprint = 0xa5dd04f52a2ddb27UL;
+    private const ulong GoldenFingerprint = 0x238c3e861f11c4a7UL;
 
-    private const ulong GoldenSpawnHash = 0x9f447e14c05dba81UL;
+    private const ulong GoldenSpawnHash = 0x39a53c582a346adbUL;
 
     [Test]
     public void Fixture_FingerprintAndSpawnedState_MatchRecordedValues()

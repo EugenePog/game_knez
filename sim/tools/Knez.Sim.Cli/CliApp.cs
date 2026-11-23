@@ -227,7 +227,7 @@ public static class CliApp
                 stdout.WriteLine(string.Format(inv, "ticks:      {0} ({1:0.0} s of battle)", state.Tick, state.Tick / (double)BattleState.TicksPerSecond));
                 stdout.WriteLine(string.Format(inv, "crowding:   {0:0.00}% of fighter-ticks overlap > 5 cm (worst tick: {1} fighters); {2:0.00}% passing through allied ranks; {3:0.00}% inside walls > 5 cm", m.Overlap * 100, meter.WorstOverlap, m.Passing * 100, m.InWalls * 100));
                 stdout.WriteLine(string.Format(inv, "stuck:      {0} fighters stuck > 2 s (longest {1:0.0} s, {2} fighter-ticks past 2 s)", meter.FightersStuck, meter.LongestStuck / (double)BattleState.TicksPerSecond, meter.StuckFighterTicks));
-                stdout.WriteLine(string.Format(inv, "engaged:    {0:0.00}% of squad members' ticks within fighting distance of an enemy (not counted as stuck); {1} orders still open", m.Engaged * 100, OpenOrders(state)));
+                stdout.WriteLine(string.Format(inv, "engaged:    {0:0.00}% of squad members' ticks in a squad in melee (not counted as stuck); {1} orders still open", m.Engaged * 100, OpenOrders(state)));
                 stdout.WriteLine(string.Format(inv, "slot error: mean {0:0.000} m, worst {1:0.00} m; longest spell > 1 m from a slot {2:0.0} s", m.MeanSlotError, m.WorstSlotError, meter.LongestFarFromSlot / (double)BattleState.TicksPerSecond));
                 stdout.WriteLine($"final hash: {hash}");
                 stdout.WriteLine(string.Format(inv, "elapsed:    {0:0.###} ms ({1:0.####} ms/tick)", elapsedMs, elapsedMs / state.Tick));

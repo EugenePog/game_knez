@@ -16,7 +16,7 @@ namespace Knez.Sim.Defs
         /// Times are seconds, rounded to the nearest whole tick (0.05 s), at least one.</summary>
         public MovementDef(Fix pivotTolerance, Fix slotCatchUpTime, Fix personalSpace, Fix separationTime, Fix holdingReach,
             Fix formedUpReach, int collisionPasses, Fix allyPartingDepth, int pathBudget, Fix regroupLead,
-            Fix regroupMaxWait, Fix regroupCost, Fix reformPace, Fix stepBackPace)
+            Fix regroupMaxWait, Fix regroupCost, Fix reformPace, Fix stepBackPace, Fix withdrawClearance)
         {
             PivotTolerance = DefChecks.Positive(pivotTolerance, 90, "°", nameof(pivotTolerance));
             SlotCatchUpTicks = DefChecks.Ticks(slotCatchUpTime, 5, nameof(slotCatchUpTime));
@@ -32,6 +32,7 @@ namespace Knez.Sim.Defs
             RegroupCost = DefChecks.NonNegative(regroupCost, 20, string.Empty, nameof(regroupCost));
             ReformPace = DefChecks.Fraction(reformPace, nameof(reformPace));
             StepBackPace = DefChecks.Fraction(stepBackPace, nameof(stepBackPace));
+            WithdrawClearance = DefChecks.NonNegative(withdrawClearance, 20, "m", nameof(withdrawClearance));
         }
 
         /// <summary>
@@ -53,7 +54,8 @@ namespace Knez.Sim.Defs
             regroupMaxWait: Fix.FromInt(5),
             regroupCost: Fix.One,
             reformPace: Fix.Ratio(1, 2),
-            stepBackPace: Fix.Ratio(1, 2));
+            stepBackPace: Fix.Ratio(1, 2),
+            withdrawClearance: Fix.FromInt(3));
 
         /// <summary>A squad turns in place until its target is within this many degrees of its front, then marches.</summary>
         public Fix PivotTolerance { get; }
@@ -106,9 +108,13 @@ namespace Knez.Sim.Defs
         /// 2026-11-21: re-form on the move, at half pace).</summary>
         public Fix ReformPace { get; }
 
-        /// <summary>A squad stepping back a short way without turning (onto a target just behind it) moves at this fraction
-        /// of its pace (decided 2026-11-21: the front lands on the ordered point).</summary>
+        /// <summary>A squad stepping back without turning moves at this fraction of its pace: onto a target just behind it
+        /// (decided 2026-11-21: the front lands on the ordered point), and out of melee (decided 2026-11-22).</summary>
         public Fix StepBackPace { get; }
+
+        /// <summary>A squad stepping back out of melee keeps facing the enemy until no enemy is within each man's weapon
+        /// reach plus this, metres; then it turns and marches (decided 2026-11-22: 3 m).</summary>
+        public Fix WithdrawClearance { get; }
 
         internal void AddTo(ref Fnv1a64 hash)
         {
@@ -126,6 +132,7 @@ namespace Knez.Sim.Defs
             hash.Add(RegroupCost.Raw);
             hash.Add(ReformPace.Raw);
             hash.Add(StepBackPace.Raw);
+            hash.Add(WithdrawClearance.Raw);
         }
     }
 }

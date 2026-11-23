@@ -39,18 +39,18 @@ public class BenchTests
         });
     }
 
-    /// <summary>Squads still on a move order without a man within fighting distance of an enemy: a jam.</summary>
+    /// <summary>Squads still on a move order without a man in melee: a jam.</summary>
     private static string[] OpenOrdersNotEngaged(BattleState state) => state.Squads
         .Where(s => s.Order.Kind == Orders.SquadOrderKind.Move)
-        .Where(s => !s.Members.Select(id => state.FindFighter(id)!).Any(f => state.Fighters.Any(e => e.IsAlive && e.SideId != f.SideId
-            && (e.Position - f.Position).Length < f.Radius + e.Radius + MovementMeter.EngagedGap)))
+        .Where(s => !s.Members.Select(id => state.FindFighter(id)!).Any(f => f.IsAlive && f.IsEngaged))
         .Select(s => s.Name).ToArray();
 
     [Test]
     [Category("Scenario")]
-    public void S1_HeadOnLines_PressAndHold_EngagedNotStuck()
+    public void S1_HeadOnLines_LockInMelee_EngagedNotStuck()
     {
-        // Decided 2026-11-21: until combat (M3) a head-on press stands; the whole squad in contact is engaged.
+        // Both head-on pairs meet and lock (M3 step 2; before the lock the shield wall and the raider flank slipped through
+        // each other). The whole squad in contact is engaged (decided 2026-11-21); no blows until step 3.
         var scenario = ScenarioFiles.Load(Path.Combine(RepoPaths.Content, "scenarios", "bench", "s1-clash.json"));
         var sim = new BattleSimulation(BattleSetup.Create(scenario, 1));
         var meter = new MovementMeter();
@@ -64,8 +64,9 @@ public class BenchTests
         var open = sim.State.Squads.Where(s => s.Order.Kind == Orders.SquadOrderKind.Move).Select(s => s.Name).ToArray();
         Assert.Multiple(() =>
         {
-            Assert.That(open, Is.EquivalentTo(new[] { "Hird line", "Raider line" }), "the head-on pair presses on");
-            Assert.That(meter.EngagedTicks, Is.EqualTo(300 * 20), "both squads engaged every tick");
+            Assert.That(open, Is.EquivalentTo(new[] { "Hird line", "Shield wall", "Raider line", "Raider flank" }),
+                "both head-on pairs stand locked, their orders waiting");
+            Assert.That(meter.EngagedTicks, Is.EqualTo(300 * 40), "four squads of 10 engaged every tick");
             Assert.That(meter.FightersStuck, Is.Zero);
         });
     }
@@ -117,9 +118,9 @@ public class BenchTests
     }
 
     [Test]
-    public void Meter_AWholeSquadWithOneManNearAnEnemy_IsEngaged_NotStuck()
+    public void Meter_AWholeSquadWithOneManInMelee_IsEngaged_NotStuck()
     {
-        // Decided 2026-11-21: fighting distance is the body + 0.5 m, and the whole squad counts as engaged.
+        // Decided 2026-11-21: the whole squad counts as engaged when one man is (in melee: an enemy within his reach).
         var state = BattleSetup.Create(new ScenarioDef("s", "", TestDefs.Map,
         [
             TestDefs.Squad("A", 0, 4, FixVec2.FromInts(45, 35), 90),
@@ -130,13 +131,15 @@ public class BenchTests
         {
             state.FighterList[0].Position = new FixVec2(Fix.FromInt(10) + Fix.Ratio(105, 100), Fix.FromInt(10)); // 0.45 m gap
             state.FighterList[1].Position = FixVec2.FromInts(15, 10); // far from his slot, not near the enemy
+            state.FighterList[0].Target = state.FighterList[4].Id; // what TargetingSystem would choose
+            state.FighterList[4].Target = state.FighterList[0].Id;
             meter.Observe(state);
         }
 
         Assert.Multiple(() =>
         {
             Assert.That(meter.FightersStuck, Is.Zero);
-            Assert.That(meter.EngagedTicks, Is.EqualTo(60 * 5), "both squads: the enemy is within fighting distance too");
+            Assert.That(meter.EngagedTicks, Is.EqualTo(60 * 5), "both squads: the enemy is in melee too");
         });
     }
 

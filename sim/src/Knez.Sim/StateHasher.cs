@@ -62,6 +62,7 @@ namespace Knez.Sim
                 squads.Add(squad.Files);
                 squads.Add(squad.Frontage);
                 squads.Add(squad.Reforming);
+                squads.Add(squad.Withdrawing);
                 squads.Add(squad.RegroupSince);
 
                 List<EntityId> members = squad.MemberList;
@@ -90,6 +91,7 @@ namespace Knez.Sim
                 fighters.Add(fighter.SquadId.Value);
                 fighters.Add(fighter.SlotIndex);
                 fighters.Add(fighter.PassingThrough);
+                fighters.Add(fighter.Target.Value);
             }
 
             return new StateHash(core.Value, rng.Value, squads.Value, fighters.Value);

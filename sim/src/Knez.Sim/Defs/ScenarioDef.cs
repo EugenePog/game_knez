@@ -19,10 +19,11 @@ namespace Knez.Sim.Defs
         /// </summary>
         public ScenarioDef(string id, string description, MapDef map, IReadOnlyList<SquadSpawnDef> squads,
             IReadOnlyList<ScriptedOrderDef>? script = null, MovementDef? movement = null,
-            IReadOnlyList<FormationDef>? formations = null)
+            IReadOnlyList<FormationDef>? formations = null, CombatDef? combat = null)
         {
             Id = DefChecks.Id(id, nameof(id));
             Movement = movement ?? MovementDef.Standard;
+            Combat = combat ?? CombatDef.Standard;
             Description = description ?? string.Empty;
             Map = map ?? throw new ArgumentNullException(nameof(map));
             if (squads == null)
@@ -51,6 +52,13 @@ namespace Knez.Sim.Defs
                     {
                         throw new ArgumentException($"squads[{i}]: a different formation def with id '{squad.Formation.Id}' is used by squads[{j}].");
                     }
+                }
+
+                string? stranger = Combat.Stranger(squad.Fighter.Kit);
+                if (stranger != null)
+                {
+                    throw new ArgumentException(
+                        $"squads[{i}] '{squad.Name}': fighter '{squad.Fighter.Id}': {stranger} is not the combat rules' def of that id.");
                 }
 
                 CheckOnMap(map, squad, i);
@@ -100,6 +108,10 @@ namespace Knez.Sim.Defs
         /// <summary>Movement rules (content's <c>movement.json</c>; <see cref="MovementDef.Standard"/> when built in code).</summary>
         public MovementDef Movement { get; }
 
+        /// <summary>Combat rules (content's <c>combat.json</c>; <see cref="CombatDef.Standard"/> when built in code). Every
+        /// squad's fighter kit is drawn from them.</summary>
+        public CombatDef Combat { get; }
+
         /// <summary>Starting squads in spawn order (ids are allocated in this order).</summary>
         public IReadOnlyList<SquadSpawnDef> Squads { get; }
 
@@ -107,7 +119,7 @@ namespace Knez.Sim.Defs
         public IReadOnlyList<ScriptedOrderDef> Script { get; }
 
         /// <summary>
-        /// FNV-1a hash of everything that affects the battle (map, movement rules, the formation catalogue, squads and the
+        /// FNV-1a hash of everything that affects the battle (map, movement and combat rules, the formation catalogue, squads and the
         /// defs they use, script), in a canonical order.
         /// Hashed in the state's Core section, so two runs of different content never share a hash.
         /// </summary>
@@ -256,6 +268,7 @@ namespace Knez.Sim.Defs
             hash.Add(Id);
             Map.AddTo(ref hash);
             Movement.AddTo(ref hash);
+            Combat.AddTo(ref hash);
             hash.Add(Formations.Count);
             for (int i = 0; i < Formations.Count; i++)
             {

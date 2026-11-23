@@ -544,7 +544,7 @@ public class CrowdingTests
 
     [Test]
     [Category("Scenario")]
-    public void MarchingIntoAHoldingLine_TheLineBendsButHolds_MarchersStayBlocked()
+    public void MarchingIntoAHoldingLine_MarchersStopInContact_TheLineHolds()
     {
         var sim = new BattleSimulation(BattleSetup.Create(TestDefs.IntoAHoldingLine(), 1));
         var holders = sim.State.Squads[0];
@@ -568,11 +568,13 @@ public class CrowdingTests
         Assert.Multiple(() =>
         {
             Assert.That(overlapWorst, Is.Zero);
-            Assert.That(movers.Anchor, Is.EqualTo(FixVec2.FromInts(30, 32)), "march on: the movers' anchor reached its target");
-            Assert.That(movers.Order.Kind, Is.EqualTo(SquadOrderKind.Move), "but the squad never formed up, so its order stands");
+            // The melee lock (M3 step 2): the march stops at contact instead of the anchor marching on through the enemy.
+            Assert.That(movers.Anchor.Y, Is.LessThan(Fix.FromInt(32)), "the movers' march stopped short of its target");
+            Assert.That(movers.Order.Kind, Is.EqualTo(SquadOrderKind.Move), "its order waits for contact to end");
+            Assert.That(sim.State.Fighters.Count(f => f.IsEngaged), Is.GreaterThan(0), "they stand in melee");
             Assert.That(holdersWorst, Is.LessThan(1.0), "the holding line bends but holds (m)");
-            Assert.That(holdersWorst, Is.EqualTo(holdersAt600).Within(0.01), "and stops bending once the push settles, even after the movers' order is done");
-            Assert.That(holdersWorst, Is.LessThan(moversWorst), "the holders are pushed out of shape less than the movers");
+            Assert.That(holdersWorst, Is.EqualTo(holdersAt600).Within(0.01), "and stops bending once contact is made");
+            Assert.That(moversWorst, Is.LessThan(1.0), "the movers keep their shape too: nobody presses on into the enemy (m)");
         });
     }
 

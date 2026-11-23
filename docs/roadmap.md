@@ -316,6 +316,22 @@ Steps (planned 2026-11-21; each ends with the project compiling in batch mode an
 Melee actions with timings, hit resolution, flanks/rear, shield wall, wounds, fatigue, morale states, rout and
 rally, hero leadership and 2–3 abilities per hero. Morale reasons shown in tooltips and the battle log.
 
+Steps (planned 2026-11-22; decisions in battle-sim.md §11, numbers to confirm with the user first):
+
+1. ✅ **Combat content:** `content/defs/combat.json` — weapon types (reach, action ticks, wound rows), the hit matrix
+   (weapon × experience), protection (shield, body armour, head cover), experience levels, warrior types; fighters gain
+   weapon, armour, experience and type. Loaded, validated, fingerprinted.
+2. ✅ **Engagement and melee lock:** reach, engaged men hold, engaged squads stop; the bench's "engaged" uses each man's
+   weapon reach; withdrawing from melee only backward, facing the enemy, until clear by reach + 3 m (decided 2026-11-22).
+3. **Attacks and blows:** action timings, target choice, the get-through roll (Combat RNG), flank/rear/shield wall.
+4. **Wounds and falling:** Light/Heavy/Down, adding up, penalties; the fallen leave the fight (ranks close). A man's
+   `Target` is chosen at stage 7, before deaths (stage 9): clear targets that fell, so nobody stays locked to the dead
+   for a tick, and test it.
+5. **Morale:** states with hysteresis, inputs (losses, flank/rear, routing neighbours, wounds), reason codes; rout
+   and rally; a squad breaks.
+6. **Fatigue**, then **heroes:** leadership aura, 2–3 abilities each.
+7. **View and log:** blows, wounds, morale bars and reasons in Unity; bench S6/S7; tune to "about a minute".
+
 **Checkpoint:** a fight can be won by flanking or by breaking morale, not only by attrition.
 
 ### M4. Enemy AI (weeks 6–7)

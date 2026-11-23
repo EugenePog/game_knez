@@ -24,6 +24,7 @@ public class HashCoverageTests
         yield return Case("FighterSlot", "Fighters", s => s.FighterList[0].SlotIndex = 7);
         yield return Case("FighterAlive", "Fighters", s => s.FighterList[0].IsAlive = false);
         yield return Case("FighterPassingThrough", "Fighters", s => s.FighterList[0].PassingThrough = true);
+        yield return Case("FighterTarget", "Fighters", s => s.FighterList[0].Target = s.FighterList[3].Id);
         yield return Case("FighterVelocityX", "Fighters", s => s.FighterList[0].Velocity += new FixVec2(Fix.FromRaw(1), Fix.Zero));
         yield return Case("FighterVelocityY", "Fighters", s => s.FighterList[0].Velocity += new FixVec2(Fix.Zero, Fix.FromRaw(1)));
         yield return Case("SquadAnchorX", "Squads", s => s.SquadList[0].Anchor += new FixVec2(Fix.FromRaw(1), Fix.Zero));
@@ -40,6 +41,7 @@ public class HashCoverageTests
         yield return Case("SquadFiles", "Squads", s => s.SquadList[0].Files = 2);
         yield return Case("SquadFrontage", "Squads", s => s.SquadList[0].Frontage = 1);
         yield return Case("SquadReforming", "Squads", s => s.SquadList[0].Reforming = true);
+        yield return Case("SquadWithdrawing", "Squads", s => s.SquadList[0].Withdrawing = true);
         yield return Case("SquadRegroupSince", "Squads", s => s.SquadList[0].RegroupSince = 0);
         yield return Case("SquadPathIndex", "Squads", s => s.SquadList[0].PathIndex = 1);
         yield return Case("SquadPathRequest", "Squads", s => s.SquadList[0].PathRequestTick = 0);

@@ -59,6 +59,19 @@ namespace Knez.Sim.Orders
                 return; // its route is planned later this tick; it marches from the next
             }
 
+            if (Engaged(state, squad) || (squad.Withdrawing && !ClearOfEnemies(state, squad)))
+            {
+                if (squad.RegroupSince >= 0)
+                {
+                    squad.RegroupSince = state.Tick; // the wait to regroup starts over once out of contact
+                }
+
+                StepBackOutOfContact(state, squad, speed * state.Scenario.Movement.StepBackPace);
+                return;
+            }
+
+            squad.Withdrawing = false; // clear: march on as usual (it may face about now)
+
             SquadOrder order = squad.Order;
             int turnRate = squad.Formation.TurnPerTick;
             List<FixVec2> path = squad.PathList;
@@ -186,6 +199,122 @@ namespace Knez.Sim.Orders
             {
                 Reach(state, squad); // the rest of this tick's stride is dropped: at most one tick's march per corner
             }
+        }
+
+        /// <summary>True when a living member is in melee (<see cref="Fighter.IsEngaged"/>, chosen at the end of last tick).</summary>
+        private static bool Engaged(BattleState state, Squad squad)
+        {
+            List<EntityId> members = squad.MemberList;
+            for (int i = 0; i < members.Count; i++)
+            {
+                Fighter? fighter = state.FindFighter(members[i]);
+                if (fighter != null && fighter.IsAlive && fighter.IsEngaged)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// True when no living enemy's body is within any living member's weapon reach plus
+        /// <see cref="Defs.MovementDef.WithdrawClearance"/> of his own (edge to edge).
+        /// </summary>
+        private static bool ClearOfEnemies(BattleState state, Squad squad)
+        {
+            Fix clearance = state.Scenario.Movement.WithdrawClearance;
+            List<EntityId> members = squad.MemberList;
+            List<Fighter> fighters = state.FighterList;
+            for (int m = 0; m < members.Count; m++)
+            {
+                Fighter? man = state.FindFighter(members[m]);
+                if (man == null || !man.IsAlive)
+                {
+                    continue;
+                }
+
+                Fix reach = man.Def.Kit.Weapon.Reach + clearance;
+                for (int j = 0; j < fighters.Count; j++)
+                {
+                    Fighter enemy = fighters[j];
+                    if (!enemy.IsAlive || enemy.SideId == squad.SideId)
+                    {
+                        continue;
+                    }
+
+                    Fix limit = man.Radius + enemy.Radius + reach;
+                    FixVec2 to = enemy.Position - man.Position;
+                    if (FixMath.Abs(to.X) <= limit && FixMath.Abs(to.Y) <= limit && to.Length <= limit)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// The melee lock (battle-sim.md §11, decided 2026-11-22): a squad in contact doesn't march, turn or regroup; its
+        /// order waits until contact ends. The one way out is backward — when the way on (the current waypoint, or the
+        /// target) lies more than a quarter turn behind its front, it steps straight toward it at
+        /// <paramref name="pace"/>, still facing the enemy, and is then <see cref="Squad.Withdrawing"/> until no enemy is
+        /// within reach + <c>withdrawClearance</c>. A waypoint passed on the way narrows or widens the squad as the route
+        /// says, without stopping to regroup; the target itself is where it stops.
+        /// </summary>
+        private static void StepBackOutOfContact(BattleState state, Squad squad, Fix pace)
+        {
+            List<FixVec2> path = squad.PathList;
+            SquadOrder order = squad.Order;
+            FixVec2 toTarget = order.Target - squad.Anchor;
+            if (squad.PathIndex < path.Count - 1 && toTarget.Length > MovementRules.ArriveDistance
+                && IsAbout(squad.Facing.DeltaTo(FixMath.Atan2(toTarget.Y, toTarget.X)))
+                && Terrain.SegmentClear(state.Scenario.Map, squad.Anchor, order.Target, MovementRules.RouteSampleStep))
+            {
+                // The target is behind with a clear way back: step straight to it. The route may run past it to leave room
+                // for facing about, which a squad facing the enemy doesn't do.
+                squad.PathIndex = path.Count - 1;
+            }
+
+            bool lastLeg = squad.PathIndex >= path.Count - 1;
+            FixVec2 waypoint = lastLeg ? order.Target : path[squad.PathIndex];
+            FixVec2 delta = waypoint - squad.Anchor;
+            Fix distance = delta.Length;
+            if (distance <= MovementRules.ArriveDistance)
+            {
+                if (lastLeg)
+                {
+                    squad.Velocity = delta;
+                    squad.Anchor = order.Target;
+                    if (squad.Facing == order.Facing && FormedUp(state, squad))
+                    {
+                        squad.Order = SquadOrder.None; // arrived facing the way it should: done, no turning in contact
+                        squad.ClearPath();
+                    }
+                }
+                else
+                {
+                    int files = squad.PathFilesList[squad.PathIndex];
+                    squad.PathIndex++;
+                    if (files >= 0)
+                    {
+                        squad.Files = files; // narrow or widen as the route says, without stopping in contact
+                    }
+                }
+
+                return;
+            }
+
+            if (!IsAbout(squad.Facing.DeltaTo(FixMath.Atan2(delta.Y, delta.X))))
+            {
+                return; // ahead or sideways: wait for contact to end
+            }
+
+            FixVec2 step = distance <= pace ? delta : delta.WithLength(pace);
+            squad.Anchor += step;
+            squad.Velocity = step;
+            squad.Withdrawing = true;
         }
 
         /// <summary>

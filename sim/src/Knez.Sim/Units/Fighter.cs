@@ -55,6 +55,15 @@ namespace Knez.Sim.Units
         /// </summary>
         public bool PassingThrough { get; internal set; }
 
+        /// <summary>
+        /// The enemy he is fighting: the nearest living enemy within his weapon's reach (body edge to body edge), ties by
+        /// lower id, or <see cref="EntityId.None"/>. Chosen after movement each tick (battle-sim.md §11, M3 step 2).
+        /// </summary>
+        public EntityId Target { get; internal set; }
+
+        /// <summary>True while he has a <see cref="Target"/>: in melee, he holds his ground and his squad stops its march.</summary>
+        public bool IsEngaged => !Target.IsNone;
+
         /// <summary>False once the fighter has died; dead fighters stay in the list until cleanup.</summary>
         public bool IsAlive { get; internal set; }
 

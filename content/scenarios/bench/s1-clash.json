@@ -1,6 +1,6 @@
 {
   "id": "s1-clash",
-  "description": "M1 bench S1: open-field clash, 20 vs 30 (50 fighters). Two squads of 10 march north head-on into two of three squads of 10 marching south, files lined up; the raider column between them meets no one. Without combat (M3) the fronts press and stand: those squads are engaged (decided 2026-11-21: a squad with a man within fighting distance, body + 0.5 m, of an enemy), their orders stay open, and they count as engaged, not stuck. Watch for jams, orbiting, overlap and lines breaking apart.",
+  "description": "M1 bench S1: open-field clash, 20 vs 30 (50 fighters). Two squads of 10 march north head-on into two of three squads of 10 marching south, files lined up; the raider column between them meets no one. The head-on pairs meet and lock in melee (M3 step 2): those squads are engaged (decided 2026-11-21: a squad with a man in melee, an enemy within his weapon's reach), their orders wait, and they count as engaged, not stuck. Watch for jams, orbiting, overlap and lines breaking apart.",
   "map": { "width": 80, "height": 50 },
   "squads": [
     { "name": "Hird line",    "side": 0, "fighter": "warrior", "count": 10, "formation": "line",       "position": [30, 10], "facing": 90 },

@@ -14,9 +14,8 @@ namespace Knez.Sim.Movement
     /// <item>overlap, passing and in-walls counts (<see cref="MovementMetrics"/>), per fighter-tick;</item>
     /// <item>slot error: distance from the slot (where a body fits) over squad members' fighter-ticks, mean and worst,
     /// and the longest spell any man spends more than <see cref="StuckGoal"/> from it (orbiting shows here);</item>
-    /// <item>engaged: a squad any of whose men stands within <see cref="EngagedGap"/> of an enemy's body (decided
-    /// 2026-11-21: fighting distance is the body plus 0.5 m; the whole squad counts — its rear ranks are held by the
-    /// press in front). Combat and the melee lock come in M3; until then an engaged squad simply stands pressed;</item>
+    /// <item>engaged: a squad any of whose men is in melee (<see cref="Fighter.IsEngaged"/>: an enemy within his weapon's
+    /// reach; decided 2026-11-21: the whole squad counts — its rear ranks are held by the fight in front);</item>
     /// <item>stuck: a living member of a squad that isn't engaged, more than <see cref="StuckGoal"/> from his slot and
     /// moving less than <see cref="StuckSpeed"/> a tick, for more than <see cref="StuckTicks"/> ticks in a row.</item>
     /// </list>
@@ -31,10 +30,6 @@ namespace Knez.Sim.Movement
 
         /// <summary>Stuck means not moving toward a goal for longer than this: 2 s.</summary>
         public const int StuckTicks = 2 * BattleState.TicksPerSecond;
-
-        /// <summary>Fighting distance beyond touching (decided 2026-11-21): bodies within 0.5 m of each other. The
-        /// default for weapon reach when combat arrives (M3).</summary>
-        public static readonly Fix EngagedGap = Fix.Ratio(1, 2);
 
         private readonly List<EntityId> _ids = new List<EntityId>();
         private readonly List<FixVec2> _last = new List<FixVec2>();
@@ -94,7 +89,7 @@ namespace Knez.Sim.Movement
 
             List<Fighter> fighters = state.FighterList;
             List<Squad> squads = state.SquadList;
-            MarkEngaged(state, fighters, squads);
+            MarkEngaged(fighters, squads);
             for (int i = 0; i < fighters.Count; i++)
             {
                 Fighter fighter = fighters[i];
@@ -158,8 +153,8 @@ namespace Knez.Sim.Movement
             }
         }
 
-        /// <summary>Which squads have a living man within fighting distance of a living enemy this tick.</summary>
-        private void MarkEngaged(BattleState state, List<Fighter> fighters, List<Squad> squads)
+        /// <summary>Which squads have a living man in melee this tick.</summary>
+        private void MarkEngaged(List<Fighter> fighters, List<Squad> squads)
         {
             _engaged.Clear();
             for (int s = 0; s < squads.Count; s++)
@@ -176,20 +171,9 @@ namespace Knez.Sim.Movement
                 }
 
                 int squad = IndexOf(squads, a.SquadId);
-                if (squad < 0 || _engaged[squad])
+                if (squad >= 0 && a.IsEngaged)
                 {
-                    continue;
-                }
-
-                for (int j = 0; j < fighters.Count; j++)
-                {
-                    Fighter b = fighters[j];
-                    if (b.IsAlive && b.SideId != a.SideId
-                        && (b.Position - a.Position).Length < a.Radius + b.Radius + EngagedGap)
-                    {
-                        _engaged[squad] = true;
-                        break;
-                    }
+                    _engaged[squad] = true;
                 }
             }
         }

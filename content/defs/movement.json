@@ -1,5 +1,5 @@
 {
-  "description": "Movement rules: how squads march, crowd, pass allies and regroup (battle-sim.md §10). Distances in metres, times in seconds (whole ticks of 0.05 s), angles in degrees. Fighter sizes and speeds are in fighters.json; formation spacing, hold weight and ally squeeze speed in formations.json.",
+  "description": "Movement rules: how squads march, crowd, pass allies and regroup (battle-sim.md §10). withdrawClearance: a squad stepping back out of melee faces the enemy until none is within reach + this (decided 2026-11-22). Distances in metres, times in seconds (whole ticks of 0.05 s), angles in degrees. Fighter sizes and speeds are in fighters.json; formation spacing, hold weight and ally squeeze speed in formations.json.",
   "movement": {
     "pivotTolerance": 30,
     "slotCatchUpTime": 0.5,
@@ -14,6 +14,7 @@
     "regroupMaxWait": 5,
     "regroupCost": 1,
     "reformPace": 0.5,
-    "stepBackPace": 0.5
+    "stepBackPace": 0.5,
+    "withdrawClearance": 3
   }
 }

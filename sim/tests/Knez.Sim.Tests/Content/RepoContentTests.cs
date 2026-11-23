@@ -48,6 +48,20 @@ public class RepoContentTests
     }
 
     [Test]
+    public void Repo_CombatRules_ComeFromContent_AndEqualTheCodesStandardCopy()
+    {
+        // Same deal as the movement rules: content owns them, tests use CombatDef.Standard; the fingerprint covers every
+        // number and id, in order.
+        var combat = ScenarioFiles.Load(Path.Combine(RepoPaths.Content, "scenarios", "march.json")).Combat;
+        Assert.Multiple(() =>
+        {
+            Assert.That(combat, Is.Not.SameAs(Knez.Sim.Defs.CombatDef.Standard));
+            Assert.That(combat.Fingerprint, Is.EqualTo(Knez.Sim.Defs.CombatDef.Standard.Fingerprint),
+                "combat.json and CombatDef.Standard differ; change both together");
+        });
+    }
+
+    [Test]
     public void Repo_HasAtLeastOneScenario()
     {
         Assert.That(ScenarioFilesInRepo(), Is.Not.Empty);

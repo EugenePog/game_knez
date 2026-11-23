@@ -69,6 +69,12 @@ namespace Knez.Sim.Movement
             FixVec2 gap = slot - fighter.Position;
 
             bool squadStill = squad.Velocity == FixVec2.Zero && squad.Spin == 0;
+            if (squadStill && fighter.IsEngaged)
+            {
+                // The melee lock (battle-sim.md §11): a man in reach of his enemy holds his ground; he only eases out of
+                // others' personal space. He follows his slot again when his squad steps back out of contact.
+                return separation;
+            }
             if (squadStill && separation == FixVec2.Zero && gap.Length <= MovementRules.SnapDistance)
             {
                 return gap;

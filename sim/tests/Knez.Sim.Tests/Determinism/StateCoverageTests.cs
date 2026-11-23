@@ -21,10 +21,10 @@ public class StateCoverageTests
         [typeof(Squad)] = ["<Anchor>k__BackingField", "<Facing>k__BackingField", "<Files>k__BackingField", "<Formation>k__BackingField", "<Frontage>k__BackingField",
             "<Id>k__BackingField", "<Name>k__BackingField", "<Order>k__BackingField", "<PathIndex>k__BackingField",
             "<PathRequestTick>k__BackingField", "<Reforming>k__BackingField", "<RegroupSince>k__BackingField", "<SideId>k__BackingField", "<Spin>k__BackingField",
-            "<Velocity>k__BackingField", "_members", "_path", "_pathFiles"],
+            "<Velocity>k__BackingField", "<Withdrawing>k__BackingField", "_members", "_path", "_pathFiles"],
         [typeof(Fighter)] = ["<Def>k__BackingField", "<Facing>k__BackingField", "<Id>k__BackingField", "<IsAlive>k__BackingField",
             "<PassingThrough>k__BackingField", "<Position>k__BackingField", "<SideId>k__BackingField", "<SlotIndex>k__BackingField",
-            "<SquadId>k__BackingField", "<Velocity>k__BackingField"],
+            "<SquadId>k__BackingField", "<Target>k__BackingField", "<Velocity>k__BackingField"],
         [typeof(SimRng)] = ["_increment", "_state"],
         [typeof(CommandQueue)] = ["_log", "_nextSequence", "_pending"],
     };
@@ -35,7 +35,7 @@ public class StateCoverageTests
     /// </summary>
     private static readonly Dictionary<Type, string[]> KnownDefFields = new()
     {
-        [typeof(FighterDef)] = ["<Id>k__BackingField", "<Radius>k__BackingField", "<RunSpeed>k__BackingField",
+        [typeof(FighterDef)] = ["<Id>k__BackingField", "<Kit>k__BackingField", "<Radius>k__BackingField", "<RunSpeed>k__BackingField",
             "<TurnRate>k__BackingField", "<WalkSpeed>k__BackingField"],
         [typeof(FormationDef)] = ["<AllyPassSpeed>k__BackingField", "<Id>k__BackingField", "<RankSpacing>k__BackingField", "<Ranks>k__BackingField",
             "<HoldWeight>k__BackingField", "<Spacing>k__BackingField", "<TurnRate>k__BackingField", "<Width>k__BackingField"],
@@ -45,14 +45,28 @@ public class StateCoverageTests
         [typeof(WallDef)] = ["<Max>k__BackingField", "<Min>k__BackingField"],
         [typeof(SquadSpawnDef)] = ["<Count>k__BackingField", "<Facing>k__BackingField", "<Fighter>k__BackingField",
             "<Formation>k__BackingField", "<Name>k__BackingField", "<Position>k__BackingField", "<SideId>k__BackingField"],
-        [typeof(ScenarioDef)] = ["<Description>k__BackingField", "<Fingerprint>k__BackingField", "<Id>k__BackingField",
+        [typeof(ScenarioDef)] = ["<Combat>k__BackingField", "<Description>k__BackingField", "<Fingerprint>k__BackingField", "<Id>k__BackingField",
             "<Formations>k__BackingField", "<Map>k__BackingField", "<Movement>k__BackingField", "<Script>k__BackingField",
             "<Squads>k__BackingField"],
         [typeof(MovementDef)] = ["<AllyPartingDepth>k__BackingField", "<CollisionPasses>k__BackingField",
             "<FormedUpReach>k__BackingField", "<HoldingReach>k__BackingField", "<PathBudget>k__BackingField",
             "<PersonalSpace>k__BackingField", "<PivotTolerance>k__BackingField", "<RegroupCost>k__BackingField",
-            "<ReformPace>k__BackingField", "<RegroupLead>k__BackingField", "<RegroupMaxWaitTicks>k__BackingField", "<SeparationTicks>k__BackingField", "<StepBackPace>k__BackingField",
+            "<ReformPace>k__BackingField", "<RegroupLead>k__BackingField", "<RegroupMaxWaitTicks>k__BackingField", "<SeparationTicks>k__BackingField", "<StepBackPace>k__BackingField", "<WithdrawClearance>k__BackingField",
             "<SlotCatchUpTicks>k__BackingField"],
+        [typeof(WeaponDef)] = ["<DownWound>k__BackingField", "<HeavyWound>k__BackingField", "<Id>k__BackingField",
+            "<LightWound>k__BackingField", "<Reach>k__BackingField", "<RecoveryTicks>k__BackingField", "<WindupTicks>k__BackingField"],
+        [typeof(ProtectionDef)] = ["<Id>k__BackingField", "<Protection>k__BackingField"],
+        [typeof(ExperienceDef)] = ["<Defence>k__BackingField", "<Id>k__BackingField"],
+        [typeof(WarriorTypeDef)] = ["<Defence>k__BackingField", "<Id>k__BackingField"],
+        [typeof(FighterKit)] = ["<BodyArmour>k__BackingField", "<Experience>k__BackingField", "<HeadCover>k__BackingField",
+            "<Shield>k__BackingField", "<Type>k__BackingField", "<Weapon>k__BackingField"],
+        [typeof(CombatDef)] = ["_hitChance", "<BodyArmours>k__BackingField", "<DefaultKit>k__BackingField",
+            "<ExperienceLevels>k__BackingField", "<Fingerprint>k__BackingField", "<FlankBonus>k__BackingField",
+            "<HeadCovers>k__BackingField", "<HeavyWoundPace>k__BackingField", "<HeavyWoundPenalty>k__BackingField",
+            "<LightWoundPace>k__BackingField", "<LightWoundPenalty>k__BackingField", "<MaxHit>k__BackingField",
+            "<MinHit>k__BackingField", "<RearBonus>k__BackingField", "<ShieldFromFlank>k__BackingField",
+            "<ShieldFromRear>k__BackingField", "<ShieldWallBonus>k__BackingField", "<Shields>k__BackingField",
+            "<WarriorTypes>k__BackingField", "<Weapons>k__BackingField"],
     };
 
     [TestCaseSource(nameof(DefTypes))]

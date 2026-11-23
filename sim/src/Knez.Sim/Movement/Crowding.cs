@@ -133,7 +133,9 @@ namespace Knez.Sim.Movement
             {
                 CrowdRole role = Role(state, fighters[i]);
                 roles.Add(role);
-                weights.Add(role == CrowdRole.Holding ? state.FindSquad(fighters[i].SquadId)!.Formation.HoldWeight : 1);
+                // Men holding their ground, and men in melee (battle-sim.md §11), weigh the formation's hold weight.
+                Squad? squad = role == CrowdRole.Holding || fighters[i].IsEngaged ? state.FindSquad(fighters[i].SquadId) : null;
+                weights.Add(squad != null ? squad.Formation.HoldWeight : 1);
             }
         }
 

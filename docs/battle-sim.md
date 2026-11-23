@@ -117,14 +117,16 @@ Assemblies:
   tick, preserving order.
 - Fighter data groups: transform (position, velocity, facing), body (HP, wounds, fatigue), morale, combat
   (current action, cooldowns, target), squad membership and slot, def reference. Now (M1 step 3): id, def, side,
-  position, velocity (m per tick), facing, squad id, slot index, alive. A fighter who falls leaves his squad (squad id
+  position, velocity (m per tick), facing, squad id, slot index, alive, `PassingThrough` (step 4), `Target` (M3 step 2:
+  the enemy he is in melee with, or none). A fighter who falls leaves his squad (squad id
   none, slot −1) at the end of the tick and stays in the list, dead, for the view.
 - `Squad`: id, side, name, formation def, anchor (centre of the front rank), facing, order (`SquadOrder`: kind,
   target, arrival facing, whether that facing is "the way it marched"), route (`Path`: waypoints, the last one the
   target; `PathFiles`: what it does at each — regroup into k files, widen, or nothing; `Frontage`: files across its front,
   set when it forms up; `Reforming`: changing formation, at reduced pace; `PathIndex`: the one it heads
   for; `PathRequestTick`: waiting for a route since that tick, or −1), `Files` (narrowed to this many files for a gap,
-  0 = its own width), `RegroupSince` (waiting for its men to regroup since that tick, or −1), velocity and spin (how far the anchor moved and the front turned this tick — they give each
+  0 = its own width), `RegroupSince` (waiting for its men to regroup since that tick, or −1), `Withdrawing` (M3 step 2:
+  stepping back out of melee, facing the enemy, until clear), velocity and spin (how far the anchor moved and the front turned this tick — they give each
   slot's own motion), member ids (sorted). Build the
   starting state with `BattleSetup.Create(scenario, seed)`: squads in scenario order, each followed by its fighters in
   slot order, every fighter on its slot facing with its squad.
@@ -132,16 +134,18 @@ Assemblies:
 ## 7. Content definitions
 
 Immutable classes in `Knez.Sim.Defs`, referenced directly by state (hashed by their string id; interning to ints only
-if profiling asks): `FighterDef` (stats, radius, speed), `WeaponDef` (reach, timings, damage), `ArmorDef`, `ShieldDef`,
+if profiling asks): `FighterDef` (stats, radius, speed, kit), `WeaponDef` (reach, timings, wounds), `ProtectionDef` (shields, body armour,
+head covers), `ExperienceDef`, `WarriorTypeDef`, `CombatDef` (the combat rules),
 `FormationDef` (slot layout, spacing, stance modifiers), `AbilityDef`, `MapDef`, `ScenarioDef` (map, sides, squads,
 spawn positions, victory conditions, seed defaults). Balance numbers live here, never as constants in systems. Each
 def gets the fields its systems need when they arrive; M1 step 1 has:
 
 | Def | Fields |
 |---|---|
-| `FighterDef` | `id`, `radius` (m), `walkSpeed`, `runSpeed` (m/s, at most 8, and under radius + 5 cm per tick so nobody steps through a 10 cm wall), `turnRate` (°/s) |
+| `FighterDef` | `id`, `radius` (m), `walkSpeed`, `runSpeed` (m/s, at most 8, and under radius + 5 cm per tick so nobody steps through a 10 cm wall), `turnRate` (°/s); optional kit (M3): `weapon`, `shield`, `bodyArmour`, `headCover`, `experience`, `type` — ids from `CombatDef`; parts left out come from its `defaultKit` |
+| `CombatDef` (`combat.json`, M3 step 1, numbers in §11) | `weapons[]`: `id`, `reach` (m, gap between bodies), `windup`, `recovery` (s, whole ticks), `wounds` {`light`, `heavy`, `down`} (‰, sum 1000); `shields[]`, `bodyArmour[]`, `headCover[]`: `id`, `protection` (‰); `experience[]` (lowest first), `warriorTypes[]`: `id`, `defence` (‰); `hitChance` {weapon: {experience level: ‰}} — every cell required, keyed by id; `defaultKit` (all six parts); `hitLimits` {`min`, `max`}; `position` {`flank`, `rear`, `shieldFromFlank`, `shieldFromRear`, `shieldWall`} (‰); `wounded` {`lightPenalty`, `heavyPenalty` (‰), `lightPace`, `heavyPace` (fractions)}. Catalogues keep file order; at most one def file holds it; code-built scenarios and fighters use `CombatDef.Standard`, which a test keeps equal to the file (by fingerprint). A scenario is refused when a squad's kit isn't drawn from its combat rules |
 | `FormationDef` | `id`, `spacing` (m between neighbours), `rankSpacing` (m between ranks), `ranks` *or* `width`, `turnRate` (°/s), `holdWeight` (how much harder men holding their ground are to push; moving men weigh 1), `allyPassSpeed` (fraction of walking speed at which allies squeeze through this formation while it holds) |
-| `MovementDef` (`movement.json`, decided 2026-11-21: tunables in content, not code) | `pivotTolerance` (° off the heading a squad still marches at, 30), `slotCatchUpTime` (s, 0.5), `personalSpace` (m, 0.1), `separationTime` (s, 0.25), `holdingReach` (m, 1.5), `formedUpReach` (m, 0.3), `collisionPasses` (6), `allyPartingDepth` (m, 0.25), `pathBudget` (search nodes per tick, 4 000), `regroupLead` (m, 1), `regroupMaxWait` (s, 5), `regroupCost` (route metres per metre of extra depth, 1), `reformPace` (fraction of the pace while changing formation, 0.5), `stepBackPace` (fraction of the pace when stepping back onto a target just behind, 0.5). Times are rounded to the nearest whole tick (0.05 s). At most one def file holds it; scenarios built in code use `MovementDef.Standard`, which a test keeps equal to the file. A scenario is refused when `personalSpace` doesn't fit between two of its men side by side or rank behind rank |
+| `MovementDef` (`movement.json`, decided 2026-11-21: tunables in content, not code) | `pivotTolerance` (° off the heading a squad still marches at, 30), `slotCatchUpTime` (s, 0.5), `personalSpace` (m, 0.1), `separationTime` (s, 0.25), `holdingReach` (m, 1.5), `formedUpReach` (m, 0.3), `collisionPasses` (6), `allyPartingDepth` (m, 0.25), `pathBudget` (search nodes per tick, 4 000), `regroupLead` (m, 1), `regroupMaxWait` (s, 5), `regroupCost` (route metres per metre of extra depth, 1), `reformPace` (fraction of the pace while changing formation, 0.5), `stepBackPace` (fraction of the pace when stepping back onto a target just behind, and when withdrawing from melee, 0.5), `withdrawClearance` (m beyond each man's weapon reach a withdrawing squad keeps facing the enemy, 3; decided 2026-11-22). Times are rounded to the nearest whole tick (0.05 s). At most one def file holds it; scenarios built in code use `MovementDef.Standard`, which a test keeps equal to the file. A scenario is refused when `personalSpace` doesn't fit between two of its men side by side or rank behind rank |
 | `MapDef` | `width`, `height` (m, at most 250: 500 route cells), optional `walls[]` (at most 64): `from` `[x, y]`, `to` `[x, y]` (opposite corners of an axis-aligned rectangle, ≥ 0.1 m thick, on the map) |
 | `ScenarioDef` | `id`, `description`, `map`, `squads[]`: `name`, `side`, `fighter`, `count`, `formation`, `position` `[x, y]`, `facing` (degrees); optional `script[]`: `tick`, `order`, `squad` (name), then for `"move"` `target` `[x, y]` and optional `facing`, for `"formation"` `formation` (an id from the catalogue). Built from content it also carries the whole formation catalogue (`Formations`) |
 
@@ -367,7 +371,7 @@ their milestone. Scratch buffers live in `TickContext`, never in system fields.
   content errors. Routes round walls came in step 6 (above). Known: a formation ordered so tight to a wall that its men
   with in-wall slots have no room on their squad's side (a line whose front rank is 0.5 m from a 1 m palisade; 0.6 m
   forms up) shoves its own front rank and never forms up (re-forming around obstacles: left for M2 playtests).
-- **Known, not covered by the bench — moved to M3 (2026-11-21), where the melee lock and combat change pushing:** a
+- **Known, not covered by the bench — moved to M3 (2026-11-21); the melee lock (M3 step 2) now stops contact pushes:** a
   push several squads deep beats `holdWeight` — three lines marching through a
   holding line shove it back ~12 m (design question: may a mass of movers drive a holding line back? default: yes until
   M3's melee lock stops "march on" pushing), and a front line crushed between such a push and its own reserve overlaps
@@ -393,9 +397,9 @@ Benchmark scenarios (in `content/scenarios/bench/`, M1 step 8):
 | S4 `s4-wheel` | a line and a shield wall wheel a quarter turn; a column wheels round a building | slot chaos, stragglers |
 | S5 `s5-shieldwall` | a holding shield wall of 10 charged by a line of 10 and a column of 8 | wall integrity, push-through |
 
-Metrics (`Movement/MovementMeter.cs`, read-only, used by the CLI and tests): *engaged* — a squad any of whose men
-stands within fighting distance (bodies within 0.5 m) of an enemy; the whole squad counts, its rear ranks held by the
-press in front (decided 2026-11-21); *stuck* — a member of a squad that isn't engaged, more than 1 m from his slot and
+Metrics (`Movement/MovementMeter.cs`, read-only, used by the CLI and tests): *engaged* — a squad any of whose men is
+in melee (`Fighter.IsEngaged`: an enemy within his weapon's reach, M3 step 2; until then bodies within 0.5 m); the whole
+squad counts, its rear ranks held by the fight in front (decided 2026-11-21); *stuck* — a member of a squad that isn't engaged, more than 1 m from his slot and
 moving under 1 cm a tick (0.2 m/s), for more than 2 s; *longest spell more than 1 m from a slot*, moving or not
 (orbiting shows here); mean and worst slot error; overlap ratio (fighter-ticks in which a fighter is closer than
 r1 + r2 − 5 cm to another, `MovementMetrics.OverlappingFighters`; allies allowed through each other's ranks don't
@@ -416,23 +420,79 @@ idle ticks.
 | S4 | 28 | 0 | 0.00 % | 0 % | 0 | 0.004 / 1.08 m | 0.1 s | 0.008 / 0.012 / 0.085 ms |
 | S5 | 28 | 0 | 0.00 % | 13.8 % | 0 | 0.053 / 7.29 m | 7.8 s | 0.008 / 0.029 / 0.035 ms |
 
-S1's head-on pair (files lined up) presses and stands for the rest of the run — engaged, their two orders open by
-design until combat; its rear ranks are what the slot error and the 33 s spell measure. The measurable criteria hold
+**After the melee lock (M3 step 2, 2026-11-22; the table above is M1's):** S1 — 0 stuck, 0 % overlap, engaged 60.9 %,
+4 orders open: both head-on pairs lock (the shield wall and the raider flank no longer slip through each other),
+p99 0.032 ms; S5 — the attackers stop at the wall and lock, engaged 74.7 %, 2 orders open; S2–S4 unchanged.
+
+In M1, S1's head-on pair (files lined up) pressed and stood for the rest of the run — engaged, their two orders open
+by design until combat; its rear ranks are what the slot error and the 33 s spell measured. The measurable criteria hold
 with a wide margin (`BenchTests` pins stuck, overlap and "no open order outside an engaged press" for S1–S4, and S1's
 press); "looks right" is the user's call in the viewer. **Decided 2026-11-21: steering stays** — no jams or overlap
-that velocity obstacles (ORCA) would fix. **Known, left for M3 (decided 2026-11-21):** marching enemies that meet
-off-line slip round each other like allies jostling past (S1's shield wall and flank; S5's charge works through the
-shield wall, 7.3 m worst displacement): only a lined-up press or a holding line stops them. The melee lock in M3 makes
-men in contact hold.
+that velocity obstacles (ORCA) would fix. **Fixed in M3 step 2:** marching enemies that met off-line slipped round each
+other like allies jostling past (S1's shield wall and flank; S5's charge worked through the shield wall, 7.3 m worst
+displacement); the melee lock now stops both squads at contact.
 
 ## 11. Combat
 
-- Melee: reach from `WeaponDef`; a fighter in reach of an enemy is *engaged*. Attacks are actions with windup,
-  strike and recovery ticks; the hit is resolved on the strike tick.
-- Hit chance (‰) = base + attack − defence + modifiers: flank +, rear ++, shield wall frontal −, fatigue −,
-  wounds −, morale state −. Exact values are design numbers — keep them in defs and tune in M3.
-- Damage vs armour → HP loss and a wound roll: Light (small penalty), Heavy (big penalty, may leave the fight),
-  Mortal (dies at end of battle unless treated — campaign later).
+**Decided 2026-11-22 (M3):** a straight-on melee between two equal squads of 8 lasts about a minute before one side
+breaks; morale ends most fights (a squad usually breaks after losing a quarter to a third of its men, much sooner
+when hit in flank or rear); a man who falls is *out of the fight* (wounded or dead is settled after the battle —
+Mortal wounds die unless treated, campaign later); there are **no hit points**: every blow that gets through leaves
+a wound. Every number below is a **proposal for the user to confirm**, kept in `content/defs/combat.json` for tuning.
+
+- **Engagement and melee lock (M3 step 2, built):** after movement (`TargetingSystem`, stage 7) every living man takes as
+  `Target` the nearest living enemy whose body is within his weapon's reach of his own (edge to edge), ties by the lower
+  id; with a target he is *engaged*. Any direction counts; where a blow may come from is step 3's business. Engaged men
+  hold their ground — they only ease out of personal space — and weigh their formation's hold weight in a push. A squad
+  with an engaged man stops: it doesn't march, turn or regroup, and its order waits until contact ends (the order then
+  carries on, e.g. after the enemy breaks). Marching enemies no longer slip through each other (the M1 known issue).
+  **Getting out (decided 2026-11-22): only backward, slowly** — when the way on lies more than a quarter turn behind the
+  squad's front (straight to the target when it is behind with a clear way), it steps toward it at `stepBackPace` (0.5)
+  of its pace, still facing the enemy, and its men follow their slots out of reach; an order ahead or sideways waits. It
+  stays `Withdrawing` — stepping back, facing the enemy — until no enemy is within each man's reach + `withdrawClearance`
+  (3 m, `movement.json`); then it marches on as usual, facing about if the way on is behind. An enemy that keeps
+  following never sees its back: the withdrawal then ends at the target, still facing it. Route marks passed while
+  withdrawing narrow or widen the squad without stopping; a regroup wait starts over once out of contact. Engaged men
+  weigh their formation's hold weight whatever their squad is doing. The bench's "engaged" squad (stuck excluded) is one
+  with an engaged man. Spearmen engage from 1.8 m, so a spear line halts before a sword line reaches it.
+- **Attacks:** a blow is a windup, the strike (resolved against one enemy in reach: nearest in front, ties by id), then
+  a recovery. Reach is the gap between the two bodies. Proposed (windup + recovery): sword 0.7 + 0.8 s, reach 0.5 m;
+  axe 0.9 + 0.9 s, 0.5 m; spear 0.8 + 0.8 s, 1.8 m (fights from the second rank); seax 0.5 + 0.6 s, 0.3 m.
+- **Does it get through (‰):** *base* from the matrix **weapon type × attacker experience**, minus the defender's
+  protection, plus position, clamped to 20..950. The roll uses the `Combat` RNG stream.
+
+  | base ‰ | new | experienced | professional | elite |
+  |---|---|---|---|---|
+  | sword | 420 | 500 | 580 | 660 |
+  | axe | 400 | 480 | 560 | 640 |
+  | spear | 380 | 460 | 540 | 620 |
+  | seax | 340 | 420 | 500 | 580 |
+
+  | defender, subtract ‰ | values |
+  |---|---|
+  | shield | none 0 · round 220 (frontal; half from the flank, none from the rear) |
+  | body armour | none 0 · padded 70 · mail 140 |
+  | head cover | none 0 · cap 30 · helm 60 |
+  | experience | new 0 · experienced 40 · professional 80 · elite 120 |
+  | warrior type | default 0 · spearman 30 (keeps the enemy at reach) · mounted 50 (riders come later) |
+  | position | flank +100 to the attacker · rear +200 · shield wall, frontal −80 more |
+  | wounds | the *attacker's* own wounds: Light −40 · Heavy −120 |
+
+  Integer permille throughout: a share (the shield from the flank, `protection × share / 1000`) truncates toward zero;
+  everything is summed, and the clamp comes last.
+
+  An experienced swordsman against an experienced man with round shield, padded coat and cap: 500 − 220 − 70 − 30 −
+  40 = 140 ‰ per blow, a blow every 1.5 s.
+- **Wounds:** a blow that gets through rolls its severity from the weapon's row — sword Light 650 / Heavy 280 / Down
+  70, axe 500 / 330 / 170, spear 600 / 300 / 100, seax 720 / 240 / 40 (‰). Wounds add up: a second Light makes it
+  Heavy; any wound on a Heavy puts the man down. Light: −40 to his blows, −10 % pace; Heavy: −120, −30 % pace, and a
+  morale hit to his squad.
+- **Kit:** a fighter type names its weapon, shield, body armour, head cover, experience and warrior type (`fighters.json`,
+  ids from `combat.json`); what it leaves out comes from the default kit (proposed: sword, round shield, padded coat,
+  cap, experienced, default).
+- With those numbers four facing pairs take a man down every ~10 s per side, so a squad of 8 loses its second or
+  third man in 30–60 s — about when morale (§12) should break it. Tune on bench scenarios S6 (8 vs 8 head-on) and S7
+  (the same, flanked by a second squad).
 - Ranged in phase 1 only as hero abilities (e.g. throwing a spear); full archers later.
 
 ## 12. Morale (central system)
@@ -467,8 +527,9 @@ Utility + FSM, no neural nets, inside the sim and deterministic:
   `BattleState`.
 - `StateHasher`: FNV-1a 64 over fields in a canonical order, with per-section sub-hashes so a desync can be
   localised to a section. Sections now: `Core` (tick, seed, id counter, scenario fingerprint), `Rng`, `Squads` (id,
-  side, name, formation id, anchor, facing, order kind/target/facing, velocity, spin, members), `Fighters` (id, def id,
-  side, alive, position, velocity, facing, squad, slot); morale and others join when that state appears. Strings are
+  side, name, formation id, anchor, facing, order kind/target/facing, route, files, frontage, regrouping, reforming,
+  withdrawing, velocity, spin, members), `Fighters` (id, def id, side, alive, position, velocity, facing, squad, slot,
+  passing through, target); morale and others join when that state appears. Strings are
   hashed ordinally (length + UTF-16 units). Velocities and spin are recomputed every tick (stages 3 and 5) but hashed
   anyway: anything that reads them earlier in a tick (AI in M4, the view) sees last tick's values, so they are state, and
   they help localise a desync. `HashCoverageTests` checks that each field moves its own section.

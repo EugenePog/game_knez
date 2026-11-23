@@ -5,13 +5,15 @@ namespace Knez.Sim.Defs
 {
     /// <summary>
     /// Immutable fighter type from content (battle-sim.md §7). Shared by every fighter of the type and by every clone
-    /// of the state; never copied, never written. Stats and equipment arrive with the systems that use them.
+    /// of the state; never copied, never written. Equipment, experience and warrior type are its <see cref="Kit"/>.
     /// </summary>
     public sealed class FighterDef
     {
-        /// <summary>Creates a def; throws <see cref="ArgumentException"/> on invalid values.</summary>
-        public FighterDef(string id, Fix radius, Fix walkSpeed, Fix runSpeed, Fix turnRate)
+        /// <summary>Creates a def; throws <see cref="ArgumentException"/> on invalid values. Without a kit the fighter
+        /// takes <see cref="CombatDef.Standard"/>'s default kit.</summary>
+        public FighterDef(string id, Fix radius, Fix walkSpeed, Fix runSpeed, Fix turnRate, FighterKit? kit = null)
         {
+            Kit = kit ?? CombatDef.Standard.DefaultKit;
             Id = DefChecks.Id(id, nameof(id));
             Radius = DefChecks.PositiveMetres(radius, MaxRadiusMetres, nameof(radius));
             WalkSpeed = DefChecks.Speed(walkSpeed, nameof(walkSpeed));
@@ -49,6 +51,9 @@ namespace Knez.Sim.Defs
         /// <summary>Content id, e.g. "warrior".</summary>
         public string Id { get; }
 
+        /// <summary>Weapon, protection, experience and warrior type: entries of the battle's <see cref="CombatDef"/>.</summary>
+        public FighterKit Kit { get; }
+
         /// <summary>Collision circle radius in metres.</summary>
         public Fix Radius { get; }
 
@@ -77,6 +82,7 @@ namespace Knez.Sim.Defs
             hash.Add(WalkSpeed.Raw);
             hash.Add(RunSpeed.Raw);
             hash.Add(TurnRate.Raw);
+            Kit.AddTo(ref hash);
         }
     }
 }

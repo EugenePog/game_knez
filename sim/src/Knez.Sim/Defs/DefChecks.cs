@@ -9,6 +9,17 @@ namespace Knez.Sim.Defs
     /// </summary>
     internal static class DefChecks
     {
+        /// <summary>A whole in permille.</summary>
+        public const int Whole = 1000;
+
+        /// <summary>A permille value, 0..1000.</summary>
+        public static int Permille(int value, string parameter) => Range(value, 0, Whole, parameter);
+
+        /// <summary>A positive decimal fraction rounded to the nearest raw unit, as the content reader rounds decimals
+        /// (for code copies of content values).</summary>
+        public static Fix Decimal(long numerator, long denominator) =>
+            Fix.FromRaw(((numerator * Fix.OneRaw * 2) + denominator) / (2 * denominator));
+
         public static string Id(string? id, string parameter)
         {
             if (string.IsNullOrEmpty(id))
