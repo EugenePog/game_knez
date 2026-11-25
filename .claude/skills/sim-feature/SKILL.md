@@ -1,6 +1,6 @@
 ---
 name: sim-feature
-description: Implement or change anything inside the battle simulation (sim/src/Knez.Sim or sim/tests) — a tick system, a state field, a command, fixed-point math, RNG use, pathfinding, steering, formations, combat, wounds, morale, heroes, enemy AI. Use whenever a task touches sim/ or the user asks to add or change a battle mechanic. Covers where code goes, determinism rules, the tick order, the new-state checklist and the test-first loop.
+description: Implement or change anything inside the battle simulation (sim/src/Knez.Sim or sim/tests) — a tick system, a state field, a command, fixed-point math, RNG use, pathfinding, steering, formations, combat, wounds, morale, Retainers (heroes), the standoff and duels, enemy AI. Use whenever a task touches sim/ or the user asks to add or change a battle mechanic. Covers where code goes, determinism rules, the tick order, the new-state checklist and the test-first loop.
 ---
 
 # Implementing a sim feature
@@ -25,7 +25,7 @@ Read `AGENTS.md` hard rules once per session; this playbook is the working loop.
 | Data that changes during a battle | `BattleState` (or a part of it, e.g. `FighterMorale`) | the only mutable state |
 | Rules that change data | a system in `sim/src/Knez.Sim/<Area>/<Name>System.cs` | stateless; reads/writes `BattleState` |
 | External input | `sim/src/Knez.Sim/Commands/<Name>Command.cs` | `Validate(state)` → `RejectReason` (no RNG, no writes); `Apply(state, context)` only if valid |
-| Tunable numbers | content defs in `sim/src/Knez.Sim/Defs/` (`FighterDef`, `FormationDef`, …), values in `content/defs/*.json` | no magic numbers in systems |
+| Tunable numbers | content defs in `sim/src/Knez.Sim/Defs/` (`BodyDef`, `WeaponDef`, `KitDef`, `FormationDef`, …), values in `content/defs/*.json` | no magic numbers in systems |
 | Reading content | `sim/src/Knez.Sim.Content/` (`DefLibrary`, `ScenarioLoader`, `JsonObjectReader`) | text in, defs out; no files, no `double` |
 | Rules that shape feel (thresholds, reaches, costs) | a content def too, e.g. `MovementDef` ← `content/defs/movement.json` (decided 2026-11-21) | never a constant in code |
 | Numerical constants (precision, safety) | a `*Rules` static class next to the system, e.g. `Movement/MovementRules.cs` | named constants with a why; nothing that changes how the battle feels |
@@ -112,10 +112,13 @@ dotnet build sim/Knez.Sim.sln            # warning-free
 dotnet test sim/Knez.Sim.sln             # all green
 dotnet test sim/Knez.Sim.sln --filter Category=Determinism
 python3 tools/check_sim_purity.py
+dotnet test sim/Knez.Sim.sln -c Release --filter FullyQualifiedName~BalanceReferenceTests  # D-026 reference; skipped in Debug
 ```
 
 If behaviour is visible on the battlefield, run a scenario and look at it (`battle-run` skill). If outcomes changed
-on purpose, regenerate golden replays (`determinism` skill) and say why in the commit message.
+on purpose, regenerate golden replays (`determinism` skill) and say why in the commit message. If the balance
+reference fails, the change moved balance: either that's a bug, or it's on purpose and the user agreed — then
+re-record it and the battle-sim.md §11 table (`battle-run` skill).
 
 ## 6. Finish
 

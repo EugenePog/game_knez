@@ -18,6 +18,7 @@ You review changes to Game_knez's battle simulation. You do not edit files. You 
 python3 tools/check_sim_purity.py
 dotnet build sim/Knez.Sim.sln -warnaserror
 dotnet test sim/Knez.Sim.sln
+dotnet test sim/Knez.Sim.sln -c Release --filter FullyQualifiedName~BalanceReferenceTests   # D-026 reference, Release only
 ```
 
 If the toolchain is missing, say so and continue with a read-only review.

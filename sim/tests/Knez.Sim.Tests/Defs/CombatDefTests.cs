@@ -3,7 +3,7 @@ using Knez.Sim.Numerics;
 
 namespace Knez.Sim.Tests.Defs;
 
-/// <summary>The combat rules (battle-sim.md §11, M3 step 1): catalogues, the hit-chance matrix, the default kit, checks.</summary>
+/// <summary>The combat rules (battle-sim.md §11, M3 step 1): catalogues, the hit-chance matrix, the named kits (step 9), checks.</summary>
 [TestFixture]
 public class CombatDefTests
 {
@@ -12,10 +12,10 @@ public class CombatDefTests
     private static int[][] Matrix() => S.Weapons.Select(w => S.ExperienceLevels.Select(e => S.BaseHit(w, e)).ToArray()).ToArray();
 
     /// <summary>The standard rules with one part replaced.</summary>
-    private static CombatDef With(int[][]? hitChance = null, IReadOnlyList<WeaponDef>? weapons = null, FighterKit? defaultKit = null,
+    private static CombatDef With(int[][]? hitChance = null, IReadOnlyList<WeaponDef>? weapons = null, IReadOnlyList<KitDef>? kits = null,
         int minHit = 20, int maxHit = 950) =>
-        new CombatDef(weapons ?? S.Weapons, S.Shields, S.BodyArmours, S.HeadCovers, S.ExperienceLevels, S.WarriorTypes,
-            hitChance ?? Matrix(), defaultKit ?? S.DefaultKit, minHit, maxHit, S.FlankBonus, S.RearBonus, S.ShieldFromFlank,
+        new CombatDef(weapons ?? S.Weapons, S.Shields, S.BodyArmours, S.HeadCovers, S.ExperienceLevels, kits ?? S.Kits,
+            hitChance ?? Matrix(), minHit, maxHit, S.FlankBonus, S.RearBonus, S.ShieldFromFlank,
             S.ShieldFromRear, S.ShieldWallBonus, S.LightWoundPenalty, S.HeavyWoundPenalty, S.LightWoundPace, S.HeavyWoundPace,
             S.FrontArc, S.RearArc, S.StrikeArc);
 
@@ -39,21 +39,38 @@ public class CombatDefTests
     }
 
     [Test]
-    public void Standard_CataloguesInFileOrder_AndDefaultKit()
+    public void Standard_CataloguesInFileOrder_AndTheSevenKits()
     {
         Assert.Multiple(() =>
         {
             Assert.That(S.Weapons.Select(w => w.Id), Is.EqualTo(new[] { "sword", "axe", "spear", "seax" }));
             Assert.That(S.ExperienceLevels.Select(e => e.Id), Is.EqualTo(new[] { "new", "experienced", "professional", "elite" }));
-            Assert.That(S.WarriorTypes.Select(t => t.Id), Is.EqualTo(new[] { "default", "spearman", "mounted" }));
             Assert.That(S.Shields.Select(s => s.Id), Is.EqualTo(new[] { "none", "round" }));
             Assert.That(S.BodyArmours.Select(s => s.Id), Is.EqualTo(new[] { "none", "padded", "mail" }));
             Assert.That(S.HeadCovers.Select(s => s.Id), Is.EqualTo(new[] { "none", "cap", "helm" }));
-            var kit = S.DefaultKit;
-            Assert.That(new[] { kit.Weapon.Id, kit.Shield.Id, kit.BodyArmour.Id, kit.HeadCover.Id, kit.Experience.Id, kit.Type.Id },
-                Is.EqualTo(new[] { "sword", "round", "padded", "cap", "experienced", "default" }));
-            Assert.That(S.Contains(kit), Is.True);
+
+            // M3 step 9 (decided 2026-11-25): seven kits named by what they hold, every one with a round shield.
+            Assert.That(S.Kits.Select(k => $"{k.Id}={k.Weapon.Id}/{k.Shield.Id}/{k.BodyArmour.Id}/{k.HeadCover.Id}"), Is.EqualTo(new[]
+            {
+                "axe-shield=axe/round/none/none", "spear-shield=spear/round/none/none",
+                "axe-shield-padded=axe/round/padded/cap", "spear-shield-padded=spear/round/padded/cap",
+                "sword-shield-padded=sword/round/padded/cap", "sword-shield-mail=sword/round/mail/helm",
+                "axe-shield-mail=axe/round/mail/helm",
+            }));
+            Assert.That(S.Kits.All(S.Contains), Is.True);
+            Assert.That(S.FindKit("sword-shield-padded"), Is.SameAs(S.Kits[4]));
+            Assert.That(S.FindKit("sword-padded"), Is.Null);
         });
+    }
+
+    [Test]
+    public void Standard_PenetrationAndDefence_AsDecided()
+    {
+        // Penetration decided by the user 2026-11-25 (the milder set); the spear's 30 was the spearman warrior type's.
+        Assert.That(S.Weapons.Select(w => (w.Id, w.Penetration, w.Defence)), Is.EqualTo(new[]
+        {
+            ("sword", 0, 0), ("axe", 300, 0), ("spear", 200, 30), ("seax", 100, 0),
+        }));
     }
 
     [Test]
@@ -63,7 +80,7 @@ public class CombatDefTests
         Assert.Multiple(() =>
         {
             Assert.That(sword.WindupTicks, Is.EqualTo(14), "0.7 s");
-            Assert.That(sword.RecoveryTicks, Is.EqualTo(16), "0.8 s");
+            Assert.That(sword.RecoveryTicks, Is.EqualTo(24), "1.2 s");
             Assert.That(sword.Reach, Is.EqualTo(Fix.Ratio(1, 2)));
             Assert.That(sword.LightWound + sword.HeavyWound + sword.DownWound, Is.EqualTo(1000));
         });
@@ -73,7 +90,7 @@ public class CombatDefTests
     public void WeaponDef_WoundRowNotSummingToAThousand_Throws()
     {
         var ex = Assert.Throws<ArgumentException>(() =>
-            new WeaponDef("w", Fix.Ratio(1, 2), Fix.Ratio(7, 10), Fix.Ratio(8, 10), 600, 300, 50));
+            new WeaponDef("w", Fix.Ratio(1, 2), Fix.Ratio(7, 10), Fix.Ratio(8, 10), 600, 300, 50, 0, 0));
         Assert.That(ex!.Message, Does.Contain("light + heavy + down must be 1000").And.Contain("950"));
     }
 
@@ -105,7 +122,7 @@ public class CombatDefTests
     [Test]
     public void Constructor_DuplicateWeaponId_Throws()
     {
-        var weapons = S.Weapons.Append(new WeaponDef("axe", Fix.One, Fix.One, Fix.One, 500, 300, 200)).ToArray();
+        var weapons = S.Weapons.Append(new WeaponDef("axe", Fix.One, Fix.One, Fix.One, 500, 300, 200, 0, 0)).ToArray();
         var matrix = Matrix().Append(new[] { 1, 2, 3, 4 }).ToArray();
         var ex = Assert.Throws<ArgumentException>(() => With(hitChance: matrix, weapons: weapons));
         Assert.That(ex!.Message, Does.Contain("weapon 'axe' is listed twice"));
@@ -119,12 +136,19 @@ public class CombatDefTests
     }
 
     [Test]
-    public void Constructor_DefaultKitFromOtherCatalogues_Throws()
+    public void Constructor_KitFromOtherCatalogues_Throws()
     {
-        var stranger = new FighterKit(new WeaponDef("sword", Fix.One, Fix.One, Fix.One, 500, 300, 200), S.DefaultKit.Shield,
-            S.DefaultKit.BodyArmour, S.DefaultKit.HeadCover, S.DefaultKit.Experience, S.DefaultKit.Type);
-        var ex = Assert.Throws<ArgumentException>(() => With(defaultKit: stranger));
-        Assert.That(ex!.Message, Does.Contain("defaultKit").And.Contain("weapon 'sword'"));
+        var stranger = new KitDef("odd", new WeaponDef("sword", Fix.One, Fix.One, Fix.One, 500, 300, 200, 0, 0), S.Shields[1],
+            S.BodyArmours[1], S.HeadCovers[1]);
+        var ex = Assert.Throws<ArgumentException>(() => With(kits: S.Kits.Append(stranger).ToArray()));
+        Assert.That(ex!.Message, Does.Contain("kit 'odd'").And.Contain("weapon 'sword'"));
+    }
+
+    [Test]
+    public void Constructor_KitListedTwice_Throws()
+    {
+        var ex = Assert.Throws<ArgumentException>(() => With(kits: S.Kits.Append(S.Kits[0]).ToArray()));
+        Assert.That(ex!.Message, Does.Contain("kit 'axe-shield' is listed twice"));
     }
 
     [Test]
@@ -140,23 +164,20 @@ public class CombatDefTests
     }
 
     [Test]
-    public void FighterDef_WithoutKit_GetsTheStandardDefaultKit()
+    public void ScenarioDef_KitOrExperienceFromOtherRules_Throws()
     {
-        var def = new FighterDef("w", Fix.Ratio(3, 10), Fix.One, Fix.FromInt(3), Fix.FromInt(360));
-        Assert.That(def.Kit, Is.SameAs(S.DefaultKit));
-    }
-
-    [Test]
-    public void ScenarioDef_FighterKitFromOtherRules_Throws()
-    {
-        var other = With(maxHit: 900);
-        var foreignWeapon = new WeaponDef("sword", Fix.One, Fix.One, Fix.One, 500, 300, 200);
-        var kit = new FighterKit(foreignWeapon, S.DefaultKit.Shield, S.DefaultKit.BodyArmour, S.DefaultKit.HeadCover,
-            S.DefaultKit.Experience, S.DefaultKit.Type);
-        var fighter = new FighterDef("odd", Fix.Ratio(3, 10), Fix.One, Fix.FromInt(3), Fix.FromInt(360), kit);
-        var squad = new SquadSpawnDef("A", 0, fighter, 4, Support.TestDefs.Line, FixVec2.FromInts(20, 20), Angle.FromDegrees(90));
+        // Rules whose kits and levels are other objects with the same ids: a squad must use the battle's own.
+        var copies = S.Kits.Select(k => new KitDef(k.Id, k.Weapon, k.Shield, k.BodyArmour, k.HeadCover)).ToArray();
+        var other = With(kits: copies);
+        var squad = Support.TestDefs.Squad("A", 0, 4, FixVec2.FromInts(20, 20), 90);
         var ex = Assert.Throws<ArgumentException>(() => new ScenarioDef("s", "", Support.TestDefs.Map, [squad], combat: other));
-        Assert.That(ex!.Message, Does.Contain("squads[0] 'A'").And.Contain("weapon 'sword' is not the combat rules' def"));
+        Assert.That(ex!.Message, Does.Contain("squads[0] 'A' men[0]: kit 'sword-shield-padded' is not the combat rules' def"));
+
+        var level = new ExperienceDef("experienced", 40, 750);
+        var odd = new SquadSpawnDef("B", 0, Support.TestDefs.Man, [new SquadMenDef(4, level, S.Kits[4])], Support.TestDefs.Line,
+            FixVec2.FromInts(20, 20), Angle.FromDegrees(90));
+        var ex2 = Assert.Throws<ArgumentException>(() => new ScenarioDef("s", "", Support.TestDefs.Map, [odd]));
+        Assert.That(ex2!.Message, Does.Contain("squads[0] 'B' men[0]: experience level 'experienced' is not the combat rules' def"));
     }
 
     [Test]
@@ -178,19 +199,24 @@ public class CombatDefTests
     {
         var w = S.Weapons.ToArray();
         CombatDef Rules(IReadOnlyList<WeaponDef>? weapons = null, IReadOnlyList<ProtectionDef>? shields = null,
-            IReadOnlyList<ExperienceDef>? levels = null, IReadOnlyList<WarriorTypeDef>? types = null, FighterKit? kit = null,
+            IReadOnlyList<ExperienceDef>? levels = null, IReadOnlyList<KitDef>? kits = null,
             IReadOnlyList<ProtectionDef>? body = null, IReadOnlyList<ProtectionDef>? head = null, int minHit = 20,
             int flank = 100, int rear = 200, int fromFlank = 500, int fromRear = 0, int wall = 80, int light = 40, int heavy = 120,
             Fix? lightPace = null, Fix? heavyPace = null, Fix? frontArc = null, Fix? rearArc = null, Fix? strikeArc = null)
         {
             var newShields = shields ?? S.Shields;
             var newLevels = levels ?? S.ExperienceLevels;
-            var newTypes = types ?? S.WarriorTypes;
             var newWeapons = weapons ?? S.Weapons;
             var newBody = body ?? S.BodyArmours;
             var newHead = head ?? S.HeadCovers;
-            var defaultKit = kit ?? new FighterKit(newWeapons.First(x => x.Id == "sword"), newShields[1], newBody[1], newHead[1], newLevels[1], newTypes[0]);
-            return new CombatDef(newWeapons, newShields, newBody, newHead, newLevels, newTypes, Matrix(), defaultKit, minHit, 950,
+
+            // Kits must hold these rules' very parts: the same id where there is one, else the same place in the list.
+            T Same<T>(IReadOnlyList<T> now, IReadOnlyList<T> was, T part, Func<T, string> id) =>
+                now.FirstOrDefault(x => id(x) == id(part)) ?? now[was.ToList().IndexOf(part)];
+            var newKits = (kits ?? S.Kits).Select(k => new KitDef(k.Id, Same(newWeapons, S.Weapons, k.Weapon, x => x.Id),
+                Same(newShields, S.Shields, k.Shield, x => x.Id), Same(newBody, S.BodyArmours, k.BodyArmour, x => x.Id),
+                Same(newHead, S.HeadCovers, k.HeadCover, x => x.Id))).ToArray();
+            return new CombatDef(newWeapons, newShields, newBody, newHead, newLevels, newKits, Matrix(), minHit, 950,
                 flank, rear, fromFlank, fromRear, wall, light, heavy, lightPace ?? S.LightWoundPace, heavyPace ?? S.HeavyWoundPace,
                 frontArc ?? S.FrontArc, rearArc ?? S.RearArc, strikeArc ?? S.StrikeArc);
         }
@@ -198,19 +224,22 @@ public class CombatDefTests
         WeaponDef[] Swap(WeaponDef replacement) => w.Select(x => x.Id == replacement.Id ? replacement : x).ToArray();
         var variants = new Dictionary<string, CombatDef>
         {
-            ["reach"] = Rules(weapons: Swap(new WeaponDef("axe", Fix.One, Fix.Ratio(9, 10), Fix.Ratio(9, 10), 500, 330, 170))),
-            ["windup"] = Rules(weapons: Swap(new WeaponDef("axe", Fix.Ratio(1, 2), Fix.One, Fix.Ratio(9, 10), 500, 330, 170))),
-            ["recovery"] = Rules(weapons: Swap(new WeaponDef("axe", Fix.Ratio(1, 2), Fix.Ratio(9, 10), Fix.One, 500, 330, 170))),
-            ["weapon id"] = Rules(weapons: w.Select(x => x.Id == "axe" ? new WeaponDef("hatchet", Fix.Ratio(1, 2), Fix.Ratio(9, 10), Fix.Ratio(9, 10), 500, 330, 170) : x).ToArray()),
+            ["reach"] = Rules(weapons: Swap(new WeaponDef("axe", Fix.One, Fix.Ratio(9, 10), Fix.Ratio(3, 2), 500, 330, 170, 300, 0))),
+            ["windup"] = Rules(weapons: Swap(new WeaponDef("axe", Fix.Ratio(1, 2), Fix.One, Fix.Ratio(3, 2), 500, 330, 170, 300, 0))),
+            ["recovery"] = Rules(weapons: Swap(new WeaponDef("axe", Fix.Ratio(1, 2), Fix.Ratio(9, 10), Fix.One, 500, 330, 170, 300, 0))),
+            ["penetration"] = Rules(weapons: Swap(new WeaponDef("axe", Fix.Ratio(1, 2), Fix.Ratio(9, 10), Fix.Ratio(3, 2), 500, 330, 170, 301, 0))),
+            ["defence"] = Rules(weapons: Swap(new WeaponDef("axe", Fix.Ratio(1, 2), Fix.Ratio(9, 10), Fix.Ratio(3, 2), 500, 330, 170, 300, 1))),
+            ["weapon id"] = Rules(weapons: w.Select(x => x.Id == "axe" ? new WeaponDef("hatchet", Fix.Ratio(1, 2), Fix.Ratio(9, 10), Fix.Ratio(3, 2), 500, 330, 170, 300, 0) : x).ToArray()),
             ["weapon order"] = Rules(weapons: [w[0], w[2], w[1], w[3]]),
             ["body armour"] = Rules(body: [S.BodyArmours[0], S.BodyArmours[1], new ProtectionDef("mail", 141)]),
             ["head cover"] = Rules(head: [S.HeadCovers[0], S.HeadCovers[1], new ProtectionDef("helm", 61)]),
             ["minHit"] = Rules(minHit: 21),
-            ["wound row"] = Rules(weapons: Swap(new WeaponDef("axe", Fix.Ratio(1, 2), Fix.Ratio(9, 10), Fix.Ratio(9, 10), 510, 320, 170))),
+            ["wound row"] = Rules(weapons: Swap(new WeaponDef("axe", Fix.Ratio(1, 2), Fix.Ratio(9, 10), Fix.Ratio(3, 2), 510, 320, 170, 300, 0))),
             ["shield"] = Rules(shields: [S.Shields[0], new ProtectionDef("round", 221)]),
             ["experience"] = Rules(levels: S.ExperienceLevels.Select(e => e.Id == "elite" ? new ExperienceDef("elite", 121) : e).ToArray()),
-            ["type"] = Rules(types: S.WarriorTypes.Select(t => t.Id == "mounted" ? new WarriorTypeDef("mounted", 51) : t).ToArray()),
-            ["kit"] = Rules(kit: new FighterKit(S.Weapons[2], S.Shields[1], S.BodyArmours[1], S.HeadCovers[1], S.ExperienceLevels[1], S.WarriorTypes[0])),
+            ["kit part"] = Rules(kits: S.Kits.Select(k => k.Id == "axe-shield" ? new KitDef(k.Id, S.Weapons[2], k.Shield, k.BodyArmour, k.HeadCover) : k).ToArray()),
+            ["kit id"] = Rules(kits: S.Kits.Select(k => k.Id == "axe-shield" ? new KitDef("axe-round", k.Weapon, k.Shield, k.BodyArmour, k.HeadCover) : k).ToArray()),
+            ["kit order"] = Rules(kits: S.Kits.Reverse().ToArray()),
             ["flank"] = Rules(flank: 101), ["rear"] = Rules(rear: 201), ["fromFlank"] = Rules(fromFlank: 501),
             ["fromRear"] = Rules(fromRear: 1), ["wall"] = Rules(wall: 81), ["light"] = Rules(light: 41), ["heavy"] = Rules(heavy: 121),
             ["frontArc"] = Rules(frontArc: Fix.FromInt(45)), ["rearArc"] = Rules(rearArc: Fix.FromInt(135)),

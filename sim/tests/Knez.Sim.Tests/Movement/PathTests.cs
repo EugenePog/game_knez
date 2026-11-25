@@ -18,7 +18,7 @@ namespace Knez.Sim.Tests.Movement;
 [TestFixture]
 public class PathTests
 {
-    private static readonly Fix R = TestDefs.Warrior.Radius;
+    private static readonly Fix R = TestDefs.Man.Radius;
 
     private static Fix M(int hundredths) => Fix.Ratio(hundredths, 100);
 
@@ -319,7 +319,7 @@ public class PathTests
         var near = new FixVec2(Fix.Ratio(1343, 128), Fix.FromInt(2)); // 0.3 m east of the fence
         var start = startNearFence ? near : FixVec2.FromInts(fromX, 2);
         var target = startNearFence ? FixVec2.FromInts(toX, 2) : near;
-        var fighter = new SquadSpawnDef("A", 0, TestDefs.Warrior, 1, TestDefs.Line, start, Angle.FromDegrees(90));
+        var fighter = new SquadSpawnDef("A", 0, TestDefs.Man, TestDefs.Men(1), TestDefs.Line, start, Angle.FromDegrees(90));
         var sim = Sim(ThinFence(), fighter, target);
         sim.Step();
         var squad = sim.State.Squads[0];

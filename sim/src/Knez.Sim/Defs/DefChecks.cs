@@ -44,9 +44,9 @@ namespace Knez.Sim.Defs
 
         public static Fix Speed(Fix value, string parameter)
         {
-            if (value < FighterDef.MinSpeed || value > Fix.FromInt(FighterDef.MaxSpeed))
+            if (value < BodyDef.MinSpeed || value > Fix.FromInt(BodyDef.MaxSpeed))
             {
-                throw new ArgumentException($"{parameter} must be 0.1..{FighterDef.MaxSpeed} m/s (got {value}).");
+                throw new ArgumentException($"{parameter} must be 0.1..{BodyDef.MaxSpeed} m/s (got {value}).");
             }
 
             return value;

@@ -9,45 +9,44 @@ namespace Knez.Sim.Content
 {
     /// <summary>
     /// All defs from the content def files (<c>content/defs/*.json</c>), looked up by id. Each file is an object with
-    /// optional <c>fighters</c> and <c>formations</c> arrays, optional <c>movement</c> and <c>combat</c> objects (the
-    /// movement and combat rules: each in at most one file) and an optional <c>description</c>; ids are unique across all
-    /// files. Lists are sorted by id (ordinal), so the order of files never matters. Fighters name their kit (weapon,
-    /// shield, bodyArmour, headCover, experience, type) by ids from the combat rules — <see cref="CombatDef.Standard"/>
-    /// when no file has them — and take the rules' default kit for what they leave out.
+    /// optional <c>bodies</c> and <c>formations</c> arrays, optional <c>movement</c>, <c>combat</c> and <c>morale</c>
+    /// objects (each in at most one file) and an optional <c>description</c>; ids are unique across all files. Lists are
+    /// sorted by id (ordinal), so the order of files never matters. Kits and experience levels belong to the combat rules
+    /// (M3 step 9, ADR-0005): a scenario names them per group of a squad's men.
     /// </summary>
     public sealed class DefLibrary
     {
-        private const string FileMembers = "description, fighters, formations, movement, combat, morale";
+        private const string FileMembers = "description, bodies, formations, movement, combat, morale";
         private const string MoraleMembers = "shaken, wavering, routing, hysteresis, lossWeight, ownLightWound, ownHeavyWound, " +
             "mateHeavyWound, flankBlow, rearBlow, mateFlankBlow, mateRearBlow, mateRouts, allySquadBroke, enemySquadBroke, nearby, " +
             "recoveryPerSecond, safeDistance, rallyAt, breakShare, reformShare, waveringHitPenalty";
         private const string MovementMembers = "pivotTolerance, slotCatchUpTime, personalSpace, separationTime, holdingReach, " +
-            "formedUpReach, collisionPasses, allyPartingDepth, pathBudget, regroupLead, regroupMaxWait, regroupCost, reformPace, stepBackPace, withdrawClearance, closeInRange";
-        private const string FighterMembers = "id, radius, walkSpeed, runSpeed, turnRate, weapon, shield, bodyArmour, headCover, experience, type";
-        private const string CombatMembers = "weapons, shields, bodyArmour, headCover, experience, warriorTypes, hitChance, defaultKit, " +
+            "formedUpReach, collisionPasses, allyPartingDepth, pathBudget, regroupLead, regroupMaxWait, regroupCost, reformPace, stepBackPace, withdrawClearance, closeInRange, turnLagTime";
+        private const string BodyMembers = "id, radius, walkSpeed, runSpeed, turnRate";
+        private const string CombatMembers = "weapons, shields, bodyArmour, headCover, experience, kits, hitChance, " +
             "hitLimits, position, strikeArc, wounded";
-        private const string WeaponMembers = "id, reach, windup, recovery, wounds";
-        private const string KitMembers = "weapon, shield, bodyArmour, headCover, experience, type";
+        private const string WeaponMembers = "id, reach, windup, recovery, wounds, penetration, defence";
+        private const string KitMembers = "id, weapon, shield, bodyArmour, headCover";
         private const string FormationMembers = "id, spacing, rankSpacing, ranks, width, turnRate, holdWeight, allyPassSpeed, shieldWall, keepsRanks";
 
-        private readonly Dictionary<string, FighterDef> _fighters;
+        private readonly Dictionary<string, BodyDef> _bodies;
         private readonly Dictionary<string, FormationDef> _formations;
 
-        private DefLibrary(List<FighterDef> fighters, List<FormationDef> formations, MovementDef? movement, CombatDef? combat,
+        private DefLibrary(List<BodyDef> bodies, List<FormationDef> formations, MovementDef? movement, CombatDef? combat,
             MoraleDef? morale)
         {
             Movement = movement;
             Morale = morale;
             Combat = combat;
-            fighters.Sort((a, b) => string.CompareOrdinal(a.Id, b.Id));
+            bodies.Sort((a, b) => string.CompareOrdinal(a.Id, b.Id));
             formations.Sort((a, b) => string.CompareOrdinal(a.Id, b.Id));
-            Fighters = new ReadOnlyCollection<FighterDef>(fighters);
+            Bodies = new ReadOnlyCollection<BodyDef>(bodies);
             Formations = new ReadOnlyCollection<FormationDef>(formations);
-            _fighters = new Dictionary<string, FighterDef>(StringComparer.Ordinal);
+            _bodies = new Dictionary<string, BodyDef>(StringComparer.Ordinal);
             _formations = new Dictionary<string, FormationDef>(StringComparer.Ordinal);
-            for (int i = 0; i < fighters.Count; i++)
+            for (int i = 0; i < bodies.Count; i++)
             {
-                _fighters.Add(fighters[i].Id, fighters[i]);
+                _bodies.Add(bodies[i].Id, bodies[i]);
             }
 
             for (int i = 0; i < formations.Count; i++)
@@ -56,8 +55,8 @@ namespace Knez.Sim.Content
             }
         }
 
-        /// <summary>Fighter defs sorted by id.</summary>
-        public IReadOnlyList<FighterDef> Fighters { get; }
+        /// <summary>Body defs sorted by id.</summary>
+        public IReadOnlyList<BodyDef> Bodies { get; }
 
         /// <summary>Formation defs sorted by id.</summary>
         public IReadOnlyList<FormationDef> Formations { get; }
@@ -71,16 +70,19 @@ namespace Knez.Sim.Content
         /// <summary>The combat rules, or null when no def file has a <c>combat</c> object.</summary>
         public CombatDef? Combat { get; }
 
+        /// <summary>The combat rules scenarios resolve kits and experience levels against: the file's, or
+        /// <see cref="CombatDef.Standard"/>.</summary>
+        public CombatDef Rules => Combat ?? CombatDef.Standard;
+
         /// <summary>Parses def files; throws <see cref="ContentException"/> on the first problem.</summary>
         public static DefLibrary Parse(IReadOnlyList<SourceText> files)
         {
-            var fighters = new List<FighterDef>();
+            var bodies = new List<BodyDef>();
             var formations = new List<FormationDef>();
             var seen = new Dictionary<string, string>(StringComparer.Ordinal); // "kind:id" → where it was defined
             MovementDef? movement = null;
             CombatDef? combat = null;
             MoraleDef? morale = null;
-            var pendingFighters = new List<PendingFighter>(); // built once every file is read: kits need the combat rules
 
             for (int f = 0; f < files.Count; f++)
             {
@@ -89,20 +91,25 @@ namespace Knez.Sim.Content
                 var root = JsonObjectReader.Of(rootValue, string.Empty, file.Name);
                 root.OptionalString("description");
 
-                IReadOnlyList<JsonValue> fighterItems = root.OptionalArray("fighters");
-                for (int i = 0; i < fighterItems.Count; i++)
+                JsonValue? oldFighters = root.Member("fighters");
+                if (oldFighters != null)
                 {
-                    var item = JsonObjectReader.Of(fighterItems[i], $"fighters[{i}]", file.Name);
+                    throw root.Error(oldFighters, "fighters",
+                        "fighter types are gone (M3 step 9, ADR-0005): bodies go in 'bodies', kits in combat 'kits', and a scenario's squads name experience and kit per group of men");
+                }
+
+                IReadOnlyList<JsonValue> bodyItems = root.OptionalArray("bodies");
+                for (int i = 0; i < bodyItems.Count; i++)
+                {
+                    var item = JsonObjectReader.Of(bodyItems[i], $"bodies[{i}]", file.Name);
                     string id = item.RequireString("id");
                     var radius = item.RequireFix("radius");
                     var walkSpeed = item.RequireFix("walkSpeed");
                     var runSpeed = item.RequireFix("runSpeed");
                     var turnRate = item.RequireFix("turnRate");
-                    var kit = KitIds.Read(item);
-                    item.RejectUnknownMembers(FighterMembers);
-                    Claim(seen, "fighter", id, item, fighterItems[i], file.Name);
-                    pendingFighters.Add(new PendingFighter(item, fighterItems[i], kit,
-                        k => new FighterDef(id, radius, walkSpeed, runSpeed, turnRate, k)));
+                    item.RejectUnknownMembers(BodyMembers);
+                    Claim(seen, "body", id, item, bodyItems[i], file.Name);
+                    bodies.Add(Build(item, bodyItems[i], () => new BodyDef(id, radius, walkSpeed, runSpeed, turnRate)));
                 }
 
                 IReadOnlyList<JsonValue> formationItems = root.OptionalArray("formations");
@@ -148,11 +155,12 @@ namespace Knez.Sim.Content
                     var stepBackPace = item.RequireFix("stepBackPace");
                     var withdrawClearance = item.RequireFix("withdrawClearance");
                     var closeInRange = item.RequireFix("closeInRange");
+                    var turnLagTime = item.RequireFix("turnLagTime");
                     item.RejectUnknownMembers(MovementMembers);
                     movement = Build(item, movementValue, () => new MovementDef(pivotTolerance, slotCatchUpTime, personalSpace,
                         separationTime, holdingReach, formedUpReach, collisionPasses, allyPartingDepth, pathBudget, regroupLead,
                         regroupMaxWait, regroupCost, reformPace, stepBackPace, withdrawClearance,
-                        closeInRange));
+                        closeInRange, turnLagTime));
                 }
 
                 JsonObjectReader? combatReader = root.OptionalObject("combat");
@@ -174,15 +182,7 @@ namespace Knez.Sim.Content
                 root.RejectUnknownMembers(FileMembers);
             }
 
-            CombatDef rules = combat ?? CombatDef.Standard;
-            for (int i = 0; i < pendingFighters.Count; i++)
-            {
-                PendingFighter pending = pendingFighters[i];
-                FighterKit kit = pending.Kit.Resolve(rules, rules.DefaultKit, pending.Item);
-                fighters.Add(Build(pending.Item, pending.At, () => pending.Create(kit)));
-            }
-
-            return new DefLibrary(fighters, formations, movement, combat, morale);
+            return new DefLibrary(bodies, formations, movement, combat, morale);
         }
 
         private static CombatDef ReadCombat(JsonObjectReader item, JsonValue at)
@@ -202,15 +202,17 @@ namespace Knez.Sim.Content
                 int heavy = wounds.RequireInt("heavy");
                 int down = wounds.RequireInt("down");
                 wounds.RejectUnknownMembers("light, heavy, down");
+                int penetration = Permille(weapon, "penetration");
+                int defence = Permille(weapon, "defence");
                 weapon.RejectUnknownMembers(WeaponMembers);
-                weapons.Add(Build(weapon, weaponItems[i], () => new WeaponDef(id, reach, windup, recovery, light, heavy, down)));
+                weapons.Add(Build(weapon, weaponItems[i], () => new WeaponDef(id, reach, windup, recovery, light, heavy, down, penetration, defence)));
             }
 
             List<ProtectionDef> shields = ReadPieces(item, "shields", "shield", "protection", (id, v) => new ProtectionDef(id, v), d => d.Id);
             List<ProtectionDef> bodyArmours = ReadPieces(item, "bodyArmour", "body armour", "protection", (id, v) => new ProtectionDef(id, v), d => d.Id);
             List<ProtectionDef> headCovers = ReadPieces(item, "headCover", "head cover", "protection", (id, v) => new ProtectionDef(id, v), d => d.Id);
             List<ExperienceDef> levels = ReadExperience(item);
-            List<WarriorTypeDef> types = ReadPieces(item, "warriorTypes", "warrior type", "defence", (id, v) => new WarriorTypeDef(id, v), d => d.Id);
+            List<KitDef> kits = ReadKits(item, weapons, shields, bodyArmours, headCovers);
 
             // The matrix: one object per weapon, one value per experience level, keyed by ids so a tuner can't shift a
             // column by accident. Every cell is required; strangers are errors.
@@ -235,14 +237,6 @@ namespace Knez.Sim.Content
 
             matrix.RejectUnknownMembers(string.Join(", ", weaponIds));
 
-            var kitReader = item.RequireObject("defaultKit");
-            KitIds kitIds = KitIds.Read(kitReader);
-            kitReader.RejectUnknownMembers(KitMembers);
-            if (!kitIds.Complete)
-            {
-                throw kitReader.Error($"the default kit names every part ({KitMembers})");
-            }
-
             var limits = item.RequireObject("hitLimits");
             int minHit = Permille(limits, "min");
             int maxHit = Permille(limits, "max");
@@ -265,15 +259,8 @@ namespace Knez.Sim.Content
             wounded.RejectUnknownMembers("lightPenalty, heavyPenalty, lightPace, heavyPace");
             item.RejectUnknownMembers(CombatMembers);
 
-            // Catalogue checks (duplicates, matrix shape) first, so the default kit resolves against sound lists.
-            CombatDef draft = Build(item, at, () => new CombatDef(weapons, shields, bodyArmours, headCovers, levels, types, rows,
-                new FighterKit(weapons[0], shields[0], bodyArmours[0], headCovers[0], levels[0], types[0]), minHit, maxHit, flank,
-                rear, shieldFromFlank, shieldFromRear, shieldWall, lightPenalty, heavyPenalty, lightPace, heavyPace,
-                frontArc, rearArc, strikeArc));
-            FighterKit defaultKit = kitIds.Resolve(draft, null, kitReader);
-            return Build(item, at, () => new CombatDef(draft.Weapons, draft.Shields, draft.BodyArmours, draft.HeadCovers,
-                draft.ExperienceLevels, draft.WarriorTypes, rows, defaultKit, minHit, maxHit, flank, rear, shieldFromFlank,
-                shieldFromRear, shieldWall, lightPenalty, heavyPenalty, lightPace, heavyPace,
+            return Build(item, at, () => new CombatDef(weapons, shields, bodyArmours, headCovers, levels, kits, rows, minHit, maxHit,
+                flank, rear, shieldFromFlank, shieldFromRear, shieldWall, lightPenalty, heavyPenalty, lightPace, heavyPace,
                 frontArc, rearArc, strikeArc));
         }
 
@@ -323,6 +310,43 @@ namespace Knez.Sim.Content
             }
 
             return list;
+        }
+
+        /// <summary>The named kits (M3 step 9): each part by id from the lists just read, located errors otherwise.</summary>
+        private static List<KitDef> ReadKits(JsonObjectReader combat, List<WeaponDef> weapons, List<ProtectionDef> shields,
+            List<ProtectionDef> bodyArmours, List<ProtectionDef> headCovers)
+        {
+            var list = new List<KitDef>();
+            IReadOnlyList<JsonValue> items = NonEmpty(combat, "kits", "kit");
+            for (int i = 0; i < items.Count; i++)
+            {
+                var kit = JsonObjectReader.Of(items[i], combat.MemberPath($"kits[{i}]"), combat.Source);
+                string id = kit.RequireString("id");
+                UniqueId(list, id, "kit", kit, d => d.Id);
+                WeaponDef weapon = Pick(kit, "weapon", "weapon", weapons, w => w.Id);
+                ProtectionDef shield = Pick(kit, "shield", "shield", shields, p => p.Id);
+                ProtectionDef body = Pick(kit, "bodyArmour", "body armour", bodyArmours, p => p.Id);
+                ProtectionDef head = Pick(kit, "headCover", "head cover", headCovers, p => p.Id);
+                kit.RejectUnknownMembers(KitMembers);
+                list.Add(Build(kit, items[i], () => new KitDef(id, weapon, shield, body, head)));
+            }
+
+            return list;
+        }
+
+        /// <summary>The entry of <paramref name="catalogue"/> a required member names, or a located "no such" error.</summary>
+        private static T Pick<T>(JsonObjectReader item, string member, string kind, IReadOnlyList<T> catalogue, Func<T, string> idOf)
+        {
+            string id = item.RequireString(member);
+            for (int i = 0; i < catalogue.Count; i++)
+            {
+                if (string.Equals(idOf(catalogue[i]), id, StringComparison.Ordinal))
+                {
+                    return catalogue[i];
+                }
+            }
+
+            throw item.Error(item.Member(member)!, item.MemberPath(member), $"no {kind} '{id}' (known: {JoinIds(catalogue, idOf)})");
         }
 
         private static List<T> ReadPieces<T>(JsonObjectReader combat, string name, string kind, string valueName,
@@ -382,98 +406,17 @@ namespace Knez.Sim.Content
             return value;
         }
 
-        /// <summary>The fighter def with <paramref name="id"/>, or null.</summary>
-        public FighterDef? FindFighter(string id) => _fighters.TryGetValue(id, out FighterDef? def) ? def : null;
+        /// <summary>The body def with <paramref name="id"/>, or null.</summary>
+        public BodyDef? FindBody(string id) => _bodies.TryGetValue(id, out BodyDef? def) ? def : null;
 
         /// <summary>The formation def with <paramref name="id"/>, or null.</summary>
         public FormationDef? FindFormation(string id) => _formations.TryGetValue(id, out FormationDef? def) ? def : null;
 
-        /// <summary>Known fighter ids, for "unknown fighter" messages.</summary>
-        public string FighterIds() => JoinIds(Fighters, d => d.Id);
+        /// <summary>Known body ids, for "unknown body" messages.</summary>
+        public string BodyIds() => JoinIds(Bodies, d => d.Id);
 
         /// <summary>Known formation ids, for "unknown formation" messages.</summary>
         public string FormationIds() => JoinIds(Formations, d => d.Id);
-
-        /// <summary>A fighter read from a file, waiting for the combat rules to resolve his kit.</summary>
-        private sealed class PendingFighter
-        {
-            public PendingFighter(JsonObjectReader item, JsonValue at, KitIds kit, Func<FighterKit, FighterDef> create)
-            {
-                Item = item;
-                At = at;
-                Kit = kit;
-                Create = create;
-            }
-
-            public JsonObjectReader Item { get; }
-
-            public JsonValue At { get; }
-
-            public KitIds Kit { get; }
-
-            public Func<FighterKit, FighterDef> Create { get; }
-        }
-
-        /// <summary>The kit members of a fighter or of the default kit, as ids (null = not named), with where each was.</summary>
-        private sealed class KitIds
-        {
-            private readonly string?[] _ids = new string?[6];
-            private readonly JsonValue?[] _at = new JsonValue?[6];
-            private static readonly string[] Names = { "weapon", "shield", "bodyArmour", "headCover", "experience", "type" };
-            private static readonly string[] Kinds = { "weapon", "shield", "body armour", "head cover", "experience level", "warrior type" };
-
-            public bool Complete => Array.IndexOf(_ids, null) < 0;
-
-            public static KitIds Read(JsonObjectReader item)
-            {
-                var kit = new KitIds();
-                for (int i = 0; i < Names.Length; i++)
-                {
-                    kit._ids[i] = item.OptionalString(Names[i]);
-                    kit._at[i] = item.Member(Names[i]);
-                }
-
-                return kit;
-            }
-
-            /// <summary>Looks the ids up in <paramref name="rules"/>, taking the rest from <paramref name="fallback"/>.</summary>
-            public FighterKit Resolve(CombatDef rules, FighterKit? fallback, JsonObjectReader item)
-            {
-                if (fallback != null && Array.TrueForAll(_ids, id => id == null))
-                {
-                    return fallback; // names nothing: share the default kit itself
-                }
-
-                WeaponDef? weapon = Pick(0, rules.Weapons, w => w.Id, fallback?.Weapon, item);
-                ProtectionDef? shield = Pick(1, rules.Shields, p => p.Id, fallback?.Shield, item);
-                ProtectionDef? body = Pick(2, rules.BodyArmours, p => p.Id, fallback?.BodyArmour, item);
-                ProtectionDef? head = Pick(3, rules.HeadCovers, p => p.Id, fallback?.HeadCover, item);
-                ExperienceDef? experience = Pick(4, rules.ExperienceLevels, e => e.Id, fallback?.Experience, item);
-                WarriorTypeDef? type = Pick(5, rules.WarriorTypes, t => t.Id, fallback?.Type, item);
-                return new FighterKit(weapon!, shield!, body!, head!, experience!, type!);
-            }
-
-            private T? Pick<T>(int part, IReadOnlyList<T> catalogue, Func<T, string> idOf, T? fallback, JsonObjectReader item)
-                where T : class
-            {
-                string? id = _ids[part];
-                if (id == null)
-                {
-                    return fallback;
-                }
-
-                for (int i = 0; i < catalogue.Count; i++)
-                {
-                    if (string.Equals(idOf(catalogue[i]), id, StringComparison.Ordinal))
-                    {
-                        return catalogue[i];
-                    }
-                }
-
-                throw item.Error(_at[part]!, item.MemberPath(Names[part]),
-                    $"no {Kinds[part]} '{id}' (known: {JoinIds(catalogue, idOf)})");
-            }
-        }
 
         private static void Claim(Dictionary<string, string> seen, string kind, string id, JsonObjectReader item,
             JsonValue at, string source)

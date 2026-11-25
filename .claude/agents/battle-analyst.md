@@ -16,10 +16,13 @@ Playbook: `.claude/skills/battle-run/SKILL.md`. Metric definitions: `docs/battle
   benchmarks.
 - For A/B: same scenarios, same seed range, same tick limit. Baseline from a separate worktree
   (`git worktree add artifacts/baseline <ref>`), removed when done (`git worktree remove artifacts/baseline`).
-- Seeds: ≥ 200 for win rates (from M3). Movement draws no random numbers, so movement metrics need one seed until
-  combat (batch's "distinct outcomes" shows 1). Benchmarks: 3 repeated `bench` runs (it warms up for 1 s first);
-  report the median of p99.
-- Don't conclude from noise: a win-rate difference under ~5 points at 200 seeds, or a p99 change under ~20 % (sub-0.1 ms
+- Seeds: 1000 for win rates on the small fights (S6 ~15 s, S7 ~28 s in Release at `--ticks 3600`), ≥ 200 where runs
+  are slow (the sandbox: ~30 s per 50 seeds). Give fights
+  `--ticks 3600` so they end. Balance questions start from the reference in `docs/battle-sim.md` §11 (S6, S7, `m3-*`,
+  sandbox). Movement draws no random numbers, so a drill's movement metrics need one seed (batch's "distinct outcomes"
+  shows 1). Benchmarks: 3 repeated `bench` runs (it warms up for 1 s first); report the median of p99.
+- Don't conclude from noise: a win-rate difference under ~10 points at 200 seeds (~4.5 at 1000; two standard errors of
+  a difference), a mean-time difference under 2×√2 of batch's printed SE, or a p99 change under ~20 % (sub-0.1 ms
   ticks jitter), is "no clear difference".
 - If the CLI lacks a command or flag you need, stop and report what's missing; don't work around it by editing code.
 

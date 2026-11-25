@@ -152,7 +152,7 @@ namespace Knez.Sim.Morale
             for (int i = 0; i < fighters.Count; i++)
             {
                 Fighter man = fighters[i];
-                int start = man.Def.Kit.Experience.Morale;
+                int start = man.Experience.Morale;
                 if (man.IsAlive && man.Morale < start && safe[i])
                 {
                     man.Morale = man.Morale + gain > start ? start : man.Morale + gain;
@@ -254,16 +254,16 @@ namespace Knez.Sim.Morale
 
                 if (!squad.Broken && routing * 1000L > (long)rules.BreakShare * inFight)
                 {
-                    Break(state, rules, squad);
+                    Break(state, rules, squad, inFight, routing);
                 }
                 else if (squad.Broken && (inFight - routing) * 1000L > (long)rules.ReformShare * inFight)
                 {
-                    Reform(state, squad);
+                    Reform(state, squad, inFight, routing);
                 }
             }
         }
 
-        private static void Break(BattleState state, MoraleDef rules, Squad squad)
+        private static void Break(BattleState state, MoraleDef rules, Squad squad, int inFight, int routing)
         {
             squad.Broken = true;
             squad.Order = SquadOrder.None;
@@ -279,7 +279,7 @@ namespace Knez.Sim.Morale
                 }
             }
 
-            state.AddEvent(new SquadBroke(state.Tick, squad.Id, reformed: false));
+            state.AddEvent(new SquadBroke(state.Tick, squad.Id, reformed: false, inFight, routing));
 
             // Squads nearby (anchor to anchor) feel it: allies lose heart, enemies gain it. Their states follow next tick.
             List<Squad> squads = state.SquadList;
@@ -299,7 +299,7 @@ namespace Knez.Sim.Morale
 
         /// <summary>Re-forms a broken squad where its rallied men stand: the anchor moves to their centre, places go to the
         /// nearest men, and those still running come back as they rally.</summary>
-        private static void Reform(BattleState state, Squad squad)
+        private static void Reform(BattleState state, Squad squad, int inFight, int routing)
         {
             long x = 0;
             long y = 0;
@@ -328,7 +328,7 @@ namespace Knez.Sim.Morale
                 SlotAssignment.Nearest(state, squad);
             }
 
-            state.AddEvent(new SquadBroke(state.Tick, squad.Id, reformed: true));
+            state.AddEvent(new SquadBroke(state.Tick, squad.Id, reformed: true, inFight, routing));
         }
 
         private static void SetState(BattleState state, Fighter man, MoraleState to)

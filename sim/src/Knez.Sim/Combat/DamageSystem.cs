@@ -34,7 +34,7 @@ namespace Knez.Sim.Combat
                 }
 
                 int roll = context.Rng(RngStream.Combat).NextInt(Defs.DefChecks.Whole);
-                WoundLevel blow = Wounds.Severity(attacker.Def.Kit.Weapon, roll);
+                WoundLevel blow = Wounds.Severity(attacker.Kit.Weapon, roll);
                 WoundLevel now = Wounds.Worsen(defender.Wound, blow);
                 defender.Wound = now;
                 state.AddEvent(new Wounded(state.Tick, defender.Id, attacker.Id, blow, now));

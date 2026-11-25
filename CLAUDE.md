@@ -13,6 +13,10 @@ Everything in AGENTS.md applies. This part covers only what is specific to Claud
 | `battle-run` | running scenarios headless, batches, benchmarks, viewing a replay |
 | `unity-view` | anything in `game/` (Unity view, input, batch-mode tests) |
 | `playtest-notes` | recording a playtest session toward the "20th battle" exit criterion |
+| `game-design` | design work without code: any game system, `docs/design/`, decision log, concept sync |
+| `economy-design` | resources, tribute/protection, businesses, upkeep, seasonal flows |
+| `unit-design` | fighter/unit types, kit, heroes, enemies, recruitment, counters |
+| `balance-design` | balance targets, measured battle balance, modelled campaign balance, tuning proposals |
 
 ## Subagents (`.claude/agents/`)
 
@@ -21,6 +25,12 @@ Everything in AGENTS.md applies. This part covers only what is specific to Claud
 | `sim-reviewer` | after any change to `sim/`, before committing — read-only review for determinism and architecture |
 | `sim-test-writer` | writing tests from the spec independently of the implementation |
 | `battle-analyst` | long batch runs, balance A/B comparisons, perf benchmarks — keeps raw output out of the main context |
+| `design-critic` | read-only review of a design doc: pillars, dominant strategies, scope, consistency |
+| `economy-modeler` | season-by-season numeric models of economy/progression, strategy archetypes, sensitivity |
+| `design-researcher` | precedents from other games and Viking-age Baltic history, with sources |
+
+Design sessions (the `game-design` family) write only under `docs/design/` and never edit `sim/`, `game/`, `content/`
+or `tools/`; number changes leave them as proposals for a coding session.
 
 ## Toolchain in your shell
 

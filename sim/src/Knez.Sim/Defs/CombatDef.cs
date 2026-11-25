@@ -7,8 +7,8 @@ namespace Knez.Sim.Defs
 {
     /// <summary>
     /// Immutable combat rules from content (<c>content/defs/combat.json</c>, battle-sim.md §11): the catalogues of
-    /// weapons, protection, experience levels and warrior types, the hit-chance matrix (weapon × attacker's experience),
-    /// the default kit, and the modifiers for position and wounds. No hit points: every blow that gets through leaves a
+    /// weapons, protection, experience levels and named kits (M3 step 9), the hit-chance matrix (weapon × attacker's
+    /// experience), and the modifiers for position and wounds. No hit points: every blow that gets through leaves a
     /// wound. Shared by the whole battle and fingerprinted. Catalogues keep the file's order (experience is a ladder).
     /// </summary>
     public sealed class CombatDef
@@ -17,13 +17,13 @@ namespace Knez.Sim.Defs
 
         /// <summary>
         /// Creates the rules and checks them as a whole: non-empty catalogues with unique ids, one matrix row per weapon
-        /// and one value per experience level in each, a default kit drawn from these catalogues, sane limits. Throws
+        /// and one value per experience level in each, kits drawn from these catalogues, sane limits. Throws
         /// <see cref="ArgumentException"/>.
         /// </summary>
         public CombatDef(IReadOnlyList<WeaponDef> weapons, IReadOnlyList<ProtectionDef> shields,
             IReadOnlyList<ProtectionDef> bodyArmours, IReadOnlyList<ProtectionDef> headCovers,
-            IReadOnlyList<ExperienceDef> experienceLevels, IReadOnlyList<WarriorTypeDef> warriorTypes,
-            IReadOnlyList<IReadOnlyList<int>> hitChance, FighterKit defaultKit, int minHit, int maxHit, int flankBonus,
+            IReadOnlyList<ExperienceDef> experienceLevels, IReadOnlyList<KitDef> kits,
+            IReadOnlyList<IReadOnlyList<int>> hitChance, int minHit, int maxHit, int flankBonus,
             int rearBonus, int shieldFromFlank, int shieldFromRear, int shieldWallBonus, int lightWoundPenalty,
             int heavyWoundPenalty, Fix lightWoundPace, Fix heavyWoundPace, Fix frontArc, Fix rearArc, Fix strikeArc)
         {
@@ -32,15 +32,17 @@ namespace Knez.Sim.Defs
             BodyArmours = Catalogue(bodyArmours, "body armour");
             HeadCovers = Catalogue(headCovers, "head cover");
             ExperienceLevels = Catalogue(experienceLevels, "experience level");
-            WarriorTypes = Catalogue(warriorTypes, "warrior type");
-            _hitChance = Matrix(hitChance ?? throw new ArgumentNullException(nameof(hitChance)), Weapons, ExperienceLevels);
-
-            DefaultKit = defaultKit ?? throw new ArgumentNullException(nameof(defaultKit));
-            string? stranger = Stranger(defaultKit);
-            if (stranger != null)
+            Kits = Catalogue(kits, "kit");
+            for (int i = 0; i < Kits.Count; i++)
             {
-                throw new ArgumentException($"defaultKit: {stranger} is not one of these rules' defs.");
+                string? stranger = Stranger(Kits[i]);
+                if (stranger != null)
+                {
+                    throw new ArgumentException($"kit '{Kits[i].Id}': {stranger} is not one of these rules' defs.");
+                }
             }
+
+            _hitChance = Matrix(hitChance ?? throw new ArgumentNullException(nameof(hitChance)), Weapons, ExperienceLevels);
 
             MaxHit = DefChecks.Permille(maxHit, "hitLimits.max");
             if (minHit < 0 || minHit > maxHit)
@@ -70,9 +72,10 @@ namespace Knez.Sim.Defs
         }
 
         /// <summary>
-        /// The values in <c>content/defs/combat.json</c> when this was written (2026-11-22), rounded exactly as the
+        /// The values in <c>content/defs/combat.json</c> when this was written (2026-11-22; kits and penetration, decided by
+        /// the user, 2026-11-25), rounded exactly as the
         /// content reader rounds decimals (a test keeps the fingerprints equal). Content always brings its own file; these
-        /// serve tests and scenarios built in code, and fighter defs built in code take its <see cref="DefaultKit"/>.
+        /// serve tests and scenarios built in code.
         /// </summary>
         public static readonly CombatDef Standard = CreateStandard();
 
@@ -91,11 +94,8 @@ namespace Knez.Sim.Defs
         /// <summary>Experience levels, lowest first (the file's order).</summary>
         public IReadOnlyList<ExperienceDef> ExperienceLevels { get; }
 
-        /// <summary>Warrior types, in file order.</summary>
-        public IReadOnlyList<WarriorTypeDef> WarriorTypes { get; }
-
-        /// <summary>The kit of a fighter type that names none (or only part) of his own.</summary>
-        public FighterKit DefaultKit { get; }
+        /// <summary>Named kits, in file order (M3 step 9): every part one of these rules' entries.</summary>
+        public IReadOnlyList<KitDef> Kits { get; }
 
         /// <summary>The chance (‰) a blow gets through never drops below this…</summary>
         public int MinHit { get; }
@@ -170,8 +170,11 @@ namespace Knez.Sim.Defs
             return _hitChance[(w * ExperienceLevels.Count) + e];
         }
 
-        /// <summary>True when every part of <paramref name="kit"/> is an entry of these rules (the very object).</summary>
-        public bool Contains(FighterKit kit) => Stranger(kit) == null;
+        /// <summary>True when <paramref name="kit"/> is one of these rules' kits (the very object).</summary>
+        public bool Contains(KitDef kit) => IndexOf(Kits, kit) >= 0;
+
+        /// <summary>True when <paramref name="level"/> is one of these rules' experience levels (the very object).</summary>
+        public bool Contains(ExperienceDef level) => IndexOf(ExperienceLevels, level) >= 0;
 
         /// <summary>The weapon with <paramref name="id"/>, or null.</summary>
         public WeaponDef? FindWeapon(string id) => Find(Weapons, id);
@@ -188,11 +191,11 @@ namespace Knez.Sim.Defs
         /// <summary>The experience level with <paramref name="id"/>, or null.</summary>
         public ExperienceDef? FindExperience(string id) => Find(ExperienceLevels, id);
 
-        /// <summary>The warrior type with <paramref name="id"/>, or null.</summary>
-        public WarriorTypeDef? FindWarriorType(string id) => Find(WarriorTypes, id);
+        /// <summary>The kit with <paramref name="id"/>, or null.</summary>
+        public KitDef? FindKit(string id) => Find(Kits, id);
 
         /// <summary>Names the first part of <paramref name="kit"/> that isn't one of these rules' entries, or null.</summary>
-        internal string? Stranger(FighterKit kit)
+        internal string? Stranger(KitDef kit)
         {
             if (IndexOf(Weapons, kit.Weapon) < 0)
             {
@@ -214,12 +217,7 @@ namespace Knez.Sim.Defs
                 return $"head cover '{kit.HeadCover.Id}'";
             }
 
-            if (IndexOf(ExperienceLevels, kit.Experience) < 0)
-            {
-                return $"experience level '{kit.Experience.Id}'";
-            }
-
-            return IndexOf(WarriorTypes, kit.Type) < 0 ? $"warrior type '{kit.Type.Id}'" : null;
+            return null;
         }
 
         internal void AddTo(ref Fnv1a64 hash) => hash.Add(Fingerprint);
@@ -323,18 +321,17 @@ namespace Knez.Sim.Defs
                 ExperienceLevels[i].AddTo(ref hash);
             }
 
-            hash.Add(WarriorTypes.Count);
-            for (int i = 0; i < WarriorTypes.Count; i++)
-            {
-                WarriorTypes[i].AddTo(ref hash);
-            }
-
             for (int i = 0; i < _hitChance.Count; i++)
             {
                 hash.Add(_hitChance[i]);
             }
 
-            DefaultKit.AddTo(ref hash);
+            hash.Add(Kits.Count);
+            for (int i = 0; i < Kits.Count; i++)
+            {
+                Kits[i].AddTo(ref hash);
+            }
+
             hash.Add(MinHit);
             hash.Add(MaxHit);
             hash.Add(FlankBonus);
@@ -371,10 +368,10 @@ namespace Knez.Sim.Defs
         {
             var weapons = new[]
             {
-                new WeaponDef("sword", Fix.Ratio(1, 2), Seconds(7), Seconds(8), 650, 280, 70),
-                new WeaponDef("axe", Fix.Ratio(1, 2), Seconds(9), Seconds(9), 500, 330, 170),
-                new WeaponDef("spear", DefChecks.Decimal(18, 10), Seconds(8), Seconds(8), 600, 300, 100),
-                new WeaponDef("seax", DefChecks.Decimal(3, 10), Seconds(5), Seconds(6), 720, 240, 40),
+                new WeaponDef("sword", Fix.Ratio(1, 2), Seconds(7), Seconds(12), 650, 280, 70, penetration: 0, defence: 0),
+                new WeaponDef("axe", Fix.Ratio(1, 2), Seconds(9), Seconds(15), 500, 330, 170, penetration: 300, defence: 0),
+                new WeaponDef("spear", Fix.Ratio(3, 2), Seconds(8), Seconds(20), 600, 300, 100, penetration: 200, defence: 30),
+                new WeaponDef("seax", DefChecks.Decimal(3, 10), Seconds(5), Seconds(8), 720, 240, 40, penetration: 100, defence: 0),
             };
             var shields = new[] { new ProtectionDef("none", 0), new ProtectionDef("round", 220) };
             var body = new[] { new ProtectionDef("none", 0), new ProtectionDef("padded", 70), new ProtectionDef("mail", 140) };
@@ -384,7 +381,6 @@ namespace Knez.Sim.Defs
                 new ExperienceDef("new", 0, 600), new ExperienceDef("experienced", 40, 750),
                 new ExperienceDef("professional", 80, 850), new ExperienceDef("elite", 120, 950),
             };
-            var types = new[] { new WarriorTypeDef("default", 0), new WarriorTypeDef("spearman", 30), new WarriorTypeDef("mounted", 50) };
             var hitChance = new IReadOnlyList<int>[]
             {
                 new[] { 420, 500, 580, 660 },
@@ -392,8 +388,18 @@ namespace Knez.Sim.Defs
                 new[] { 380, 460, 540, 620 },
                 new[] { 340, 420, 500, 580 },
             };
-            var kit = new FighterKit(weapons[0], shields[1], body[1], head[1], levels[1], types[0]);
-            return new CombatDef(weapons, shields, body, head, levels, types, hitChance, kit, minHit: 20, maxHit: 950,
+            // Named by what they hold; every one has a round shield (weapons: sword, axe, spear, seax).
+            var kits = new[]
+            {
+                new KitDef("axe-shield", weapons[1], shields[1], body[0], head[0]),
+                new KitDef("spear-shield", weapons[2], shields[1], body[0], head[0]),
+                new KitDef("axe-shield-padded", weapons[1], shields[1], body[1], head[1]),
+                new KitDef("spear-shield-padded", weapons[2], shields[1], body[1], head[1]),
+                new KitDef("sword-shield-padded", weapons[0], shields[1], body[1], head[1]),
+                new KitDef("sword-shield-mail", weapons[0], shields[1], body[2], head[2]),
+                new KitDef("axe-shield-mail", weapons[1], shields[1], body[2], head[2]),
+            };
+            return new CombatDef(weapons, shields, body, head, levels, kits, hitChance, minHit: 20, maxHit: 950,
                 flankBonus: 100, rearBonus: 200, shieldFromFlank: 500, shieldFromRear: 0, shieldWallBonus: 80,
                 lightWoundPenalty: 40, heavyWoundPenalty: 120, lightWoundPace: DefChecks.Decimal(9, 10),
                 heavyWoundPace: DefChecks.Decimal(7, 10), frontArc: Fix.FromInt(60), rearArc: Fix.FromInt(120),

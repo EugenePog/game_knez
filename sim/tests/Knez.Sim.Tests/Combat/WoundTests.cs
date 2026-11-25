@@ -96,7 +96,7 @@ public class WoundTests
         sim.StepTicks(5); // route planned, marching
         FixVec2 before = squad.Anchor;
         sim.Step();
-        Fix expected = TestDefs.Warrior.WalkPerTick * C.HeavyWoundPace;
+        Fix expected = TestDefs.Man.WalkPerTick * C.HeavyWoundPace;
         Assert.That((double)Math.Abs((squad.Anchor - before).Length.Raw - expected.Raw), Is.LessThanOrEqualTo(2), "raw units");
     }
 
@@ -211,7 +211,7 @@ public class WoundTests
         man.Wound = WoundLevel.Heavy;
         man.Position = FixVec2.FromInts(20, 5);
         sim.Step();
-        Fix cap = TestDefs.Warrior.RunPerTick * C.HeavyWoundPace;
+        Fix cap = TestDefs.Man.RunPerTick * C.HeavyWoundPace;
         Assert.That((double)Math.Abs(man.Velocity.Length.Raw - cap.Raw), Is.LessThanOrEqualTo(2), "raw units: at the wounded cap");
     }
 
@@ -224,8 +224,8 @@ public class WoundTests
         [
             TestDefs.Squad("a", 0, 1, FixVec2.FromInts(20, 10), 90),
             // a at (20, 10); b straight ahead, gap 0.35 m; c ahead-right, gap ~0.36 m: both in sword reach, b nearer.
-            new SquadSpawnDef("b", 1, TestDefs.Warrior, 1, TestDefs.Line, new FixVec2(Fix.FromInt(20), Fix.Ratio(1095, 100)), Angle.FromDegrees(270)),
-            new SquadSpawnDef("c", 1, TestDefs.Warrior, 1, TestDefs.Line, new FixVec2(Fix.Ratio(2085, 100), Fix.Ratio(1045, 100)), Angle.FromDegrees(208)),
+            new SquadSpawnDef("b", 1, TestDefs.Man, TestDefs.Men(1), TestDefs.Line, new FixVec2(Fix.FromInt(20), Fix.Ratio(1095, 100)), Angle.FromDegrees(270)),
+            new SquadSpawnDef("c", 1, TestDefs.Man, TestDefs.Men(1), TestDefs.Line, new FixVec2(Fix.Ratio(2085, 100), Fix.Ratio(1045, 100)), Angle.FromDegrees(208)),
         ]);
         var sim = new BattleSimulation(BattleSetup.Create(scenario, 1));
         var a = sim.State.FighterList[0];

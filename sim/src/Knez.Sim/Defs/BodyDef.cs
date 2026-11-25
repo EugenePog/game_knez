@@ -4,16 +4,15 @@ using Knez.Sim.Numerics;
 namespace Knez.Sim.Defs
 {
     /// <summary>
-    /// Immutable fighter type from content (battle-sim.md §7). Shared by every fighter of the type and by every clone
-    /// of the state; never copied, never written. Equipment, experience and warrior type are its <see cref="Kit"/>.
+    /// A fighter's body from content (battle-sim.md §7, M3 step 9; ADR-0005): size, speeds and turn rate — nothing he
+    /// carries and nothing he knows; those are his <see cref="KitDef"/> and <see cref="ExperienceDef"/>. Immutable, shared
+    /// by every fighter with it and by every clone of the state.
     /// </summary>
-    public sealed class FighterDef
+    public sealed class BodyDef : IDefId
     {
-        /// <summary>Creates a def; throws <see cref="ArgumentException"/> on invalid values. Without a kit the fighter
-        /// takes <see cref="CombatDef.Standard"/>'s default kit.</summary>
-        public FighterDef(string id, Fix radius, Fix walkSpeed, Fix runSpeed, Fix turnRate, FighterKit? kit = null)
+        /// <summary>Creates a def; throws <see cref="ArgumentException"/> on invalid values.</summary>
+        public BodyDef(string id, Fix radius, Fix walkSpeed, Fix runSpeed, Fix turnRate)
         {
-            Kit = kit ?? CombatDef.Standard.DefaultKit;
             Id = DefChecks.Id(id, nameof(id));
             Radius = DefChecks.PositiveMetres(radius, MaxRadiusMetres, nameof(radius));
             WalkSpeed = DefChecks.Speed(walkSpeed, nameof(walkSpeed));
@@ -48,11 +47,8 @@ namespace Knez.Sim.Defs
         /// <summary>Sanity bound for <see cref="TurnRate"/> (°/s), not a balance number.</summary>
         public const int MaxTurnRate = 3600;
 
-        /// <summary>Content id, e.g. "warrior".</summary>
+        /// <summary>Content id, e.g. "man".</summary>
         public string Id { get; }
-
-        /// <summary>Weapon, protection, experience and warrior type: entries of the battle's <see cref="CombatDef"/>.</summary>
-        public FighterKit Kit { get; }
 
         /// <summary>Collision circle radius in metres.</summary>
         public Fix Radius { get; }
@@ -82,7 +78,6 @@ namespace Knez.Sim.Defs
             hash.Add(WalkSpeed.Raw);
             hash.Add(RunSpeed.Raw);
             hash.Add(TurnRate.Raw);
-            Kit.AddTo(ref hash);
         }
     }
 }

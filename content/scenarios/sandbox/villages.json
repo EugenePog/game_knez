@@ -33,16 +33,16 @@
     {"from": [110, 58], "to": [116, 64]}
   ] },
   "squads": [
-    {"name": "Hird line", "side": 0, "fighter": "warrior", "count": 8, "formation": "line", "position": [38, 56], "facing": 0},
-    {"name": "Shield wall", "side": 0, "fighter": "warrior", "count": 8, "formation": "shieldwall", "position": [38, 46], "facing": 0},
-    {"name": "Spearmen", "side": 0, "fighter": "spearman", "count": 8, "formation": "line", "position": [38, 36], "facing": 0},
-    {"name": "Veterans", "side": 0, "fighter": "veteran", "count": 6, "formation": "line", "position": [38, 66], "facing": 0},
-    {"name": "Levy", "side": 0, "fighter": "levy", "count": 8, "formation": "column", "position": [28, 46], "facing": 0},
-    {"name": "Raider line", "side": 1, "fighter": "warrior", "count": 8, "formation": "line", "position": [142, 56], "facing": 180},
-    {"name": "Raider shields", "side": 1, "fighter": "warrior", "count": 8, "formation": "shieldwall", "position": [142, 46], "facing": 180},
-    {"name": "Raider spears", "side": 1, "fighter": "spearman", "count": 8, "formation": "line", "position": [142, 36], "facing": 180},
-    {"name": "Raider veterans", "side": 1, "fighter": "veteran", "count": 6, "formation": "line", "position": [142, 66], "facing": 180},
-    {"name": "Raider levy", "side": 1, "fighter": "levy", "count": 8, "formation": "column", "position": [152, 46], "facing": 180}
+    {"name": "Hird line", "side": 0, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line", "position": [38, 56], "facing": 0},
+    {"name": "Shield wall", "side": 0, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "shieldwall", "position": [38, 46], "facing": 0},
+    {"name": "Spearmen", "side": 0, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "spear-shield-padded" }], "formation": "line", "position": [38, 36], "facing": 0},
+    {"name": "Veterans", "side": 0, "body": "man", "men": [{ "count": 6, "experience": "elite", "kit": "sword-shield-mail" }], "formation": "line", "position": [38, 66], "facing": 0},
+    {"name": "Levy", "side": 0, "body": "man", "men": [{ "count": 8, "experience": "new", "kit": "axe-shield" }], "formation": "column", "position": [28, 46], "facing": 0},
+    {"name": "Raider line", "side": 1, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line", "position": [142, 56], "facing": 180},
+    {"name": "Raider shields", "side": 1, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "shieldwall", "position": [142, 46], "facing": 180},
+    {"name": "Raider spears", "side": 1, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "spear-shield-padded" }], "formation": "line", "position": [142, 36], "facing": 180},
+    {"name": "Raider veterans", "side": 1, "body": "man", "men": [{ "count": 6, "experience": "elite", "kit": "sword-shield-mail" }], "formation": "line", "position": [142, 66], "facing": 180},
+    {"name": "Raider levy", "side": 1, "body": "man", "men": [{ "count": 8, "experience": "new", "kit": "axe-shield" }], "formation": "column", "position": [152, 46], "facing": 180}
   ],
   "script": [
   ]

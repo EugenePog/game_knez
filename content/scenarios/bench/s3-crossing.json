@@ -3,9 +3,9 @@
   "description": "M1 bench S3: two allied lines of 10 cross at 90 degrees, both 16 m from the crossing point, so they meet there together; a column close behind the east-bound line runs into the north-bound line's rear. Watch for interpenetration and oscillation.",
   "map": { "width": 60, "height": 40 },
   "squads": [
-    { "name": "East line",   "side": 0, "fighter": "warrior", "count": 10, "formation": "line",   "position": [12, 20], "facing": 0 },
-    { "name": "North line",  "side": 0, "fighter": "warrior", "count": 10, "formation": "line",   "position": [28, 4],  "facing": 90 },
-    { "name": "East column", "side": 0, "fighter": "warrior", "count": 8,  "formation": "column", "position": [9, 20],  "facing": 0 }
+    { "name": "East line",   "side": 0, "body": "man", "men": [{ "count": 10, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line",   "position": [12, 20], "facing": 0 },
+    { "name": "North line",  "side": 0, "body": "man", "men": [{ "count": 10, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line",   "position": [28, 4],  "facing": 90 },
+    { "name": "East column", "side": 0, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "sword-shield-padded" }],  "formation": "column", "position": [9, 20],  "facing": 0 }
   ],
   "script": [
     { "tick": 10, "order": "move", "squad": "East line",   "target": [44, 20] },

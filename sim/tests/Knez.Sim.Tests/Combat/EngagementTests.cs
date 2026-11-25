@@ -16,14 +16,13 @@ public class EngagementTests
 {
     private static readonly CombatDef C = CombatDef.Standard;
 
-    private static FighterDef Spearman { get; } = new("test-spearman", Fix.Ratio(3, 10), Fix.Ratio(14, 10), Fix.Ratio(35, 10),
-        Fix.FromInt(360), new FighterKit(C.FindWeapon("spear")!, C.DefaultKit.Shield, C.DefaultKit.BodyArmour,
-            C.DefaultKit.HeadCover, C.DefaultKit.Experience, C.FindWarriorType("spearman")!));
+    /// <summary>An experienced man with a spear, round shield, padded coat and cap.</summary>
+    private static SquadMenDef Spearman { get; } = TestDefs.Men(1, kit: TestDefs.KitOf("spear-shield-padded"))[0];
 
     /// <summary>Lone men (squads of one) at the given points; side 0 faces north, side 1 south.</summary>
-    private static BattleSimulation Men(params (int side, int xCm, int yCm, FighterDef? def)[] men)
+    private static BattleSimulation Men(params (int side, int xCm, int yCm, SquadMenDef? def)[] men)
     {
-        var squads = men.Select((m, i) => new SquadSpawnDef($"m{i}", m.side, m.def ?? TestDefs.Warrior, 1, TestDefs.Line,
+        var squads = men.Select((m, i) => new SquadSpawnDef($"m{i}", m.side, TestDefs.Man, [m.def ?? TestDefs.Men(1)[0]], TestDefs.Line,
             new FixVec2(Fix.Ratio(m.xCm, 100), Fix.Ratio(m.yCm, 100)), Angle.FromDegrees(m.side == 0 ? 90 : 270))).ToArray();
         return new BattleSimulation(BattleSetup.Create(new ScenarioDef("test-men", "test", TestDefs.Map, squads), seed: 1));
     }
@@ -80,8 +79,8 @@ public class EngagementTests
     [Test]
     public void Targeting_Spear_ReachesAcrossTheGapOfARank()
     {
-        // Gap 1.6 m: out of a sword's reach, inside the spear's 1.8 m. The swordsman is not engaged; the spearman is.
-        var sim = Men((0, 2000, 1000, Spearman), (1, 2000, 1220, null));
+        // Gap 1.4 m: out of a sword's reach, inside the spear's 1.5 m. The swordsman is not engaged; the spearman is.
+        var sim = Men((0, 2000, 1000, Spearman), (1, 2000, 1200, null));
         sim.Step();
         Assert.Multiple(() =>
         {
@@ -147,7 +146,7 @@ public class EngagementTests
         {
             var foe = sim.State.FindFighter(man.Target)!;
             Fix gap = (foe.Position - man.Position).Length - man.Radius - foe.Radius;
-            Assert.That(gap, Is.InRange(Fix.Zero, man.Def.Kit.Weapon.Reach), $"fighter {man.Id.Value}");
+            Assert.That(gap, Is.InRange(Fix.Zero, man.Kit.Weapon.Reach), $"fighter {man.Id.Value}");
         }
     }
 
@@ -159,7 +158,7 @@ public class EngagementTests
         var blue = sim.State.Squads[0];
         Angle facing = blue.Facing;
         sim.Enqueue(new MoveSquadCommand(0, blue.Id, new FixVec2(blue.Anchor.X, blue.Anchor.Y - Fix.FromInt(6)), Angle.FromDegrees(90)));
-        Fix pace = TestDefs.Warrior.WalkPerTick * MovementDef.Standard.StepBackPace;
+        Fix pace = TestDefs.Man.WalkPerTick * MovementDef.Standard.StepBackPace;
 
         bool clear = false;
         for (int t = 0; t < 10 * BattleState.TicksPerSecond && !clear; t++)
@@ -230,7 +229,7 @@ public class EngagementTests
     private static Fix Gap(BattleSimulation sim, int a, int b) =>
         Members(sim, a).SelectMany(x => Members(sim, b).Select(y => (y.Position - x.Position).Length - x.Radius - y.Radius)).Min();
 
-    private static readonly Fix Clearance = TestDefs.Warrior.Kit.Weapon.Reach + MovementDef.Standard.WithdrawClearance;
+    private static readonly Fix Clearance = TestDefs.Kit.Weapon.Reach + MovementDef.Standard.WithdrawClearance;
 
     [Test]
     public void Withdraw_FromAnAdvancingEnemy_KeepsFacingIt_AndEndsAtTheTarget()

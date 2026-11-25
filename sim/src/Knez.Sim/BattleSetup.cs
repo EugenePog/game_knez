@@ -23,7 +23,7 @@ namespace Knez.Sim
                 for (int slot = 0; slot < spawn.Count; slot++)
                 {
                     FixVec2 position = FormationLayout.SlotPosition(spawn.Formation, spawn.Count, slot, spawn.Position, spawn.Facing);
-                    state.AddSquadMember(squad, spawn.Fighter, position, slot);
+                    state.AddSquadMember(squad, spawn.Body, spawn.GroupAt(slot), position, slot); // groups fill slots in order
                 }
             }
 

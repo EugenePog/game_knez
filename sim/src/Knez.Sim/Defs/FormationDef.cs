@@ -17,7 +17,7 @@ namespace Knez.Sim.Defs
         {
             ShieldWall = shieldWall;
             KeepsRanks = keepsRanks;
-            TurnRate = DefChecks.Positive(turnRate, FighterDef.MaxTurnRate, "°/s", nameof(turnRate));
+            TurnRate = DefChecks.Positive(turnRate, BodyDef.MaxTurnRate, "°/s", nameof(turnRate));
             HoldWeight = DefChecks.Range(holdWeight, 1, MaxHoldWeight, nameof(holdWeight));
             AllyPassSpeed = DefChecks.Fraction(allyPassSpeed, nameof(allyPassSpeed));
             Id = DefChecks.Id(id, nameof(id));

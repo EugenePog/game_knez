@@ -6,7 +6,7 @@ namespace Knez.Sim.Defs
     /// <summary>
     /// Immutable movement rules from content (<c>content/defs/movement.json</c>, battle-sim.md §7 and §10): the numbers
     /// that decide how squads march, crowd, pass allies and regroup. Shared by the whole battle and fingerprinted.
-    /// Fighter sizes and speeds live in <see cref="FighterDef"/>, formation shapes and ally squeezing in
+    /// Fighter sizes and speeds live in <see cref="BodyDef"/>, formation shapes and ally squeezing in
     /// <see cref="FormationDef"/>. Numerical constants that only keep the maths exact stay in code
     /// (<c>Movement/MovementRules.cs</c>).
     /// </summary>
@@ -16,7 +16,8 @@ namespace Knez.Sim.Defs
         /// Times are seconds, rounded to the nearest whole tick (0.05 s), at least one.</summary>
         public MovementDef(Fix pivotTolerance, Fix slotCatchUpTime, Fix personalSpace, Fix separationTime, Fix holdingReach,
             Fix formedUpReach, int collisionPasses, Fix allyPartingDepth, int pathBudget, Fix regroupLead,
-            Fix regroupMaxWait, Fix regroupCost, Fix reformPace, Fix stepBackPace, Fix withdrawClearance, Fix closeInRange)
+            Fix regroupMaxWait, Fix regroupCost, Fix reformPace, Fix stepBackPace, Fix withdrawClearance, Fix closeInRange,
+            Fix turnLagTime)
         {
             PivotTolerance = DefChecks.Positive(pivotTolerance, 90, "°", nameof(pivotTolerance));
             SlotCatchUpTicks = DefChecks.Ticks(slotCatchUpTime, 5, nameof(slotCatchUpTime));
@@ -34,6 +35,12 @@ namespace Knez.Sim.Defs
             StepBackPace = DefChecks.Fraction(stepBackPace, nameof(stepBackPace));
             WithdrawClearance = DefChecks.NonNegative(withdrawClearance, 20, "m", nameof(withdrawClearance));
             CloseInRange = DefChecks.NonNegative(closeInRange, 20, "m", nameof(closeInRange));
+            if (turnLagTime < Fix.Zero || turnLagTime > Fix.FromInt(20))
+            {
+                throw new ArgumentException($"turnLagTime must be 0 (off) or 0.05..20 s (got {turnLagTime}).");
+            }
+
+            TurnLagTicks = turnLagTime == Fix.Zero ? 0 : DefChecks.Ticks(turnLagTime, 20, nameof(turnLagTime));
         }
 
         /// <summary>
@@ -57,7 +64,8 @@ namespace Knez.Sim.Defs
             reformPace: Fix.Ratio(1, 2),
             stepBackPace: Fix.Ratio(1, 2),
             withdrawClearance: Fix.FromInt(3),
-            closeInRange: Fix.FromInt(3));
+            closeInRange: Fix.FromInt(3),
+            turnLagTime: Fix.FromInt(4));
 
         /// <summary>A squad turns in place until its target is within this many degrees of its front, then marches.</summary>
         public Fix PivotTolerance { get; }
@@ -123,6 +131,13 @@ namespace Knez.Sim.Defs
         /// 2026-11-23; 3 m is a proposal).</summary>
         public Fix CloseInRange { get; }
 
+        /// <summary>
+        /// Soft wheel (asked for 2026-11-23): men are not carried round with their slots when the squad turns; each
+        /// walks after his slot and the lag the turn left closes over this many ticks (to about 5 %); 0 = carried
+        /// rigidly, as before. 4 s is a proposal from the 3–5 s asked for.
+        /// </summary>
+        public int TurnLagTicks { get; }
+
         internal void AddTo(ref Fnv1a64 hash)
         {
             hash.Add(PivotTolerance.Raw);
@@ -141,6 +156,7 @@ namespace Knez.Sim.Defs
             hash.Add(StepBackPace.Raw);
             hash.Add(WithdrawClearance.Raw);
             hash.Add(CloseInRange.Raw);
+            hash.Add(TurnLagTicks);
         }
     }
 }

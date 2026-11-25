@@ -18,7 +18,7 @@ namespace Knez.Sim.Tests.Movement;
 public class WallTests
 {
     private const long Tolerance = 3; // raw units for decimals written with Fix.Ratio
-    private static readonly Fix R = TestDefs.Warrior.Radius;
+    private static readonly Fix R = TestDefs.Man.Radius;
 
     private static Fix M(int hundredths) => Fix.Ratio(hundredths, 100);
 
@@ -51,8 +51,8 @@ public class WallTests
         // 0.3 m radius + 5 cm = 0.35 m per tick = 7 m/s: faster, and a man could step through a 10 cm wall in one tick.
         Assert.Multiple(() =>
         {
-            Assert.DoesNotThrow(() => new FighterDef("w", R, Fix.One, Fix.Ratio(69, 10), Fix.FromInt(360)));
-            var ex = Assert.Throws<ArgumentException>(() => new FighterDef("w", R, Fix.One, Fix.FromInt(7), Fix.FromInt(360)));
+            Assert.DoesNotThrow(() => new BodyDef("w", R, Fix.One, Fix.Ratio(69, 10), Fix.FromInt(360)));
+            var ex = Assert.Throws<ArgumentException>(() => new BodyDef("w", R, Fix.One, Fix.FromInt(7), Fix.FromInt(360)));
             Assert.That(ex!.Message, Does.Contain("step through a wall"));
         });
     }

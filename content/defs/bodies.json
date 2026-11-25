@@ -1,0 +1,6 @@
+{
+  "description": "Bodies (M3 step 9, ADR-0005): what a fighter is made of, apart from what he carries (combat.json kits) and how well he fights (combat.json experience). radius: collision circle (m); walkSpeed: marching pace (m/s), a squad marches at its slowest member's; runSpeed: top speed (m/s), for now only to catch up with the formation slot; turnRate: how fast a fighter turns (degrees/s). One body, man, until riders come. Speeds agreed 2026-11-20; radius and turnRate are placeholders, tuned on the M1 bench.",
+  "bodies": [
+    { "id": "man", "radius": 0.3, "walkSpeed": 1.4, "runSpeed": 3.5, "turnRate": 360 }
+  ]
+}

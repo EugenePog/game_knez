@@ -52,8 +52,8 @@ namespace Knez.Game.Tests
             var sim = M3("m3-veterans");
             var veteran = sim.State.Fighters.First(f => f.SideId == 0);
             var levy = sim.State.Fighters.First(f => f.SideId == 1);
-            Assert.That(HudText.Kit(veteran.Def.Kit), Is.EqualTo("sword · round shield · mail · helm · elite"));
-            Assert.That(HudText.Kit(levy.Def.Kit), Is.EqualTo("axe · round shield · no armour · bare head · new"));
+            Assert.That(HudText.Kit(veteran.Kit, veteran.Experience), Is.EqualTo("sword · round shield · mail · helm · elite"));
+            Assert.That(HudText.Kit(levy.Kit, levy.Experience), Is.EqualTo("axe · round shield · no armour · bare head · new"));
         }
 
         [Test]

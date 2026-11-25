@@ -49,6 +49,24 @@ namespace Knez.Sim.Movement
             return squad.Formation.Spacing * (files - 1);
         }
 
+        /// <summary>
+        /// True when this tick's turn was a wheel round the inner flank (<c>OrderSystem.Wheel</c>): the anchor is exactly
+        /// where swinging it about the inner end of the front rank puts it. Then every slot's motion is the turn's.
+        /// </summary>
+        public static bool Wheeled(Squad squad)
+        {
+            Fix half = FrontWidth(squad) / 2;
+            if (squad.Spin == 0 || squad.Velocity == FixVec2.Zero || half <= Fix.Zero)
+            {
+                return false;
+            }
+
+            Angle before = squad.Facing - Angle.FromRaw(squad.Spin);
+            Fix side = squad.Spin > 0 ? -half : half; // turning left: pivot on the left end
+            FixVec2 pivot = FormationLayout.ToWorld(squad.Anchor - squad.Velocity, before, new FixVec2(side, Fix.Zero));
+            return FormationLayout.ToWorld(pivot, squad.Facing, new FixVec2(-side, Fix.Zero)) == squad.Anchor;
+        }
+
         /// <summary>The slot's world position now.</summary>
         public static FixVec2 Position(Squad squad, FixVec2 offset) => FormationLayout.ToWorld(squad.Anchor, squad.Facing, offset);
 

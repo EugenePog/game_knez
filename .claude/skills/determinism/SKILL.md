@@ -63,6 +63,10 @@ dotnet run --project sim/tools/Knez.Sim.Cli -- golden regenerate sim/tests/Golde
 git diff --stat sim/tests/Golden
 ```
 
+`sim/tests/Golden/balance-reference.json` (M3 step 7) is not a hash golden: it pins balance measures over many
+seeds with tolerances. Re-recorded traces with the balance reference still green mean the change reshuffled outcomes
+without moving balance; re-record the reference itself only when balance changes on purpose (battle-sim.md §11).
+
 Only regenerate after you understand *why* outcomes changed. The commit message says it, e.g.
 `sim: flank bonus +100‰ — golden replays regenerated (hit rolls change)`. A change that should be
 outcome-neutral (refactor, perf) must leave golden replays untouched; if they change, it's a bug.

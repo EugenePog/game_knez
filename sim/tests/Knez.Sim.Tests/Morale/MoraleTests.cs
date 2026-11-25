@@ -173,7 +173,9 @@ public class MoraleTests
             Assert.That(squad.Broken, Is.True);
             Assert.That(a.All(f => f.IsRouting), Is.True, "the last man runs too");
             Assert.That(squad.Order.Kind, Is.EqualTo(SquadOrderKind.None), "a broken squad's order is dropped");
-            Assert.That(state.Events.OfType<SquadBroke>().Single().Squad, Is.EqualTo(squad.Id));
+            var broke = state.Events.OfType<SquadBroke>().Single();
+            Assert.That(broke.Squad, Is.EqualTo(squad.Id));
+            Assert.That((broke.InFight, broke.Running), Is.EqualTo((4, 3)), "3 of 4 ran on their own morale; the 4th was swept along");
             Assert.That(Of(state, "B").All(f => f.Morale == 750 - 150), Is.True, "an allied squad nearby broke");
             Assert.That(Of(state, "E").All(f => f.Morale == 750 + 100), Is.True, "an enemy squad nearby broke");
         });
@@ -292,18 +294,27 @@ public class MoraleTests
         men[0].Morale = 100; // enough to start the break
         men[1].Morale = men[2].Morale = 150;
         var sim = new BattleSimulation(state);
-        bool broke = false;
-        bool reformed = false;
-        for (int t = 0; t < 40 * BattleState.TicksPerSecond && !reformed; t++)
+        SquadBroke? broke = null;
+        SquadBroke? reformed = null;
+        int aliveAtReform = -1;
+        int runningAtReform = -1;
+        for (int t = 0; t < 40 * BattleState.TicksPerSecond && reformed == null; t++)
         {
             sim.Step();
-            broke |= state.Events.OfType<SquadBroke>().Any(e => !e.Reformed);
-            reformed |= state.Events.OfType<SquadBroke>().Any(e => e.Reformed);
+            broke ??= state.Events.OfType<SquadBroke>().FirstOrDefault(e => !e.Reformed);
+            reformed ??= state.Events.OfType<SquadBroke>().FirstOrDefault(e => e.Reformed);
+            aliveAtReform = reformed != null ? men.Count(f => f.IsAlive) : -1;
+            runningAtReform = reformed != null ? men.Count(f => f.IsAlive && f.IsRouting) : -1; // cleanup leaves states be
         }
 
         Assert.Multiple(() =>
         {
-            Assert.That(broke && reformed, Is.True, "it broke, ran, rallied and re-formed");
+            Assert.That(broke != null && reformed != null, Is.True, "it broke, ran, rallied and re-formed");
+            Assert.That((broke!.InFight, broke.Running), Is.EqualTo((4, 3)), "men 0–2 ran; man 3 was swept along");
+            Assert.That(reformed!.InFight, Is.EqualTo(aliveAtReform), "those who fled over the edge are out of it");
+            Assert.That(reformed.Running, Is.EqualTo(runningAtReform), "those still running when it re-formed");
+            Assert.That((reformed.InFight - reformed.Running) * 1000, Is.GreaterThan(R.ReformShare * reformed.InFight),
+                "more than half were back when it re-formed; Running counts those still running");
             Assert.That(squad.Broken, Is.False);
             Assert.That(squad.Anchor.Y, Is.LessThan(Fix.FromInt(50)), "where its men stopped running, behind where it stood");
         });

@@ -16,7 +16,7 @@ public class DeterminismTests
     /// Final hash of <c>Run(TestBattle.Create(42), 300)</c>. A change here means outcomes changed: if that was intended
     /// (a rule change), update the constant and say why in the commit message; if not, it is a determinism bug.
     /// </summary>
-    private const ulong GoldenFinalHash = 0x6b3a892d0c2c064bUL;
+    private const ulong GoldenFinalHash = 0x153abbfd1f5e262bUL;
 
     [Test]
     public void TwinRun_SameSeedAndCommands_IdenticalHashEveryTick()
@@ -77,7 +77,7 @@ public class DeterminismTests
     /// Final hash of <see cref="TestDefs.March"/> after 400 ticks (seed 42): marching, turning in place, arrival facing
     /// and slot following. Same rule as <see cref="GoldenFinalHash"/>: a change means movement outcomes changed.
     /// </summary>
-    private const ulong GoldenMarchHash = 0x278105e4bb1ca6c6UL;
+    private const ulong GoldenMarchHash = 0x7912ed39efddc1a2UL;
 
     [Test]
     public void Golden_March_FinalHashMatchesRecordedValue()
@@ -94,7 +94,7 @@ public class DeterminismTests
     /// jostling through each other. A trace, not the final hash — the crossing settles exactly on the slots afterwards, so
     /// the end state alone didn't notice when separation or sliding changed. A change means crowding outcomes changed.
     /// </summary>
-    private const ulong GoldenCrossingTrace = 0x738a2d062507ea70UL;
+    private const ulong GoldenCrossingTrace = 0x593e8f7fc3a2df14UL;
 
     [Test]
     public void Golden_Crossing_EveryTickMatchesTheRecordedTrace()
@@ -115,7 +115,7 @@ public class DeterminismTests
     /// Every tick's hash of <see cref="TestDefs.AlliesThroughAHoldingLine"/> (seed 42, 700 ticks) folded into one value:
     /// a line squeezing through the ranks of an allied line that holds its ground (decided 2026-11-21).
     /// </summary>
-    private const ulong GoldenAlliesThroughTrace = 0xf12214d1c690bc90UL;
+    private const ulong GoldenAlliesThroughTrace = 0xee33ada011ef45beUL;
 
     [Test]
     public void Golden_AlliesThrough_EveryTickMatchesTheRecordedTrace()
@@ -136,7 +136,7 @@ public class DeterminismTests
     /// Every tick's hash of <see cref="TestDefs.Drill"/> (seed 42, 500 ticks) folded into one value: a wheel round a flank,
     /// a face-about, re-forming line → column → line on the march, and ranks closing after a man falls at tick 150.
     /// </summary>
-    private const ulong GoldenDrillTrace = 0xbc985f81da5152feUL;
+    private const ulong GoldenDrillTrace = 0x2a66fddc0ee947dbUL;
 
     [Test]
     public void Golden_Drill_EveryTickMatchesTheRecordedTrace()
@@ -163,7 +163,7 @@ public class DeterminismTests
     /// ticks) folded into one value: walls, sliding along them and round their corners, and (since step 6) the route the
     /// line plans through a gap narrower than its frontage: it stops to regroup into 3 files, passes, and widens again.
     /// </summary>
-    private const ulong GoldenGateTrace = 0x0e5a6589f88e57dcUL;
+    private const ulong GoldenGateTrace = 0xbe0f807fe27b2bcfUL;
 
     [Test]
     public void Golden_Gate_EveryTickMatchesTheRecordedTrace()

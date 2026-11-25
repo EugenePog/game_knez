@@ -1,8 +1,10 @@
 #nullable enable
 using System.Collections.Generic;
 using Knez.Sim;
+using Knez.Sim.Combat;
 using Knez.Sim.Defs;
 using Knez.Sim.Events;
+using Knez.Sim.Morale;
 using Knez.Sim.Units;
 using UnityEngine;
 using EntityId = Knez.Sim.EntityId; // Unity 6 has a UnityEngine.EntityId too
@@ -10,23 +12,55 @@ using EntityId = Knez.Sim.EntityId; // Unity 6 has a UnityEngine.EntityId too
 namespace Knez.Game.View
 {
     /// <summary>
-    /// The on-screen panel (M2 step 6, M3), drawn with Unity's immediate-mode GUI so it needs no scene set-up: the clock,
-    /// speed and pause and, once decided, the result; every squad with its formation, men in the fight and state, its kit,
-    /// how its men are hurt, its blows, and its average morale as a bar; the man under the mouse (top right); refused
-    /// orders, fading after a few seconds; and the controls. Reads the state only.
+    /// The on-screen panels (M2 step 6, M3), drawn with Unity's immediate-mode GUI so they need no scene set-up. Top left:
+    /// the clock, speed and pause and, once decided, the result; then every squad (scrolling when they don't fit) with
+    /// its formation, men in the fight and state, who it started with, how its men are hurt, its blows, its average
+    /// morale as a bar, one cell per man coloured by his morale state, how many must run before it breaks, and what has
+    /// cost it morale — once broken, why it broke (M3 step 8). Bottom left: the battle log (L hides it). Top right: the
+    /// man under the mouse, with what moved his morale. Refused orders fade after a few seconds. Reads the state only;
+    /// <see cref="Covers"/> tells input which screen areas are the HUD's.
     /// </summary>
     public sealed class BattleHud : MonoBehaviour
     {
         private const float RefusalSeconds = 4f;
+        private const float PanelWidth = 450;
+        private const float LogHeight = 200;
+        private const int LogShown = 200; // the newest lines the log panel lays out
 
         [SerializeField] private BattleRunner? runner;
 
         private readonly List<(string Text, float Until)> _refusals = new List<(string, float)>();
-        private readonly SquadTally _tally = new SquadTally();
-        private bool _begun;
+        private readonly List<Rect> _panels = new List<Rect>();
+        private readonly BattleRecord _record = new BattleRecord();
         private string? _result;
         private GUIStyle? _label;
         private GUIStyle? _small;
+        private GUIStyle? _wrap;
+        private Vector2 _squadScroll;
+        private Vector2 _logScroll;
+        private bool _followLog = true;
+
+        /// <summary>Whether the battle log panel is shown (L).</summary>
+        public bool ShowLog { get; set; } = true;
+
+        /// <summary>The view's record of the battle: tally, morale ledger, log.</summary>
+        public BattleRecord Record => _record;
+
+        /// <summary>Whether a screen point (pixels, origin bottom left, as input reports it) lies on a HUD panel drawn last
+        /// frame — input over the HUD isn't meant for the map.</summary>
+        public bool Covers(Vector2 screen)
+        {
+            var gui = new Vector2(screen.x, Screen.height - screen.y);
+            foreach (Rect panel in _panels)
+            {
+                if (panel.Contains(gui))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
 
         private void Start()
         {
@@ -34,9 +68,14 @@ namespace Knez.Game.View
             {
                 runner = GetComponent<BattleRunner>();
             }
+
             if (runner != null)
             {
                 runner.Ticked += OnTicked;
+                if (runner.Simulation != null)
+                {
+                    EnsureRecord(runner.Simulation.State); // Start runs before the first Update steps the battle: tick 0
+                }
             }
         }
 
@@ -50,8 +89,8 @@ namespace Knez.Game.View
 
         private void OnTicked(BattleState state)
         {
-            EnsureTally(state);
-            _tally.Observe(state);
+            EnsureRecord(state);
+            _record.Observe(state);
             foreach (SimEvent simEvent in state.Events)
             {
                 if (simEvent is CommandRejected rejected)
@@ -61,17 +100,16 @@ namespace Knez.Game.View
                 else if (simEvent is BattleEnded ended)
                 {
                     _result = ended.Winner < 0 ? "Nobody holds the field."
-                        : $"Side {ended.Winner} holds the field ({ended.Tick / (float)BattleState.TicksPerSecond:0.0} s).";
+                        : $"Side {ended.Winner} holds the field ({HudText.Seconds(ended.Tick)}).";
                 }
             }
         }
 
-        private void EnsureTally(BattleState state)
+        private void EnsureRecord(BattleState state)
         {
-            if (!_begun)
+            if (!_record.Begun)
             {
-                _tally.Begin(state);
-                _begun = true;
+                _record.Begin(state); // before the first step, the battle as it starts
             }
         }
 
@@ -80,6 +118,8 @@ namespace Knez.Game.View
             BattleSimulation? sim = runner != null ? runner.Simulation : null;
             _label ??= new GUIStyle(GUI.skin.label) { fontSize = 14, richText = true };
             _small ??= new GUIStyle(GUI.skin.label) { fontSize = 12, richText = true };
+            _wrap ??= new GUIStyle(GUI.skin.label) { fontSize = 12, richText = true, wordWrap = true };
+            _panels.Clear();
             if (runner == null || sim == null)
             {
                 GUI.Label(new Rect(12, 12, 900, 24), runner != null && runner.Error != null ? runner.Error : "No battle loaded.", _label);
@@ -87,62 +127,225 @@ namespace Knez.Game.View
             }
 
             BattleState state = sim.State;
-            EnsureTally(state);
-            const float SquadHeight = 70;
-            const float Width = 430;
-            float y = 10;
-            GUI.Box(new Rect(6, 6, Width, 40 + (state.Squads.Count * SquadHeight) + (_result != null ? 22 : 0)), GUIContent.none);
-            string clock = $"<b>{state.Scenario.Id}</b>   tick {state.Tick} ({state.Tick / (float)BattleState.TicksPerSecond:0.0} s)   " +
-                (runner.Clock.Paused ? "<color=#ffcc55>PAUSED</color>" : $"×{runner.Clock.Speed:0.##}");
-            GUI.Label(new Rect(14, y, Width - 10, 22), clock, _label);
-            y += 26;
-            if (_result != null)
+            EnsureRecord(state);
+            float logTop = ShowLog ? Screen.height - 36 - LogHeight : Screen.height - 36;
+            DrawSquads(state, runner, logTop - 8);
+            if (ShowLog)
             {
-                GUI.Label(new Rect(14, y - 4, Width - 10, 22), "<color=#ffe08a><b>" + _result + "</b></color>", _small);
-                y += 22;
-            }
-
-            MoraleDef rules = state.Scenario.Morale;
-            foreach (Squad squad in state.Squads)
-            {
-                int total = Spawned(state.Scenario, squad.Name);
-                SquadStats stats = _tally.Of(state, squad);
-                string side = squad.SideId == 0 ? "#7fb2ff" : "#ff8f7f";
-                GUI.Label(new Rect(14, y, Width - 10, 20),
-                    $"<color={side}><b>{squad.Name}</b></color>  {squad.Formation.Id} · {stats.InFight}/{total} · {HudText.Status(squad)}", _small);
-                Fighter? any = AnyMan(state, squad);
-                if (any != null)
-                {
-                    GUI.Label(new Rect(14, y + 15, Width - 10, 18), "<color=#d8d8d8>" + HudText.Kit(any.Def.Kit) + "</color>", _small);
-                }
-
-                string hurt = $"hurt {stats.Light} light, {stats.Heavy} heavy · fallen {stats.Fallen} · fled {stats.Fled}";
-                string blows = stats.Blows > 0 ? $" · blows {stats.Blows}, {stats.Landed} through" : string.Empty;
-                GUI.Label(new Rect(14, y + 30, Width - 10, 18), "<color=#d8d8d8>" + hurt + blows + "</color>", _small);
-                Bar(new Rect(16, y + 52, 140, 8), stats.InFight > 0 ? stats.Morale / 1000f : 0, MoraleColour(rules, stats.Morale));
-                string running = stats.Running > 0 ? $" · {stats.Running} running" : string.Empty;
-                GUI.Label(new Rect(162, y + 46, Width - 160, 18),
-                    stats.InFight > 0 ? $"morale {stats.Morale} · {HudText.MoraleWord(rules, stats.Morale)}{running}" : "no one left", _small);
-                y += SquadHeight;
+                DrawLog(new Rect(6, logTop, Mathf.Min(760, Screen.width - 12), LogHeight));
             }
 
             DrawHovered(state);
 
             float now = Time.unscaledTime;
             _refusals.RemoveAll(r => r.Until < now);
-            float ry = Screen.height - 60 - (_refusals.Count * 20);
+            float ry = logTop - 8 - (_refusals.Count * 20);
             foreach (var (text, _) in _refusals)
             {
-                GUI.Label(new Rect(12, ry, 700, 20), "<color=#ff9f7f>" + text + "</color>", _label);
+                GUI.Label(new Rect(PanelWidth + 20, ry, 700, 20), "<color=#ff9f7f>" + text + "</color>", _label);
                 ry += 20;
             }
 
             GUI.Label(new Rect(12, Screen.height - 30, Screen.width - 24, 22),
-                "<color=#cccccc>Left: select (drag: box, Shift: add, Esc: clear) · Right: move (drag: facing) · 1/2/3: line/shield wall/column · Space: pause · =/−: speed · WASD/middle drag: pan · scroll: zoom · point at a man for details</color>",
+                "<color=#cccccc>Left: select (drag: box, Shift: add, Esc: clear) · Right: move (drag: facing) · 1/2/3: line/shield wall/column · Space: pause · =/−: speed · WASD/middle drag: pan · scroll: zoom · L: log · B: morale bars · point at a man for details</color>",
                 _small);
         }
 
-        /// <summary>The man under the mouse: his kit, wound, morale and what he is doing, top right.</summary>
+        /// <summary>The clock and every squad, in a panel that scrolls when the squads don't fit above <paramref name="bottom"/>.</summary>
+        private void DrawSquads(BattleState state, BattleRunner battle, float bottom)
+        {
+            float inner = PanelWidth - 24;
+            var blocks = new List<(Squad Squad, float Height)>();
+            float content = 0;
+            foreach (Squad squad in state.Squads)
+            {
+                float height = SquadHeight(state, squad, inner);
+                blocks.Add((squad, height));
+                content += height;
+            }
+
+            float header = _result != null ? 48 : 28;
+            float panelHeight = Mathf.Min(header + content + 8, Mathf.Max(120, bottom - 6));
+            var panel = new Rect(6, 6, PanelWidth, panelHeight);
+            _panels.Add(panel);
+            GUI.Box(panel, GUIContent.none);
+            string clock = $"<b>{state.Scenario.Id}</b>   tick {state.Tick} ({HudText.Seconds(state.Tick)})   " +
+                (battle.Clock.Paused ? "<color=#ffcc55>PAUSED</color>" : $"×{battle.Clock.Speed:0.##}");
+            GUI.Label(new Rect(14, 10, PanelWidth - 16, 22), clock, _label);
+            if (_result != null)
+            {
+                GUI.Label(new Rect(14, 30, PanelWidth - 16, 20), "<color=#ffe08a><b>" + _result + "</b></color>", _small);
+            }
+
+            var view = new Rect(8, 6 + header, PanelWidth - 4, panelHeight - header - 4);
+            _squadScroll = GUI.BeginScrollView(view, _squadScroll, new Rect(0, 0, PanelWidth - 24, content));
+            float y = 0;
+            foreach (var (squad, height) in blocks)
+            {
+                DrawSquad(state, squad, new Rect(6, y, inner, height));
+                y += height;
+            }
+
+            GUI.EndScrollView();
+        }
+
+        private float SquadHeight(BattleState state, Squad squad, float width)
+        {
+            int groups = Mathf.Max(1, _record.Tally.Composition(state, squad).Count);
+            string? why = Why(state, squad);
+            float whyHeight = why != null ? _wrap!.CalcHeight(new GUIContent(why), width) : 0;
+            return 15 + (groups * 15) + 17 + 16 + 14 + whyHeight + 10; // as DrawSquad lays them out
+        }
+
+        /// <summary>Why a broken squad broke, or what has cost a standing one morale so far; null when nothing has.</summary>
+        private string? Why(BattleState state, Squad squad)
+        {
+            if (squad.Broken)
+            {
+                string? why = _record.Log.WhyBroke(squad.Id);
+                return "<color=#ff9f7f><b>Broke:</b> " + (why ?? "its men ran.") + "</color>";
+            }
+
+            MoraleAccount account = _record.Ledger.Of(state, squad.Id);
+            if (account.Men == 0 || account.Reasons.Count == 0)
+            {
+                return null;
+            }
+
+            return "<color=#c8c8c8>Morale " + HudText.Account(account, 3) + "</color>";
+        }
+
+        private void DrawSquad(BattleState state, Squad squad, Rect at)
+        {
+            MoraleDef rules = state.Scenario.Morale;
+            SquadStats stats = _record.Tally.Of(state, squad);
+            var composition = _record.Tally.Composition(state, squad);
+            int total = 0;
+            foreach (var group in composition)
+            {
+                total += group.Count;
+            }
+
+            float x = at.x;
+            float y = at.y;
+            string side = squad.SideId == 0 ? "#7fb2ff" : "#ff8f7f";
+            GUI.Label(new Rect(x, y, at.width, 18),
+                $"<color={side}><b>{squad.Name}</b></color>  {squad.Formation.Id} · {stats.InFight}/{total} · {HudText.Status(squad)}", _small);
+            y += 15;
+            foreach (var (sample, count, inFight) in composition)
+            {
+                GUI.Label(new Rect(x, y, at.width, 18), "<color=#d8d8d8>" + HudText.Group(sample, count, inFight) + "</color>", _small);
+                y += 15;
+            }
+
+            if (composition.Count == 0)
+            {
+                y += 15;
+            }
+
+            string hurt = $"hurt {stats.Light} light, {stats.Heavy} heavy · fallen {stats.Fallen} · fled {stats.Fled}";
+            string blows = stats.Blows > 0 ? $" · blows {stats.Blows}, {stats.Landed} through" : string.Empty;
+            GUI.Label(new Rect(x, y, at.width, 18), "<color=#d8d8d8>" + hurt + blows + "</color>", _small);
+            y += 17;
+
+            Bar(new Rect(x + 2, y + 4, 140, 8), stats.InFight > 0 ? stats.Morale / 1000f : 0, MoraleColour(rules, stats.Morale));
+            GUI.Label(new Rect(x + 150, y - 2, at.width - 150, 18),
+                stats.InFight > 0 ? $"morale {stats.Morale} · {HudText.MoraleWord(rules, stats.Morale)} · {BreakLine(rules, squad, stats)}" : "no one left",
+                _small);
+            y += 16;
+
+            Cells(state, squad, new Vector2(x + 2, y));
+            y += 14;
+
+            string? why = Why(state, squad);
+            if (why != null)
+            {
+                float h = _wrap!.CalcHeight(new GUIContent(why), at.width);
+                GUI.Label(new Rect(x, y, at.width, h), why, _wrap);
+            }
+        }
+
+        /// <summary>"2 of 7 running · breaks when 4 run" / "broken · re-forms when 4 are back".</summary>
+        private static string BreakLine(MoraleDef rules, Squad squad, SquadStats stats)
+        {
+            int inFight = stats.InFight;
+            if (squad.Broken)
+            {
+                int back = inFight - stats.Running;
+                int needBack = (int)((long)rules.ReformShare * inFight / 1000) + 1;
+                return $"{back} of {inFight} back · re-forms at {needBack}";
+            }
+
+            int need = (int)((long)rules.BreakShare * inFight / 1000) + 1;
+            return $"{stats.Running} of {inFight} running · breaks at {need}";
+        }
+
+        /// <summary>One cell per man who started in the squad, in id order, coloured by his morale state; dark when down,
+        /// hollow when he fled.</summary>
+        private void Cells(BattleState state, Squad squad, Vector2 at)
+        {
+            float x = at.x;
+            foreach (Fighter man in state.Fighters)
+            {
+                if (_record.Tally.HomeOf(man) != squad.Id)
+                {
+                    continue;
+                }
+
+                var cell = new Rect(x, at.y, 10, 9);
+                if (man.MoraleState == MoraleState.Fled)
+                {
+                    Frame(cell, new Color(0.7f, 0.7f, 0.7f, 0.8f));
+                }
+                else
+                {
+                    Fill(cell, man.Wound == WoundLevel.Down ? new Color(0.25f, 0.25f, 0.25f, 0.9f) : StateColour(man.MoraleState));
+                }
+
+                x += 12;
+            }
+        }
+
+        /// <summary>The battle log: the newest lines, scrolled to the end unless the player scrolled back.</summary>
+        private void DrawLog(Rect panel)
+        {
+            _panels.Add(panel);
+            GUI.Box(panel, GUIContent.none);
+            GUI.Label(new Rect(panel.x + 8, panel.y + 2, panel.width - 16, 18), "<b>Battle log</b>  <color=#9a9a9a>(L hides it)</color>", _small);
+            IReadOnlyList<LogLine> lines = _record.Log.Lines;
+            int first = Mathf.Max(0, lines.Count - LogShown);
+            float width = panel.width - 36;
+            var texts = new List<(string Text, float Height)>(lines.Count - first);
+            float content = 0;
+            for (int i = first; i < lines.Count; i++)
+            {
+                LogLine line = lines[i];
+                string text = $"<color=#9a9a9a>{HudText.Clock(line.Tick),6}</color>  <color={KindColour(line.Kind)}>{line.Text}</color>";
+                float h = _wrap!.CalcHeight(new GUIContent(text), width);
+                texts.Add((text, h));
+                content += h;
+            }
+
+            var view = new Rect(panel.x + 4, panel.y + 20, panel.width - 8, panel.height - 24);
+            float maxY = Mathf.Max(0, content - view.height);
+            if (_followLog)
+            {
+                _logScroll.y = maxY;
+            }
+
+            _logScroll = GUI.BeginScrollView(view, _logScroll, new Rect(0, 0, width, content));
+            float y = 0;
+            foreach (var (text, h) in texts)
+            {
+                GUI.Label(new Rect(4, y, width, h), text, _wrap);
+                y += h;
+            }
+
+            GUI.EndScrollView();
+            _followLog = _logScroll.y >= maxY - 2;
+        }
+
+        /// <summary>The man under the mouse: his kit, wound, morale and what moved it, and what he is doing, top right.</summary>
         private void DrawHovered(BattleState state)
         {
             Camera? cam = Camera.main;
@@ -171,27 +374,28 @@ namespace Knez.Game.View
                 return;
             }
 
-            Squad? home = state.FindSquad(_tally.HomeOf(man));
+            Squad? home = state.FindSquad(_record.Tally.HomeOf(man));
             var lines = new List<string>
             {
-                $"<b>#{man.Id.Value}</b> {man.Def.Id} · {(home != null ? home.Name : "no squad")} (side {man.SideId})",
-                HudText.Kit(man.Def.Kit),
+                $"<b>#{man.Id.Value}</b> · {(home != null ? home.Name : "no squad")} (side {man.SideId})",
+                HudText.Kit(man.Kit, man.Experience),
                 $"{HudText.Wound(man.Wound)} · morale {man.Morale} ({HudText.MoraleWord(man.MoraleState)})",
+                "morale " + HudText.Account(_record.Ledger.Of(man), 4),
                 HudText.Action(state, man),
             };
-            BlowStruck? by = _tally.LastBlowBy(man);
+            BlowStruck? by = _record.Tally.LastBlowBy(man);
             if (by != null)
             {
-                lines.Add($"his last blow: {HudText.Blow(by)} at {HudText.Name(state, by.Defender)}");
+                lines.Add($"his last blow: {HudText.Blow(by)} at {_record.Log.Name(state, by.Defender)}");
             }
 
-            BlowStruck? at = _tally.LastBlowAt(man);
+            BlowStruck? at = _record.Tally.LastBlowAt(man);
             if (at != null)
             {
-                lines.Add($"last blow at him: {HudText.Blow(at)} by {HudText.Name(state, at.Attacker)}");
+                lines.Add($"last blow at him: {HudText.Blow(at)} by {_record.Log.Name(state, at.Attacker)}");
             }
 
-            float width = 420;
+            float width = 440;
             float height = 10 + (lines.Count * 18);
             var box = new Rect(Screen.width - width - 8, 6, width, height);
             GUI.Box(box, GUIContent.none);
@@ -201,19 +405,30 @@ namespace Knez.Game.View
             }
         }
 
-        private static Fighter? AnyMan(BattleState state, Squad squad)
+        private static string KindColour(LogKind kind) => kind switch
         {
-            foreach (EntityId id in squad.Members)
-            {
-                Fighter? fighter = state.FindFighter(id);
-                if (fighter != null)
-                {
-                    return fighter;
-                }
-            }
+            LogKind.FirstBlow => "#ffe08a",
+            LogKind.Wound => "#e8b0a0",
+            LogKind.Fell => "#ff7a6a",
+            LogKind.Ran => "#ffb060",
+            LogKind.Rallied => "#9fd0ff",
+            LogKind.Fled => "#b0b0b0",
+            LogKind.Broke => "#ff6a5a",
+            LogKind.Reformed => "#8fe0a0",
+            LogKind.Refused => "#ff9f7f",
+            _ => "#ffe08a",
+        };
 
-            return null;
-        }
+        /// <summary>A man's morale state as a colour: the same in the squad cells and the bars over men.</summary>
+        public static Color StateColour(MoraleState state) => state switch
+        {
+            MoraleState.Shaken => new Color(0.75f, 0.80f, 0.25f),
+            MoraleState.Wavering => new Color(0.95f, 0.65f, 0.15f),
+            MoraleState.Routing => new Color(0.90f, 0.20f, 0.20f),
+            MoraleState.Rallying => new Color(0.35f, 0.65f, 0.95f),
+            MoraleState.Fled => new Color(0.6f, 0.6f, 0.6f),
+            _ => new Color(0.30f, 0.70f, 0.32f),
+        };
 
         private static Color MoraleColour(MoraleDef rules, int morale) =>
             morale >= rules.Shaken ? new Color(0.30f, 0.70f, 0.32f) : morale >= rules.Wavering ? new Color(0.95f, 0.75f, 0.20f)
@@ -221,25 +436,24 @@ namespace Knez.Game.View
 
         private static void Bar(Rect rect, float fraction, Color colour)
         {
+            Fill(rect, new Color(0, 0, 0, 0.45f));
+            Fill(new Rect(rect.x, rect.y, rect.width * Mathf.Clamp01(fraction), rect.height), colour);
+        }
+
+        private static void Fill(Rect rect, Color colour)
+        {
             Color old = GUI.color;
-            GUI.color = new Color(0, 0, 0, 0.45f);
-            GUI.DrawTexture(rect, Texture2D.whiteTexture);
             GUI.color = colour;
-            GUI.DrawTexture(new Rect(rect.x, rect.y, rect.width * Mathf.Clamp01(fraction), rect.height), Texture2D.whiteTexture);
+            GUI.DrawTexture(rect, Texture2D.whiteTexture);
             GUI.color = old;
         }
 
-        private static int Spawned(ScenarioDef scenario, string name)
+        private static void Frame(Rect rect, Color colour)
         {
-            foreach (SquadSpawnDef spawn in scenario.Squads)
-            {
-                if (spawn.Name == name)
-                {
-                    return spawn.Count;
-                }
-            }
-
-            return 0;
+            Fill(new Rect(rect.x, rect.y, rect.width, 1), colour);
+            Fill(new Rect(rect.x, rect.yMax - 1, rect.width, 1), colour);
+            Fill(new Rect(rect.x, rect.y, 1, rect.height), colour);
+            Fill(new Rect(rect.xMax - 1, rect.y, 1, rect.height), colour);
         }
     }
 }

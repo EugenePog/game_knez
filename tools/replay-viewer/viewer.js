@@ -607,7 +607,9 @@
     el.classList.remove('muted');
     el.innerHTML = '';
     const lines = [
-      `Fighter #${hoverId} (${info.def}), side ${info.side}`,
+      // From M3 step 9 the fighter table names his body (def), experience and kit; older files have only def (his type).
+      info.kit ? `Fighter #${hoverId}, ${info.experience}, ${info.kit} (${info.def}), side ${info.side}`
+        : `Fighter #${hoverId} (${info.def}), side ${info.side}`,
       // Rows from step 7 on carry the current squad and slot; older files only have the starting ones.
       row.length > 8
         ? (row[7] > 0 ? `Squad ${squadInfo.get(row[7]).name} (#${row[7]}), slot ${row[8]}` : `Fell from ${squad ? squad.name : 'no squad'}`)

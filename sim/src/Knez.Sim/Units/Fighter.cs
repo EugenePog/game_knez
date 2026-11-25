@@ -6,22 +6,24 @@ using Knez.Sim.Numerics;
 namespace Knez.Sim.Units
 {
     /// <summary>
-    /// A combatant (боец). Heroes will be fighters too, with extra hero data. M1 step 1 has identity, type, side,
-    /// transform and squad membership; body, morale and combat data arrive with their milestones (battle-sim.md §6).
+    /// A combatant (боец): a body, an experience level and a kit (M3 step 9, ADR-0005), with his side, place, squad,
+    /// morale, wound and action (battle-sim.md §6). Retainers will be fighters too, with a Retainer part.
     /// </summary>
     public sealed class Fighter : IHasEntityId
     {
-        internal Fighter(EntityId id, FighterDef def, int sideId, FixVec2 position, Angle facing)
+        internal Fighter(EntityId id, BodyDef body, ExperienceDef experience, KitDef kit, int sideId, FixVec2 position, Angle facing)
         {
             Id = id;
-            Def = def;
+            Body = body;
+            Experience = experience;
+            Kit = kit;
             SideId = sideId;
             Position = position;
             Facing = facing;
             SquadId = EntityId.None;
             SlotIndex = NoSlot;
             IsAlive = true;
-            Morale = def.Kit.Experience.Morale;
+            Morale = experience.Morale;
         }
 
         /// <summary><see cref="SlotIndex"/> of a fighter outside any squad.</summary>
@@ -30,8 +32,14 @@ namespace Knez.Sim.Units
         /// <summary>Identity; fighters are kept sorted by it.</summary>
         public EntityId Id { get; }
 
-        /// <summary>Fighter type from content; immutable and shared, never copied.</summary>
-        public FighterDef Def { get; }
+        /// <summary>His body (size, speeds, turn rate); immutable and shared, never copied.</summary>
+        public BodyDef Body { get; }
+
+        /// <summary>How experienced he is; from the combat rules, shared.</summary>
+        public ExperienceDef Experience { get; }
+
+        /// <summary>What he carries: weapon, shield, body armour, head cover; from the combat rules, shared.</summary>
+        public KitDef Kit { get; }
 
         /// <summary>Side the fighter belongs to (0 = player, 1 = enemy in phase 1).</summary>
         public int SideId { get; }
@@ -44,6 +52,13 @@ namespace Knez.Sim.Units
 
         /// <summary>Direction the fighter faces.</summary>
         public Angle Facing { get; internal set; }
+
+        /// <summary>
+        /// How far behind his slot he is meant to be because his squad turned (battle-sim.md §10, soft wheel): his slot
+        /// swings round with the squad, this keeps him where the swing left him, and it shrinks to zero over
+        /// <c>MovementDef.TurnLagTicks</c>. He walks toward slot + this. Zero when he isn't following a slot.
+        /// </summary>
+        public FixVec2 TurnLag { get; internal set; }
 
         /// <summary>The squad the fighter belongs to, or <see cref="EntityId.None"/>.</summary>
         public EntityId SquadId { get; internal set; }
@@ -89,8 +104,8 @@ namespace Knez.Sim.Units
         /// (<see cref="MoraleState"/> Fled); "alive" predates morale and means "in the fight". Such fighters stay in the list for the view.</summary>
         public bool IsAlive { get; internal set; }
 
-        /// <summary>Collision radius in metres, from <see cref="Def"/>.</summary>
-        public Fix Radius => Def.Radius;
+        /// <summary>Collision radius in metres, from <see cref="Body"/>.</summary>
+        public Fix Radius => Body.Radius;
 
         // Every field is a value or an immutable def, so a shallow copy is a deep copy.
         internal Fighter Clone() => (Fighter)MemberwiseClone();

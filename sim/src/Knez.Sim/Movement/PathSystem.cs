@@ -8,7 +8,7 @@ namespace Knez.Sim.Movement
     /// Tick stage 4: plans the routes squads are waiting for (battle-sim.md §9, §10), first come first served (by the
     /// tick of the request, then squad id). Each search runs to the end; once a tick has spent
     /// <see cref="Defs.MovementDef.PathBudget"/> search nodes, the rest wait for the next tick. A squad marches the tick
-    /// after its route is planned. Detached fighters (heroes) get routes when they arrive.
+    /// after its route is planned. Retainers standing alone get routes when they arrive.
     /// </summary>
     public sealed class PathSystem : ISimSystem
     {

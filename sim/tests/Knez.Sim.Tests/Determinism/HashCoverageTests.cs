@@ -24,6 +24,7 @@ public class HashCoverageTests
         yield return Case("FighterSlot", "Fighters", s => s.FighterList[0].SlotIndex = 7);
         yield return Case("FighterAlive", "Fighters", s => s.FighterList[0].IsAlive = false);
         yield return Case("FighterPassingThrough", "Fighters", s => s.FighterList[0].PassingThrough = true);
+        yield return Case("FighterTurnLag", "Fighters", s => s.FighterList[0].TurnLag = new FixVec2(Fix.FromRaw(1), Fix.Zero));
         yield return Case("FighterAction", "Fighters", s => s.FighterList[0].Action = Knez.Sim.Combat.FighterAction.Windup);
         yield return Case("FighterActionTicks", "Fighters", s => s.FighterList[0].ActionTicks = 5);
         yield return Case("FighterWound", "Fighters", s => s.FighterList[0].Wound = Knez.Sim.Combat.WoundLevel.Light);

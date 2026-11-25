@@ -83,7 +83,9 @@ namespace Knez.Sim
             {
                 Fighter fighter = list[i];
                 fighters.Add(fighter.Id.Value);
-                fighters.Add(fighter.Def.Id);
+                fighters.Add(fighter.Body.Id);
+                fighters.Add(fighter.Experience.Id);
+                fighters.Add(fighter.Kit.Id);
                 fighters.Add(fighter.SideId);
                 fighters.Add(fighter.IsAlive);
                 fighters.Add(fighter.Position.X.Raw);
@@ -100,6 +102,8 @@ namespace Knez.Sim
                 fighters.Add((int)fighter.Wound);
                 fighters.Add(fighter.Morale);
                 fighters.Add((int)fighter.MoraleState);
+                fighters.Add(fighter.TurnLag.X.Raw);
+                fighters.Add(fighter.TurnLag.Y.Raw);
             }
 
             return new StateHash(core.Value, rng.Value, squads.Value, fighters.Value);

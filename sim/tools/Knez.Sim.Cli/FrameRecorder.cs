@@ -83,8 +83,10 @@ public sealed class FrameRecorder : IDisposable
             _json.WriteNumber("squad", fighter.SquadId.Value);
             _json.WriteNumber("slot", fighter.SlotIndex);
             _json.WriteNumber("side", fighter.SideId);
-            _json.WriteString("def", fighter.Def.Id);
+            _json.WriteString("def", fighter.Body.Id); // the body since M3 step 9 (it was the fighter type)
             _json.WriteNumber("radius", Metres(fighter.Radius));
+            _json.WriteString("experience", fighter.Experience.Id);
+            _json.WriteString("kit", fighter.Kit.Id);
             _json.WriteEndObject();
         }
 
@@ -256,6 +258,8 @@ public sealed class FrameRecorder : IDisposable
             case SquadBroke broke:
                 _json.WriteNumber("squad", broke.Squad.Value);
                 _json.WriteBoolean("reformed", broke.Reformed);
+                _json.WriteNumber("inFight", broke.InFight);
+                _json.WriteNumber("running", broke.Running);
                 break;
             case BattleEnded ended:
                 _json.WriteNumber("winner", ended.Winner);

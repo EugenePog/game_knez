@@ -1,11 +1,11 @@
 {
-  "description": "Combat rules (battle-sim.md §11). No hit points: every blow that gets through leaves a wound. Chances are permille (‰). A blow gets through with hitChance[weapon][attacker's experience] minus the defender's shield, body armour, head cover, experience and warrior type, plus position (flank, rear; a shield wall in front protects more), minus the attacker's own wound penalty, kept within hitLimits. position.frontArc / rearArc: from the defender's facing to the attacker, within frontArc degrees is his front, up to rearArc his flank, beyond his rear (decided 2026-11-23). strikeArc: a man strikes only an enemy within this many degrees of his facing; engaged men turn toward their enemy (decided 2026-11-23). shieldFromFlank / shieldFromRear: the share (‰) of the shield's protection that still counts from the flank / rear. reach: gap between bodies a weapon fights across (m); windup and recovery: seconds before and after the blow (whole 0.05 s ticks). wounds: how a blow that gets through lands (light + heavy + down = 1000). experience.morale: the morale a man of that level starts with (morale.json, decided 2026-11-23). Fighters (fighters.json) take defaultKit for anything they don't name. Every number is a proposal of 2026-11-22, tuned on the M3 bench.",
+  "description": "Combat rules (battle-sim.md §11). No hit points: every blow that gets through leaves a wound. Chances are permille (‰). A blow gets through with hitChance[weapon][attacker's experience] minus the defender's shield, his body armour and head cover less the share the attacker's weapon penetrates, his experience's defence and his own weapon's defence, plus position (flank, rear; a shield wall in front protects more), minus the attacker's own wound penalty, kept within hitLimits. position.frontArc / rearArc: from the defender's facing to the attacker, within frontArc degrees is his front, up to rearArc his flank, beyond his rear (decided 2026-11-23). strikeArc: a man strikes only an enemy within this many degrees of his facing; engaged men turn toward their enemy (decided 2026-11-23). shieldFromFlank / shieldFromRear: the share (‰) of the shield's protection that still counts from the flank / rear. reach: gap between bodies a weapon fights across (m); windup and recovery: seconds before and after the blow (whole 0.05 s ticks). wounds: how a blow that gets through lands (light + heavy + down = 1000). experience.morale: the morale a man of that level starts with (morale.json, decided 2026-11-23). weapon.penetration: share (‰) of the defender's body armour and head cover the weapon's blows ignore (shields aren't affected; axe 300, spear 200, seax 100, sword 0 decided by the user 2026-11-25); weapon.defence: ‰ off blows at the man who carries it (the spear's reach keeps an enemy off; it was the spearman warrior type's). kits: named by what they hold, every part an id from these lists; a scenario names a kit and an experience level for each group of a squad's men (M3 step 9, ADR-0005). Every number is a proposal of 2026-11-22, tuned on the M3 bench.",
   "combat": {
     "weapons": [
-      { "id": "sword", "reach": 0.5, "windup": 0.7, "recovery": 0.8, "wounds": { "light": 650, "heavy": 280, "down": 70 } },
-      { "id": "axe",   "reach": 0.5, "windup": 0.9, "recovery": 0.9, "wounds": { "light": 500, "heavy": 330, "down": 170 } },
-      { "id": "spear", "reach": 1.8, "windup": 0.8, "recovery": 0.8, "wounds": { "light": 600, "heavy": 300, "down": 100 } },
-      { "id": "seax",  "reach": 0.3, "windup": 0.5, "recovery": 0.6, "wounds": { "light": 720, "heavy": 240, "down": 40 } }
+      { "id": "sword", "reach": 0.5, "windup": 0.7, "recovery": 1.2, "wounds": { "light": 650, "heavy": 280, "down": 70 },  "penetration": 0, "defence": 0 },
+      { "id": "axe",   "reach": 0.5, "windup": 0.9, "recovery": 1.5, "wounds": { "light": 500, "heavy": 330, "down": 170 }, "penetration": 300, "defence": 0 },
+      { "id": "spear", "reach": 1.5, "windup": 0.8, "recovery": 2.0, "wounds": { "light": 600, "heavy": 300, "down": 100 }, "penetration": 200, "defence": 30 },
+      { "id": "seax",  "reach": 0.3, "windup": 0.5, "recovery": 0.8, "wounds": { "light": 720, "heavy": 240, "down": 40 },  "penetration": 100, "defence": 0 }
     ],
     "shields": [
       { "id": "none", "protection": 0 },
@@ -27,10 +27,14 @@
       { "id": "professional", "defence": 80, "morale": 850 },
       { "id": "elite", "defence": 120, "morale": 950 }
     ],
-    "warriorTypes": [
-      { "id": "default", "defence": 0 },
-      { "id": "spearman", "defence": 30 },
-      { "id": "mounted", "defence": 50 }
+    "kits": [
+      { "id": "axe-shield",          "weapon": "axe",   "shield": "round", "bodyArmour": "none",   "headCover": "none" },
+      { "id": "spear-shield",        "weapon": "spear", "shield": "round", "bodyArmour": "none",   "headCover": "none" },
+      { "id": "axe-shield-padded",   "weapon": "axe",   "shield": "round", "bodyArmour": "padded", "headCover": "cap" },
+      { "id": "spear-shield-padded", "weapon": "spear", "shield": "round", "bodyArmour": "padded", "headCover": "cap" },
+      { "id": "sword-shield-padded", "weapon": "sword", "shield": "round", "bodyArmour": "padded", "headCover": "cap" },
+      { "id": "sword-shield-mail",   "weapon": "sword", "shield": "round", "bodyArmour": "mail",   "headCover": "helm" },
+      { "id": "axe-shield-mail",     "weapon": "axe",   "shield": "round", "bodyArmour": "mail",   "headCover": "helm" }
     ],
     "hitChance": {
       "sword": { "new": 420, "experienced": 500, "professional": 580, "elite": 660 },
@@ -38,7 +42,6 @@
       "spear": { "new": 380, "experienced": 460, "professional": 540, "elite": 620 },
       "seax":  { "new": 340, "experienced": 420, "professional": 500, "elite": 580 }
     },
-    "defaultKit": { "weapon": "sword", "shield": "round", "bodyArmour": "padded", "headCover": "cap", "experience": "experienced", "type": "default" },
     "hitLimits": { "min": 20, "max": 950 },
     "position": { "frontArc": 60, "rearArc": 120, "flank": 100, "rear": 200, "shieldFromFlank": 500, "shieldFromRear": 0, "shieldWall": 80 },
     "strikeArc": 60,

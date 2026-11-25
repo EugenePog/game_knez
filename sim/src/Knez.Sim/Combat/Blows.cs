@@ -23,7 +23,7 @@ namespace Knez.Sim.Combat
             }
 
             FixVec2 to = defender.Position - attacker.Position;
-            Fix limit = attacker.Radius + defender.Radius + attacker.Def.Kit.Weapon.Reach;
+            Fix limit = attacker.Radius + defender.Radius + attacker.Kit.Weapon.Reach;
             if (FixMath.Abs(to.X) > limit || FixMath.Abs(to.Y) > limit || to.Length > limit)
             {
                 return false;
@@ -59,15 +59,17 @@ namespace Knez.Sim.Combat
         /// <summary>
         /// The chance (‰) a blow by <paramref name="attacker"/> at <paramref name="defender"/> gets through: the matrix
         /// (attacker's weapon × experience), minus the defender's shield (all of it from the front, a share from flank and
-        /// rear), a shield wall's bonus from the front (with a shield), body armour, head cover, experience and type; plus
-        /// the flank or rear bonus; minus the attacker's own wound penalty and, wavering, his morale penalty; within the limits.
+        /// rear), a shield wall's bonus from the front (with a shield), his body armour and head cover less the share the
+        /// attacker's weapon penetrates (truncated; M3 step 9), his experience's defence and his own weapon's defence (the
+        /// spear's); plus the flank or rear bonus; minus the attacker's own wound penalty and, wavering, his morale
+        /// penalty; within the limits.
         /// </summary>
         public static int Chance(BattleState state, Fighter attacker, Fighter defender, out BlowSector sector)
         {
             CombatDef rules = state.Scenario.Combat;
-            FighterKit kit = defender.Def.Kit;
+            KitDef kit = defender.Kit;
             sector = Sector(rules, defender, attacker.Position);
-            int chance = rules.BaseHit(attacker.Def.Kit.Weapon, attacker.Def.Kit.Experience);
+            int chance = rules.BaseHit(attacker.Kit.Weapon, attacker.Experience);
             int shield = kit.Shield.Protection;
             switch (sector)
             {
@@ -89,7 +91,8 @@ namespace Knez.Sim.Combat
                     break;
             }
 
-            chance -= kit.BodyArmour.Protection + kit.HeadCover.Protection + kit.Experience.Defence + kit.Type.Defence;
+            int armour = (kit.BodyArmour.Protection + kit.HeadCover.Protection) * (DefChecks.Whole - attacker.Kit.Weapon.Penetration) / DefChecks.Whole;
+            chance -= armour + defender.Experience.Defence + kit.Weapon.Defence;
             chance -= Wounds.HitPenalty(rules, attacker.Wound);
             if (attacker.MoraleState == Morale.MoraleState.Wavering)
             {

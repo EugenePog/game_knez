@@ -57,6 +57,39 @@ namespace Knez.Game.View
         public EntityId HomeOf(Fighter fighter) =>
             _home.TryGetValue(fighter.Id.Value, out int squad) ? new EntityId(squad) : fighter.SquadId;
 
+        /// <summary>The squad the fighter <paramref name="fighterId"/> started in, or none.</summary>
+        public EntityId HomeOf(EntityId fighterId) =>
+            _home.TryGetValue(fighterId.Value, out int squad) ? new EntityId(squad) : EntityId.None;
+
+        /// <summary>
+        /// Who a squad started with (M3 step 8): its men grouped by experience and kit (M3 step 9: one squad may mix them),
+        /// in the order they first appear, with how many of each are still in the fight.
+        /// </summary>
+        public IReadOnlyList<(Fighter Sample, int Count, int InFight)> Composition(BattleState state, Squad squad)
+        {
+            var groups = new List<(Fighter Sample, int Count, int InFight)>();
+            foreach (Fighter fighter in state.Fighters)
+            {
+                if (HomeOf(fighter) != squad.Id)
+                {
+                    continue;
+                }
+
+                int at = groups.FindIndex(g => g.Sample.Kit == fighter.Kit && g.Sample.Experience == fighter.Experience);
+                int inFight = fighter.IsAlive ? 1 : 0;
+                if (at < 0)
+                {
+                    groups.Add((fighter, 1, inFight));
+                }
+                else
+                {
+                    groups[at] = (groups[at].Sample, groups[at].Count + 1, groups[at].InFight + inFight);
+                }
+            }
+
+            return groups;
+        }
+
         /// <summary>The last blow <paramref name="fighter"/> struck, or null.</summary>
         public BlowStruck? LastBlowBy(Fighter fighter) => _lastBy.TryGetValue(fighter.Id.Value, out BlowStruck? b) ? b : null;
 

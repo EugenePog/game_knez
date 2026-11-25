@@ -17,8 +17,10 @@ each order as a dashed line to a ring with the arrival facing. Bodies are solid 
 metric (`crowding:` line; M1 target < 1 % of fighter-ticks) and the viewer rings overlapping fighters in red —
 allies passing through a holding ally's ranks are allowed and not ringed (decided 2026-11-21);
 `content/scenarios/crowding.json` shows a crossing, allies squeezing through a holding line, an enemy block and the
-map edge. After changing `tools/replay-viewer/` files, hard-reload the page (Cmd+Shift+R): `http.server` sends no
-cache headers and the browser may keep running the old script. `batch` and `bench` exist since M1 step 8;
+map edge. After changing `tools/replay-viewer/` files, the page may keep running the old script: `http.server` sends no
+cache headers, and in the browser pane Cmd+Shift+R didn't help (M3 step 9). Refresh the cached copy from the page —
+`await fetch('/tools/replay-viewer/viewer.js', {cache: 'reload'})` with the javascript tool — then navigate to the
+viewer again. `batch` and `bench` exist since M1 step 8;
 `--out` (replay files) and `replay verify` arrive later — those parts below describe the target. CLI code lives in
 `sim/tools/Knez.Sim.Cli/` (`CliApp.cs`, `ScenarioFiles.cs`, `FrameRecorder.cs`); its tests in
 `sim/tests/Knez.Sim.Tests/Cli/`. Frames format and viewer options: battle-sim.md §17.
@@ -66,12 +68,23 @@ dotnet run --project sim/tools/Knez.Sim.Cli -c Release -- batch content/scenario
   > artifacts/reports/<name>-<label>.json
 ```
 
-Metrics today (M1): overlap (mean and worst run), stuck (worst run's fighters stuck > 2 s, longest spell), mean slot
-error, distinct outcomes. Win rate, duration, casualties and routs come with combat (M3). Movement draws no random
-numbers yet, so every seed plays the same battle; `run` prints the same metrics for one seed.
+Movement metrics (M1): overlap (mean and worst run), stuck (worst run's fighters stuck > 2 s, longest spell), mean
+slot error, distinct outcomes. For a fight, the D-026 balance measures (M3 step 7, battle-sim.md §17), each taken up to
+the decision: wins per side, how runs ended (rout / annihilation / nobody left / undecided at the limit), when they
+were decided, losses when a squad first broke, each side's men down, blows that got through. Give fights time to end:
+`--ticks 3600` (3 minutes). `run` prints one seed's result, morale breaks and blows.
+
+**The balance reference** (battle-sim.md §11): S6 `bench/s6-lines` (8 vs 8 head-on) and S7 `bench/s7-flank` (the same
+plus a flanking squad), with the `m3-*` and sandbox fights, pinned in `sim/tests/Golden/balance-reference.json` and
+checked by `BalanceReferenceTests` in Release only (`dotnet test sim/Knez.Sim.sln -c Release --filter
+FullyQualifiedName~BalanceReferenceTests`). Compare a balance change against that table; when the change is on purpose,
+re-record (`--filter Name=Record_WritesTheReferenceFile`, also `-c Release`) and update the §11 table.
 
 **A/B comparison:** run the same scenario and seed range on the baseline commit and on the change (use a git
-worktree or stash for the baseline), then compare. Win-rate differences under ~5 points on 200 seeds are noise.
+worktree or stash for the baseline), then compare. A win rate measured on n seeds has a standard error of about
+50/√n points, and the difference of two such runs √2 times that: under ~10 points on 200 seeds, or ~4.5 on 1000, is
+noise. `batch` steps every run to `--ticks` (only the test stops at the decision): 1000 seeds of S6 at `--ticks 3600`
+take ~15 s in Release, S7 ~28 s, the sandbox ~30 s per 50 seeds.
 Long batches: hand them to the `battle-analyst` subagent so raw output stays out of the main context.
 
 ## Benchmark (M1 criterion: p99 < 2 ms per tick for 50 fighters on the dev Mac)
@@ -82,6 +95,18 @@ dotnet run --project sim/tools/Knez.Sim.Cli -c Release -- bench content/scenario
 
 Always Release, nothing else heavy running; report p50/p99 and the machine. Compare against the previous number
 in `docs/roadmap.md` or the last report, not against a guess.
+
+## A battle played in Unity
+
+When Play stops, Unity writes the battle as a scenario with every applied order in its `script` to
+`artifacts/sessions/<scenario>-seed<N>-<yyyyMMdd-HHmmss>.json` and logs the exact replay command to the Console. Run it
+with the same seed and the tick count from the file's description, record frames, and watch it in the viewer:
+
+```bash
+dotnet run --project sim/tools/Knez.Sim.Cli -c Release -- run artifacts/sessions/villages-seed1-20261123-153000.json --seed 1 --ticks 6500 --frames artifacts/replays/villages-session.frames.json
+```
+
+The defs come from today's `content/defs/`, so a session recorded before a content change no longer replays exactly.
 
 ## Scenarios
 

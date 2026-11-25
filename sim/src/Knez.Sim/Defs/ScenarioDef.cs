@@ -44,9 +44,9 @@ namespace Knez.Sim.Defs
                         throw new ArgumentException($"squads[{i}]: name '{squad.Name}' is already used by squads[{j}].");
                     }
 
-                    if (!ReferenceEquals(other.Fighter, squad.Fighter) && string.Equals(other.Fighter.Id, squad.Fighter.Id, StringComparison.Ordinal))
+                    if (!ReferenceEquals(other.Body, squad.Body) && string.Equals(other.Body.Id, squad.Body.Id, StringComparison.Ordinal))
                     {
-                        throw new ArgumentException($"squads[{i}]: a different fighter def with id '{squad.Fighter.Id}' is used by squads[{j}].");
+                        throw new ArgumentException($"squads[{i}]: a different body def with id '{squad.Body.Id}' is used by squads[{j}].");
                     }
 
                     if (!ReferenceEquals(other.Formation, squad.Formation) && string.Equals(other.Formation.Id, squad.Formation.Id, StringComparison.Ordinal))
@@ -55,17 +55,26 @@ namespace Knez.Sim.Defs
                     }
                 }
 
-                if (squad.Fighter.Kit.Experience.Morale < Morale.Routing)
+                for (int g = 0; g < squad.Men.Count; g++)
                 {
-                    throw new ArgumentException(
-                        $"squads[{i}] '{squad.Name}': experience '{squad.Fighter.Kit.Experience.Id}' starts at morale {squad.Fighter.Kit.Experience.Morale}, below the routing threshold {Morale.Routing}: they would run at once.");
-                }
+                    SquadMenDef men = squad.Men[g];
+                    if (men.Experience.Morale < Morale.Routing)
+                    {
+                        throw new ArgumentException(
+                            $"squads[{i}] '{squad.Name}' men[{g}]: experience '{men.Experience.Id}' starts at morale {men.Experience.Morale}, below the routing threshold {Morale.Routing}: they would run at once.");
+                    }
 
-                string? stranger = Combat.Stranger(squad.Fighter.Kit);
-                if (stranger != null)
-                {
-                    throw new ArgumentException(
-                        $"squads[{i}] '{squad.Name}': fighter '{squad.Fighter.Id}': {stranger} is not the combat rules' def of that id.");
+                    if (!Combat.Contains(men.Experience))
+                    {
+                        throw new ArgumentException(
+                            $"squads[{i}] '{squad.Name}' men[{g}]: experience level '{men.Experience.Id}' is not the combat rules' def of that id.");
+                    }
+
+                    if (!Combat.Contains(men.Kit))
+                    {
+                        throw new ArgumentException(
+                            $"squads[{i}] '{squad.Name}' men[{g}]: kit '{men.Kit.Id}' is not the combat rules' def of that id.");
+                    }
                 }
 
                 CheckOnMap(map, squad, i);
@@ -141,13 +150,13 @@ namespace Knez.Sim.Defs
         /// </summary>
         private static void CheckPersonalSpace(MovementDef movement, SquadSpawnDef squad, int index)
         {
-            Fix bodies = squad.Fighter.Radius * 2;
+            Fix bodies = squad.Body.Radius * 2;
             Fix gap = FixMath.Min(squad.Formation.Spacing, squad.Formation.RankSpacing) - bodies;
             if (movement.PersonalSpace >= gap)
             {
                 throw new ArgumentException(
                     $"squads[{index}] '{squad.Name}': personalSpace {movement.PersonalSpace} m must be less than the {gap} m between " +
-                    $"'{squad.Fighter.Id}' bodies in formation '{squad.Formation.Id}'.");
+                    $"'{squad.Body.Id}' bodies in formation '{squad.Formation.Id}'.");
             }
         }
 
@@ -162,7 +171,7 @@ namespace Knez.Sim.Defs
                         $"squads[{index}] '{squad.Name}': slot {slot} at {position} is off the {map} map; move the squad inward.");
                 }
 
-                if (Knez.Sim.Movement.Terrain.WallDepth(map, position, squad.Fighter.Radius) > Fix.Zero)
+                if (Knez.Sim.Movement.Terrain.WallDepth(map, position, squad.Body.Radius) > Fix.Zero)
                 {
                     throw new ArgumentException(
                         $"squads[{index}] '{squad.Name}': slot {slot} at {position} is in or against a wall; move the squad clear of it.");

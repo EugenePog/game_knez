@@ -3,11 +3,11 @@
   "description": "M1 step 3, turning updated in step 7: squads on the march. Hird line advances 14 m; the column, ordered back the way it came, faces about (its rear rank leads) and marches back; the shield wall turns to face east; the raider line moves west and turns back to face south; the flankers march to a point and face north-west. Turns of 30-90 degrees are wheels round a flank, more than 90 a face-about. Bodies are solid since step 4, so squads whose paths cross jostle past each other.",
   "map": { "width": 60, "height": 40 },
   "squads": [
-    { "name": "Hird line",     "side": 0, "fighter": "warrior", "count": 8, "formation": "line",       "position": [14, 8],  "facing": 90 },
-    { "name": "Shield wall",   "side": 0, "fighter": "warrior", "count": 8, "formation": "shieldwall", "position": [30, 10], "facing": 90 },
-    { "name": "Raider column", "side": 1, "fighter": "warrior", "count": 6, "formation": "column",     "position": [44, 12], "facing": 90 },
-    { "name": "Raider line",   "side": 1, "fighter": "warrior", "count": 8, "formation": "line",       "position": [34, 30], "facing": 270 },
-    { "name": "Flankers",      "side": 1, "fighter": "warrior", "count": 5, "formation": "line",       "position": [50, 30], "facing": 225 }
+    { "name": "Hird line",     "side": 0, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line",       "position": [14, 8],  "facing": 90 },
+    { "name": "Shield wall",   "side": 0, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "shieldwall", "position": [30, 10], "facing": 90 },
+    { "name": "Raider column", "side": 1, "body": "man", "men": [{ "count": 6, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "column",     "position": [44, 12], "facing": 90 },
+    { "name": "Raider line",   "side": 1, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line",       "position": [34, 30], "facing": 270 },
+    { "name": "Flankers",      "side": 1, "body": "man", "men": [{ "count": 5, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line",       "position": [50, 30], "facing": 225 }
   ],
   "script": [
     { "tick": 20, "order": "move", "squad": "Hird line",     "target": [14, 22] },

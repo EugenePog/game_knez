@@ -6,9 +6,9 @@ using Knez.Sim.Units;
 namespace Knez.Sim.Movement
 {
     /// <summary>
-    /// Tick stage 5: each fighter's velocity for this tick (battle-sim.md §10). A squad member follows its formation slot:
-    /// it moves with the slot's own motion this tick (from the anchor's move and turn) plus a tenth of the lag it had
-    /// before (a 10-tick time constant); anyone inside another man's personal space also eases away from him
+    /// Tick stage 5: each fighter's velocity for this tick (battle-sim.md §10). A squad member follows its formation slot,
+    /// held back by his turn lag (the soft wheel: a turning squad doesn't carry its men round): he moves with his target's
+    /// own motion this tick plus a tenth of the gap he had before (a 10-tick time constant); anyone inside another man's personal space also eases away from him
     /// (<see cref="Crowding.Separation"/>). That is capped at run speed, and then the part heading into a neighbour is cut
     /// (<see cref="Crowding.Slide"/>): men slide along bodies instead of walking into them, and along walls
     /// (<see cref="Terrain.SlideAlongWalls"/>). Passing through allied ranks is slow (<see cref="Crowding.Squeeze"/>). When the squad stands still, nobody crowds the
@@ -23,6 +23,7 @@ namespace Knez.Sim.Movement
             List<Fighter> fighters = state.FighterList;
             List<int> weights = context.FighterWeights;
             List<CrowdRole> roles = context.FighterRoles;
+            UpdateTurnLag(state, context.TurnLagMotion);
             Crowding.Fill(state, weights, roles);
 
             // Where each man means to go (formation-following alone) decides whether he walks into allied ranks.
@@ -31,7 +32,7 @@ namespace Knez.Sim.Movement
             intents.Clear();
             for (int i = 0; i < fighters.Count; i++)
             {
-                intents.Add(fighters[i].IsAlive ? Follow(state, context, fighters[i], FixVec2.Zero) : FixVec2.Zero);
+                intents.Add(fighters[i].IsAlive ? Follow(state, context, fighters[i], i, FixVec2.Zero) : FixVec2.Zero);
             }
 
             Crowding.UpdatePassing(state, roles, intents);
@@ -47,11 +48,60 @@ namespace Knez.Sim.Movement
                 // Cap first, then slide: the slide only removes speed, and cutting an uncapped request (a man 10 m behind
                 // his slot asks for ~1 m/tick) would still leave more than run speed, straight into the body in front.
                 FixVec2 separation = Crowding.Separation(state, weights, roles, i);
-                Fix run = fighter.Def.RunPerTick * Combat.Wounds.Pace(state.Scenario.Combat, fighter.Wound); // wounds slow him
-                FixVec2 desired = Follow(state, context, fighter, separation).ClampLength(run);
+                Fix run = fighter.Body.RunPerTick * Combat.Wounds.Pace(state.Scenario.Combat, fighter.Wound); // wounds slow him
+                FixVec2 desired = Follow(state, context, fighter, i, separation).ClampLength(run);
                 FixVec2 slid = Crowding.Slide(state, weights, roles, i, desired);
                 slid = Terrain.SlideAlongWalls(state.Scenario.Map, state.Scenario.Movement.PersonalSpace, fighter.Position, fighter.Radius, slid);
                 fighter.Velocity = Crowding.Squeeze(state, roles, i, slid);
+            }
+        }
+
+        /// <summary>
+        /// The soft wheel (battle-sim.md §10, asked for 2026-11-23): the part of each man's slot motion that comes from his
+        /// squad turning this tick is added to his <see cref="Fighter.TurnLag"/> the other way round, so he is not carried
+        /// with it; then the lag shrinks by 3/<c>TurnLagTicks</c> of itself per tick (to ~5 % over that time), but by at least
+        /// 1 m per that time, so a lag of a few metres ends within about that time; under 1 cm it is dropped.
+        /// Men not following a slot (running, broken squad, no squad) have none. <paramref name="motion"/> gets each
+        /// man's change, by fighter index.
+        /// </summary>
+        private static void UpdateTurnLag(BattleState state, List<FixVec2> motion)
+        {
+            motion.Clear();
+            int ticks = state.Scenario.Movement.TurnLagTicks;
+            List<Fighter> fighters = state.FighterList;
+            for (int i = 0; i < fighters.Count; i++)
+            {
+                Fighter fighter = fighters[i];
+                FixVec2 before = fighter.TurnLag;
+                FixVec2 lag = FixVec2.Zero;
+                Squad? squad = ticks == 0 || !fighter.IsAlive || fighter.IsRouting || fighter.SquadId.IsNone || fighter.SlotIndex < 0
+                    ? null
+                    : state.FindSquad(fighter.SquadId);
+                bool following = squad != null && !squad.Broken;
+                if (following && (before != FixVec2.Zero || squad!.Spin != 0))
+                {
+                    lag = before;
+                    if (squad!.Spin != 0)
+                    {
+                        // A wheel is all turn: the man at the inner end of the front marks time and the outer flank
+                        // swings. Any other turn is about the anchor, while the anchor's own march still carries him.
+                        FixVec2 offset = SlotTracking.Offset(squad, fighter);
+                        FixVec2 swing = SlotTracking.Wheeled(squad)
+                            ? SlotTracking.Position(squad, offset) - SlotTracking.PreviousPosition(squad, offset)
+                            : Formations.FormationLayout.ToWorld(FixVec2.Zero, squad.Facing, offset)
+                                - Formations.FormationLayout.ToWorld(FixVec2.Zero, squad.Facing - Angle.FromRaw(squad.Spin), offset);
+                        lag -= swing;
+                    }
+
+                    // 3/ticks of it per tick (to ~5 % over the time), but at least 1 m per that time,
+                    // so the tail closes too instead of creeping for seconds.
+                    Fix length = lag.Length;
+                    Fix step = FixMath.Max((length * Fix.FromInt(3)) / ticks, Fix.One / ticks);
+                    lag = length <= step + MovementRules.ArriveDistance ? FixVec2.Zero : lag.WithLength(length - step);
+                }
+
+                fighter.TurnLag = lag;
+                motion.Add(following ? lag - before : FixVec2.Zero); // a dropped lag isn't a move toward anything
             }
         }
 
@@ -146,7 +196,7 @@ namespace Knez.Sim.Movement
 
             FixVec2 toward = foe.Position - fighter.Position;
             Fix gap = toward.Length - fighter.Radius - foe.Radius;
-            Fix step = FixMath.Min(fighter.Def.WalkPerTick, gap - (fighter.Def.Kit.Weapon.Reach / 2));
+            Fix step = FixMath.Min(fighter.Body.WalkPerTick, gap - (fighter.Kit.Weapon.Reach / 2));
             return step <= Fix.Zero || toward == FixVec2.Zero ? FixVec2.Zero : toward.WithLength(step);
         }
 
@@ -187,19 +237,19 @@ namespace Knez.Sim.Movement
         /// Velocity toward the formation slot, plus <paramref name="separation"/> — or, in a squad standing in melee whose
         /// formation doesn't keep its ranks, a step toward an enemy (closing in, or settling well inside reach).
         /// </summary>
-        private static FixVec2 Follow(BattleState state, TickContext context, Fighter fighter, FixVec2 separation)
+        private static FixVec2 Follow(BattleState state, TickContext context, Fighter fighter, int index, FixVec2 separation)
         {
             if (fighter.IsRouting)
             {
                 // Routing (battle-sim.md §12): run for his side's map edge, ignoring his squad and its orders.
                 FixVec2 away = Morale.MoraleRules.FleeTarget(state, fighter) - fighter.Position;
-                return (away == FixVec2.Zero ? FixVec2.Zero : away.WithLength(fighter.Def.RunPerTick)) + separation;
+                return (away == FixVec2.Zero ? FixVec2.Zero : away.WithLength(fighter.Body.RunPerTick)) + separation;
             }
 
             Squad? squad = fighter.SquadId.IsNone ? null : state.FindSquad(fighter.SquadId);
             if (squad == null || fighter.SlotIndex < 0)
             {
-                return separation; // individual orders (heroes) come later
+                return separation; // individual orders (Retainers standing alone) come later
             }
 
             if (squad.Broken)
@@ -211,7 +261,7 @@ namespace Knez.Sim.Movement
             // wall, so men stand at the edge or against the wall instead of leaning into it (decided 2026-11-21).
             MapDef map = state.Scenario.Map;
             FixVec2 offset = SlotTracking.Offset(squad, fighter);
-            FixVec2 slot = Terrain.ConstrainToward(map, SlotTracking.Position(squad, offset), fighter.Radius, squad.Anchor);
+            FixVec2 slot = Terrain.ConstrainToward(map, SlotTracking.Position(squad, offset) + fighter.TurnLag, fighter.Radius, squad.Anchor);
             FixVec2 gap = slot - fighter.Position;
 
             bool squadStill = squad.Velocity == FixVec2.Zero && squad.Spin == 0;
@@ -250,10 +300,13 @@ namespace Knez.Sim.Movement
                 return gap;
             }
 
-            // A member moves with its slot when the squad marches or turns.
+            // A member moves with its slot when the squad marches or turns — less the turn, which his lag takes back (the
+            // soft wheel) and then gives back slowly.
+            FixVec2 lagMotion = context.TurnLagMotion[index];
             FixVec2 slotMotion = squadStill
-                ? FixVec2.Zero
-                : slot - Terrain.ConstrainToward(map, SlotTracking.PreviousPosition(squad, offset), fighter.Radius, squad.Anchor - squad.Velocity);
+                ? lagMotion
+                : slot - Terrain.ConstrainToward(map, SlotTracking.PreviousPosition(squad, offset) + fighter.TurnLag - lagMotion,
+                    fighter.Radius, squad.Anchor - squad.Velocity);
             FixVec2 lag = gap - slotMotion; // the gap already includes this tick's slot motion: don't count it twice
             return slotMotion + lag / state.Scenario.Movement.SlotCatchUpTicks + separation;
         }

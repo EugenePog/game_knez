@@ -50,7 +50,7 @@ public class ScenarioDefTests
         var widerSpacing = new FormationDef("test-line", Fix.Ratio(11, 10), Fix.Ratio(3, 2), 2, 0, Fix.FromInt(45), 3, Fix.Ratio(1, 3));
         var heavierHold = new FormationDef("test-line", Fix.One, Fix.Ratio(3, 2), 2, 0, Fix.FromInt(45), 4, Fix.Ratio(1, 3));
         var easierPassage = new FormationDef("test-line", Fix.One, Fix.Ratio(3, 2), 2, 0, Fix.FromInt(45), 3, Fix.Ratio(1, 2));
-        var biggerFighter = TestDefs.Fighter("test-warrior", walkTenths: 14, radiusHundredths: 35);
+        var biggerFighter = TestDefs.Body("test-warrior", walkTenths: 14, radiusHundredths: 35);
 
         ulong[] variants =
         [
@@ -62,15 +62,28 @@ public class ScenarioDefTests
             Scenario(squad0: TestDefs.Squad("Line", 0, 8, FixVec2.FromInts(20, 10), 90, easierPassage)), // ally pass speed
             new ScenarioDef("test-two-squads", "test", TestDefs.Map,                                         // fighter def number
             [
-                new SquadSpawnDef("Line", 0, biggerFighter, 8, TestDefs.Line, FixVec2.FromInts(20, 10), Angle.FromDegrees(90)),
-                new SquadSpawnDef("Column", 1, biggerFighter, 6, TestDefs.Column, FixVec2.FromInts(30, 30), Angle.FromDegrees(270)),
+                new SquadSpawnDef("Line", 0, biggerFighter, TestDefs.Men(8), TestDefs.Line, FixVec2.FromInts(20, 10), Angle.FromDegrees(90)),
+                new SquadSpawnDef("Column", 1, biggerFighter, TestDefs.Men(6), TestDefs.Column, FixVec2.FromInts(30, 30), Angle.FromDegrees(270)),
             ]).Fingerprint,
             new ScenarioDef("test-two-squads", "test", new MapDef(Fix.FromInt(61), Fix.FromInt(40)),
                 TestDefs.TwoSquads().Squads.ToArray()).Fingerprint,                                          // map
+            Scenario(squad0: Line(TestDefs.Men(8, TestDefs.Level("new")))),                                 // experience
+            Scenario(squad0: Line(TestDefs.Men(8, kit: TestDefs.KitOf("axe-shield-padded")))),              // kit
+            Scenario(squad0: Line([.. TestDefs.Men(3), .. TestDefs.Men(5)])),                                // same men, two groups
         ];
 
-        Assert.That(variants, Has.None.EqualTo(baseline));
+        // M3 step 9: the order of a squad's groups is the order of its slots — a different battle.
+        ulong spearsFirst = Scenario(squad0: Line([.. TestDefs.Men(3, kit: TestDefs.KitOf("spear-shield")), .. TestDefs.Men(5)]));
+        ulong spearsLast = Scenario(squad0: Line([.. TestDefs.Men(5), .. TestDefs.Men(3, kit: TestDefs.KitOf("spear-shield"))]));
+        Assert.Multiple(() =>
+        {
+            Assert.That(variants, Has.None.EqualTo(baseline));
+            Assert.That(spearsLast, Is.Not.EqualTo(spearsFirst));
+        });
     }
+
+    private static SquadSpawnDef Line(SquadMenDef[] men) =>
+        new("Line", 0, TestDefs.Man, men, TestDefs.Line, FixVec2.FromInts(20, 10), Angle.FromDegrees(90));
 
     [Test]
     public void Fingerprint_DescriptionIsForPeople_DoesNotChangeIt()
@@ -115,7 +128,7 @@ public class ScenarioDefTests
     [Test]
     public void DefErrors_HaveNoParameterSuffix_SameTextOnEveryRuntime()
     {
-        var ex = Assert.Throws<ArgumentException>(() => new FighterDef("w", Fix.Zero, Fix.One, Fix.FromInt(3), Fix.FromInt(360)));
+        var ex = Assert.Throws<ArgumentException>(() => new BodyDef("w", Fix.Zero, Fix.One, Fix.FromInt(3), Fix.FromInt(360)));
         Assert.Multiple(() =>
         {
             Assert.That(ex!.Message, Is.EqualTo("radius must be > 0 and <= 2 m (got 0.00000)."));

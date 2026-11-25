@@ -100,7 +100,7 @@ public class FormationChangeTests
         });
 
         sim.Step();
-        Assert.That(Line(sim).Velocity.Length.Raw, Is.EqualTo(TestDefs.Warrior.WalkPerTick.Raw / 2).Within(2), "half pace while re-forming");
+        Assert.That(Line(sim).Velocity.Length.Raw, Is.EqualTo(TestDefs.Man.WalkPerTick.Raw / 2).Within(2), "half pace while re-forming");
         int ticks = 0;
         while (Line(sim).Reforming && ticks++ < 200)
         {
@@ -111,7 +111,7 @@ public class FormationChangeTests
         Assert.Multiple(() =>
         {
             Assert.That(ticks, Is.LessThan(200), "formed up");
-            Assert.That(Line(sim).Velocity.Length, Is.EqualTo(TestDefs.Warrior.WalkPerTick), "back to full pace");
+            Assert.That(Line(sim).Velocity.Length, Is.EqualTo(TestDefs.Man.WalkPerTick), "back to full pace");
         });
     }
 
@@ -217,14 +217,14 @@ public class FormationChangeTests
     public void Loader_FormationOrder_AndTheWholeCatalogue()
     {
         var defs = DefLibrary.Parse([new SourceText("f.json", """
-            { "fighters": [ { "id": "w", "radius": 0.3, "walkSpeed": 1.4, "runSpeed": 3.5, "turnRate": 360 } ],
+            { "bodies": [ { "id": "w", "radius": 0.3, "walkSpeed": 1.4, "runSpeed": 3.5, "turnRate": 360 } ],
               "formations": [
                 { "id": "line", "spacing": 1, "rankSpacing": 1.5, "ranks": 2, "turnRate": 45, "holdWeight": 3, "allyPassSpeed": 0.5 },
                 { "id": "column", "spacing": 1, "rankSpacing": 1.5, "width": 2, "turnRate": 90, "holdWeight": 3, "allyPassSpeed": 0.5 } ] }
             """)]);
         var scenario = ScenarioLoader.Parse(new SourceText("s.json", """
             { "id": "s", "map": { "width": 60, "height": 40 },
-              "squads": [ { "name": "A", "side": 0, "fighter": "w", "count": 4, "formation": "line", "position": [20, 10], "facing": 90 } ],
+              "squads": [ { "name": "A", "side": 0, "body": "w", "men": [{ "count": 4, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line", "position": [20, 10], "facing": 90 } ],
               "script": [ { "tick": 5, "order": "formation", "squad": "A", "formation": "column" } ] }
             """), defs);
         Assert.Multiple(() =>
@@ -366,7 +366,7 @@ public class FormationChangeTests
                 {
                     var map = new MapDef(Fix.FromInt(60), Fix.FromInt(40));
                     var state = BattleSetup.Create(new ScenarioDef("s", "", map,
-                        [new SquadSpawnDef("A", 0, TestDefs.Warrior, count, formation, FixVec2.FromInts(30, 30), Angle.FromDegrees(90))]), 1);
+                        [new SquadSpawnDef("A", 0, TestDefs.Man, TestDefs.Men(count), formation, FixVec2.FromInts(30, 30), Angle.FromDegrees(90))]), 1);
                     var squad = state.SquadList[0];
                     int frontage = squad.Frontage;
                     var frontSurvivors = new List<EntityId>();

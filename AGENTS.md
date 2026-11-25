@@ -6,25 +6,29 @@ This file is the source of truth for how we work in this repository. Keep it sho
 ## The project in one paragraph
 
 Game_knez is an RPG-first **real-time-with-pause tactics** game inspired by the Viking-age Baltic (VIII–IX c.):
-a clan that fled a raid settles next to a foreign trading town, and its warband (дружина) opens new routes.
-The player commands 3–5 heroes directly and 2–3 squads of 5–8 fighters through orders (formation, shield wall,
-hold, advance, pursue). Morale is the central combat system. Engine: **Unity 6**, but the battle simulation is
-**pure C# outside Unity** and deterministic.
+a clan that fled a raid settles next to a foreign trading town, and its retinue (дружина) opens new routes.
+The player, the clan's chief, commands Retainers (дружинники — the named heroes) directly and 2–3 squads of 5–8
+fighters through orders (formation, shield wall, hold, advance, pursue). Morale is the central combat system.
+Engine: **Unity 6**, but the battle simulation is **pure C# outside Unity** and deterministic.
 
 - Concept (Russian, snapshot): [docs/concept/concept-v2.md](docs/concept/concept-v2.md)
+- Game design (Russian): [docs/design/](docs/design/README.md), decision log D-NNN in
+  [docs/design/decisions.md](docs/design/decisions.md)
 - Battle simulation spec: [docs/battle-sim.md](docs/battle-sim.md)
 - Roadmap and current milestone: [docs/roadmap.md](docs/roadmap.md)
 - Decision records: [docs/adr/](docs/adr/)
 
 ## Current phase — read before writing code
 
-**Phase 1: internal 2D skirmish vs AI (6–8 weeks).** One battle on a small map: 2 player squads + 2 heroes
-vs 3 enemy squads, top-down 2D view (circles, order arrows, morale bars). Orders, 2–3 formations, morale,
-wounds, enemy AI. Exit criterion: *the battle is still interesting the 20th time.*
+**Phase 1: internal 2D skirmish vs AI.** One battle on a small map: 2 player squads + 2 Retainers vs 3 enemy
+squads, top-down 2D view (circles, order arrows, morale bars). Orders, 2–3 formations, morale, wounds, Retainers
+with leadership and a trait ability, the standoff and duels (D-021), enemy AI. Exit criterion: *the battle is still
+interesting the 20th time.*
 
 Until that criterion is met, **do not build**: campaign, global map, economy, settlement, relationships
 beyond what a battle needs, 3D, art pipeline, Steam integration, save/load of campaigns, multiplayer.
-If a task seems to need one of these, stop and ask. Cut from the concept for good: magic, mass battles
+If a task seems to need one of these, stop and ask. Designing them on paper (`docs/design/`) is allowed; a design
+doc is not a task to build it. Cut from the concept for good: magic, mass battles
 (50–100 per side), Stronghold-style economy, multiple independent parties in MVP.
 
 The first thing proven is the main technical risk: **formation movement and local collision avoidance at
@@ -35,6 +39,7 @@ The first thing proven is the main technical risk: **formation movement and loca
 ```
 AGENTS.md  CLAUDE.md  README.md
 docs/                 concept snapshot, battle-sim spec, roadmap, ADRs, playtest notes
+  design/             game-design docs per system, design decision log (D-NNN), open questions
 sim/                  pure C# simulation (no UnityEngine) — the heart of the game
   Knez.Sim.sln
   src/Knez.Sim/       core sim library: netstandard2.1, C# 9, also a Unity local package
@@ -85,6 +90,7 @@ dotnet build sim/Knez.Sim.sln
 dotnet test sim/Knez.Sim.sln
 dotnet test sim/Knez.Sim.sln --filter Category=Determinism
 python3 tools/check_sim_purity.py
+dotnet test sim/Knez.Sim.sln -c Release --filter FullyQualifiedName~BalanceReferenceTests   # balance reference, Release only
 dotnet run --project sim/tools/Knez.Sim.Cli -c Release -- run content/scenarios/formations.json --seed 1
 ```
 
@@ -125,13 +131,25 @@ Playbooks for common tasks are in `.claude/skills/*/SKILL.md` (`sim-feature`, `d
 
 ## Glossary (Russian design term → code name)
 
+Names in `code` exist in the code or are fixed by a decision (D-NNN in `docs/design/decisions.md`); names in plain
+text aren't in the code yet, and the roadmap step that builds them may still change them.
+
 | Русский | Code | Note |
 |---|---|---|
-| дружина | `Warband` | the player's whole force |
+| дружина | `Retinue` | the chief's band of Retainers (D-015; formerly `Warband`) |
+| дружинник, герой | `Retainer` | a named fighter with experience, a trait, leadership and one active ability; leads from a squad's front rank, can leave it and join another; under direct control in battle, own AI only on independent tasks (D-010, D-014, D-015, D-019, D-023). battle-sim.md's "hero" becomes `Retainer` (roadmap M3 step 6) |
+| вождь (клана) | chief | the player's own character, not a Retainer (D-010) |
 | отряд | `Squad` | 5–8 fighters, controlled by orders |
-| боец | `Fighter` | any combatant; heroes are fighters too |
-| герой | `Hero` | component on a fighter: abilities, leadership |
-| именной дружинник | named retainer | veteran promoted to a named character (later) |
+| боец | `Fighter` | any combatant; Retainers are fighters too |
+| ополчение, ополченец | militia | settlement men who muster on alarm, one squad per settlement; experience new or experienced only (D-007, D-018); in content, men of `new`/`experienced` in kits such as `axe-shield` or `spear-shield` (the `levy` fighter type went in M3 step 9) |
+| опыт | `Experience` | `new` / `experienced` / `professional` / `elite` (новичок / опытный / профессионал / элита); professional and elite only for Retainers (D-019); independent of kit (D-022) |
+| снаряжение | kit | weapon, shield, body armour, head cover (`KitDef`, named by what it holds, e.g. `sword-shield-mail`); independent of experience, may differ within a squad (D-022, M3 step 9) |
+| черта (характера) | trait | proud, cautious, greedy, loyal, bold, cruel (гордый, осторожный, жадный, верный, напористый, жестокий): each gives one active ability and shifts AI decisions (D-025) |
+| способность | ability | a Retainer's active ability, cooldown in seconds (D-023) |
+| стояние | standoff | morale pressure before contact; nobody strikes until the first blow (D-009) |
+| поединок / вызов / требование | duel / challenge / demand | a Retainer's one-on-one fight before the troops; the call to it; the terms put to the enemy (D-009) |
+| правитель | ruler | the local ruler, main enemy of the удел; his warriors are his Retainers (D-007, D-020) |
+| разбойники | bandits | enemy kind that fights for loot (D-024) |
 | строй | `Formation` | slot layout for a squad |
 | стена щитов | `ShieldWall` | formation + stance |
 | приказ | `Order` | squad-level intent inside the sim |
@@ -142,11 +160,11 @@ Playbooks for common tasks are in `.claude/skills/*/SKILL.md` (`sim-feature`, `d
 | усталость | `Fatigue` | |
 | ранение | `Wound` | Light / Heavy / Down (`WoundLevel`); Down = out of the fight, life or death settled after the battle |
 | бегство | `Rout` | |
-| лидерство | `Leadership` | hero aura / attached leader |
+| лидерство | `Leadership` | a Retainer's passive morale bonus to his squad, stronger with experience (D-023) |
 | побратим / соперник | `SwornBrother` / `Rival` | relationship tags (morale modifiers) |
 | колдун | `Sorcerer` | enemy leader; source of `Fear` (no real magic) |
 | князь | `Knez` | the town's prince (campaign, later) |
-| воевода | `Voivode` | hero left to run the homestead (campaign, later) |
+| воевода | `Voivode` | Retainer left to run the homestead (campaign, later) |
 
 ## Setting and content rules
 

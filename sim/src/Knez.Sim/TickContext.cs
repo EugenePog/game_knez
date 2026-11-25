@@ -59,6 +59,10 @@ namespace Knez.Sim
         /// <summary>Per-fighter intent for this tick: where formation-following alone would take him (before crowding).</summary>
         internal List<Numerics.FixVec2> FighterIntents { get; } = new List<Numerics.FixVec2>();
 
+        /// <summary>Per-fighter change of <see cref="Units.Fighter.TurnLag"/> this tick (steering, stage 5): how his
+        /// target moved relative to his slot. Read by movement (stage 6) the same tick.</summary>
+        internal List<Numerics.FixVec2> TurnLagMotion { get; } = new List<Numerics.FixVec2>();
+
         /// <summary>The route-planning grid of this battle's map: built with the context for maps with walls, else on first use
         /// (derived content: not state).</summary>
         internal Movement.NavGrid Nav => _nav ??= new Movement.NavGrid(_state.Scenario.Map);

@@ -12,7 +12,8 @@ namespace Knez.Sim.Defs
     {
         /// <summary>Creates a weapon; throws <see cref="ArgumentException"/> on invalid values. Times are seconds, rounded
         /// to whole ticks; the wound row is permille and must add up to 1000.</summary>
-        public WeaponDef(string id, Fix reach, Fix windupTime, Fix recoveryTime, int lightWound, int heavyWound, int downWound)
+        public WeaponDef(string id, Fix reach, Fix windupTime, Fix recoveryTime, int lightWound, int heavyWound, int downWound,
+            int penetration, int defence)
         {
             Id = DefChecks.Id(id, nameof(id));
             Reach = DefChecks.PositiveMetres(reach, MaxReachMetres, nameof(reach));
@@ -21,6 +22,8 @@ namespace Knez.Sim.Defs
             LightWound = DefChecks.Permille(lightWound, "wounds.light");
             HeavyWound = DefChecks.Permille(heavyWound, "wounds.heavy");
             DownWound = DefChecks.Permille(downWound, "wounds.down");
+            Penetration = DefChecks.Permille(penetration, nameof(penetration));
+            Defence = DefChecks.Permille(defence, nameof(defence));
             int sum = lightWound + heavyWound + downWound;
             if (sum != DefChecks.Whole)
             {
@@ -55,6 +58,14 @@ namespace Knez.Sim.Defs
         /// <summary>Of the blows that get through, how many in 1000 put the man down at once.</summary>
         public int DownWound { get; }
 
+        /// <summary>Share (‰) of the defender's body armour and head cover this weapon's blows ignore (M3 step 9; shields
+        /// aren't affected).</summary>
+        public int Penetration { get; }
+
+        /// <summary>‰ off blows at the man who carries it (the spear's reach keeps an enemy off; M3 step 9, formerly the
+        /// spearman warrior type's).</summary>
+        public int Defence { get; }
+
         internal void AddTo(ref Fnv1a64 hash)
         {
             hash.Add(Id);
@@ -64,6 +75,8 @@ namespace Knez.Sim.Defs
             hash.Add(LightWound);
             hash.Add(HeavyWound);
             hash.Add(DownWound);
+            hash.Add(Penetration);
+            hash.Add(Defence);
         }
     }
 }

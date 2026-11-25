@@ -234,7 +234,7 @@ namespace Knez.Sim.Orders
                     continue;
                 }
 
-                Fix reach = man.Def.Kit.Weapon.Reach + clearance;
+                Fix reach = man.Kit.Weapon.Reach + clearance;
                 for (int j = 0; j < fighters.Count; j++)
                 {
                     Fighter enemy = fighters[j];
@@ -463,10 +463,7 @@ namespace Knez.Sim.Orders
         /// </summary>
         private static void Wheel(BattleState state, Squad squad, Angle toward, int turnRate)
         {
-            int count = squad.MemberList.Count;
-            int width = FormationLayout.Width(squad.Formation, squad.Frontage, count);
-            int files = squad.Files > 0 && squad.Files < width ? squad.Files : width;
-            Fix half = squad.Formation.Spacing * (files - 1) / 2;
+            Fix half = SlotTracking.FrontWidth(squad) / 2; // SlotTracking.Wheeled recognises the wheel by the same pivot
             if (half <= Fix.Zero)
             {
                 Turn(squad, toward, turnRate); // a single file pivots
@@ -537,7 +534,7 @@ namespace Knez.Sim.Orders
                     continue;
                 }
 
-                Fix run = fighter.Def.RunPerTick * Combat.Wounds.Pace(state.Scenario.Combat, fighter.Wound);
+                Fix run = fighter.Body.RunPerTick * Combat.Wounds.Pace(state.Scenario.Combat, fighter.Wound);
                 if (!any || run < slowest)
                 {
                     slowest = run;
@@ -562,7 +559,7 @@ namespace Knez.Sim.Orders
                     continue;
                 }
 
-                Fix walk = fighter.Def.WalkPerTick * Combat.Wounds.Pace(state.Scenario.Combat, fighter.Wound); // wounded men slow the squad
+                Fix walk = fighter.Body.WalkPerTick * Combat.Wounds.Pace(state.Scenario.Combat, fighter.Wound); // wounded men slow the squad
                 if (!any || walk < slowest)
                 {
                     slowest = walk;

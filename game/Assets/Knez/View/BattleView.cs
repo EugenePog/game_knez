@@ -16,9 +16,10 @@ namespace Knez.Game.View
     /// with a tick for their facing (grey once fallen), each squad's anchor with a facing marker, and the route still
     /// ahead of a squad on the march. Reads the state only. Positions are interpolated between the last two ticks by the
     /// clock's alpha, so motion is smooth at any frame rate. The camera is fitted to the map. M3: a red dot on a wounded
-    /// man (bigger = heavily), white for a running man, a thin line in the striker's squad colour from a man winding up a
-    /// blow to his target, and when the blow falls a flash along it in the same colour plus a spark on the struck man —
-    /// red if it got through, white if it was turned aside.
+    /// man (bigger = heavily), a running man in his squad's colour faded toward white, a thin line in the striker's squad
+    /// colour from a man winding up a blow to his target, and when the blow falls a flash along it in the same colour
+    /// plus a spark on the struck man — red if it got through, white if it was turned aside. M3 step 8: a morale bar over
+    /// every man in the fight, as long as his morale and coloured by his state (<see cref="ShowMoraleBars"/>).
     /// </summary>
     public sealed class BattleView : MonoBehaviour
     {
@@ -40,6 +41,11 @@ namespace Knez.Game.View
         private readonly Dictionary<int, Color> _squadColours = new Dictionary<int, Color>(); // view-side cache keyed by id
         private readonly Dictionary<int, int> _index = new Dictionary<int, int>(); // fighter id → position in the list
         private readonly List<SpriteRenderer> _wounds = new List<SpriteRenderer>();
+        private readonly List<SpriteRenderer> _barBacks = new List<SpriteRenderer>();
+        private readonly List<SpriteRenderer> _barFills = new List<SpriteRenderer>();
+        private readonly List<float> _radii = new List<float>();
+        private const float BarWidth = 0.7f; // metres
+        private const float BarHeight = 0.09f;
         private readonly List<LineRenderer> _aims = new List<LineRenderer>();
         private readonly List<Flash> _flashes = new List<Flash>();
         private const float FlashSeconds = 0.35f;
@@ -49,6 +55,9 @@ namespace Knez.Game.View
         private Vector2[] _current = new Vector2[0];
         private float[] _previousFacing = new float[0];
         private float[] _currentFacing = new float[0];
+
+        /// <summary>Whether a morale bar is drawn over every man in the fight (B).</summary>
+        public bool ShowMoraleBars { get; set; } = true;
 
         /// <summary>Sets what to draw from code (tests, bootstrapping) instead of the Inspector.</summary>
         public void Bind(BattleRunner battle, Camera? cam)
@@ -126,6 +135,12 @@ namespace Knez.Game.View
                 wound.transform.localPosition = Vector3.zero;
                 wound.enabled = false;
                 _wounds.Add(wound);
+                // Bars aren't children of the body: it turns with his facing, they stay level over him.
+                SpriteRenderer back = Make("Morale bar", ShapeSprites.Square, new Color(0, 0, 0, 0.55f), 7, Vector2.zero, new Vector2(BarWidth, BarHeight));
+                SpriteRenderer fill = Make("Morale", ShapeSprites.Square, Color.green, 8, Vector2.zero, new Vector2(BarWidth, BarHeight));
+                _barBacks.Add(back);
+                _barFills.Add(fill);
+                _radii.Add(fighter.Radius.ToFloat());
                 _aims.Add(Line("Aim " + fighter.Id.Value, 2));
                 _index[fighter.Id.Value] = i;
                 _bodies.Add(body.transform);
@@ -262,6 +277,7 @@ namespace Knez.Game.View
                 _bodies[i].rotation = Quaternion.Euler(0, 0, Mathf.LerpAngle(_previousFacing[i], _currentFacing[i], t));
                 _bodyRenderers[i].color = Colour(fighter);
                 _halos[i].enabled = fighter.IsAlive && _selection.Contains(fighter.SquadId);
+                Bars(i, fighter);
                 bool hurt = fighter.IsAlive && (fighter.Wound == WoundLevel.Light || fighter.Wound == WoundLevel.Heavy);
                 _wounds[i].enabled = hurt;
                 if (hurt)
@@ -347,10 +363,37 @@ namespace Knez.Game.View
             }
         }
 
-        // M3: a running man is drawn white until the view gets morale bars (M3 step 7).
-        private Color Colour(Fighter fighter) =>
-            !fighter.IsAlive ? Fallen : fighter.IsRouting ? Color.white
-            : _squadColours.TryGetValue(fighter.SquadId.Value, out Color c) ? c : Fallen;
+        /// <summary>Man <paramref name="i"/>'s morale bar: level over his body, filled to his morale (0..1000) in his
+        /// state's colour; hidden once he is out of the fight or the bars are off.</summary>
+        private void Bars(int i, Fighter fighter)
+        {
+            bool shown = ShowMoraleBars && fighter.IsAlive;
+            _barBacks[i].enabled = shown;
+            _barFills[i].enabled = shown;
+            if (!shown)
+            {
+                return;
+            }
+
+            Vector2 centre = (Vector2)_bodies[i].position + new Vector2(0, _radii[i] + 0.16f);
+            float filled = BarWidth * Mathf.Clamp01(fighter.Morale / 1000f);
+            _barBacks[i].transform.position = centre;
+            _barFills[i].transform.position = centre + new Vector2((filled - BarWidth) / 2, 0);
+            _barFills[i].transform.localScale = new Vector3(filled, BarHeight, 1);
+            _barFills[i].color = BattleHud.StateColour(fighter.MoraleState);
+        }
+
+        // A running man keeps his squad's colour, faded toward white; his bar says how far gone he is.
+        private Color Colour(Fighter fighter)
+        {
+            if (!fighter.IsAlive)
+            {
+                return Fallen;
+            }
+
+            Color squad = _squadColours.TryGetValue(fighter.SquadId.Value, out Color c) ? c : Fallen;
+            return fighter.IsRouting ? Color.Lerp(squad, Color.white, 0.55f) : squad;
+        }
 
         private void FitCamera(MapDef map)
         {

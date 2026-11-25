@@ -127,18 +127,18 @@ namespace Knez.Sim
             return squad;
         }
 
-        /// <summary>Adds a fighter outside any squad (tests; heroes later) and returns it.</summary>
-        internal Fighter AddFighter(FighterDef def, int sideId, FixVec2 position, Angle facing)
+        /// <summary>Adds a fighter outside any squad (tests; Retainers standing alone later) and returns it.</summary>
+        internal Fighter AddFighter(BodyDef body, ExperienceDef experience, KitDef kit, int sideId, FixVec2 position, Angle facing)
         {
-            var fighter = new Fighter(AllocateId(), def, sideId, position, facing);
+            var fighter = new Fighter(AllocateId(), body, experience, kit, sideId, position, facing);
             _fighters.Add(fighter); // ids grow monotonically, so the list stays sorted
             return fighter;
         }
 
         /// <summary>Adds a fighter to <paramref name="squad"/> in <paramref name="slot"/>, facing with the squad.</summary>
-        internal Fighter AddSquadMember(Squad squad, FighterDef def, FixVec2 position, int slot)
+        internal Fighter AddSquadMember(Squad squad, BodyDef body, SquadMenDef men, FixVec2 position, int slot)
         {
-            Fighter fighter = AddFighter(def, squad.SideId, position, squad.Facing);
+            Fighter fighter = AddFighter(body, men.Experience, men.Kit, squad.SideId, position, squad.Facing);
             fighter.SquadId = squad.Id;
             fighter.SlotIndex = slot;
             squad.MemberList.Add(fighter.Id); // the newest id is the largest: members stay sorted

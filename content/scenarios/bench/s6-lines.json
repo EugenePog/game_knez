@@ -1,0 +1,13 @@
+{
+  "id": "s6-lines",
+  "description": "Bench S6, the balance reference (D-026, M3 step 7): two equal lines of 8 warriors march into each other head-on, mirror images of each other. Equal forces should win about equally often; batch reports who won, how it ended, how long it took and how many men a squad had lost when it broke, and BalanceReferenceTests pins those numbers. Don't edit it to play: a change here moves the reference.",
+  "map": {"width": 60, "height": 40},
+  "squads": [
+    {"name": "Hird line", "side": 0, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line", "position": [30, 12], "facing": 90},
+    {"name": "Raider line", "side": 1, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line", "position": [30, 28], "facing": 270}
+  ],
+  "script": [
+    {"tick": 10, "order": "move", "squad": "Hird line", "target": [30, 30], "facing": 90},
+    {"tick": 10, "order": "move", "squad": "Raider line", "target": [30, 10], "facing": 270}
+  ]
+}

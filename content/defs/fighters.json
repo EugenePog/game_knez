@@ -1,9 +1,0 @@
-{
-  "description": "Fighter types. radius: collision circle (m); walkSpeed: marching pace (m/s), a squad marches at its slowest member's; runSpeed: top speed (m/s), for now only to catch up with the formation slot; turnRate: how fast a fighter turns (degrees/s). Optional kit (M3): weapon, shield, bodyArmour, headCover, experience, type — ids from combat.json; what a type leaves out comes from its defaultKit (sword, round shield, padded coat, cap, experienced, default). warrior: the default kit; spearman: spear, spearman type; levy: axe, shield only, new; veteran: mail and helm, elite. Speeds agreed 2026-11-20; radius and turnRate are placeholders, tuned on the M1 bench.",
-  "fighters": [
-    { "id": "warrior", "radius": 0.3, "walkSpeed": 1.4, "runSpeed": 3.5, "turnRate": 360 },
-    { "id": "spearman", "radius": 0.3, "walkSpeed": 1.4, "runSpeed": 3.5, "turnRate": 360, "weapon": "spear", "type": "spearman" },
-    { "id": "levy", "radius": 0.3, "walkSpeed": 1.4, "runSpeed": 3.5, "turnRate": 360, "weapon": "axe", "bodyArmour": "none", "headCover": "none", "experience": "new" },
-    { "id": "veteran", "radius": 0.3, "walkSpeed": 1.4, "runSpeed": 3.5, "turnRate": 360, "bodyArmour": "mail", "headCover": "helm", "experience": "elite" }
-  ]
-}

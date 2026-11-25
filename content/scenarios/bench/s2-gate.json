@@ -9,8 +9,8 @@
     ]
   },
   "squads": [
-    { "name": "Hird line",   "side": 0, "fighter": "warrior", "count": 10, "formation": "line",   "position": [30, 10], "facing": 90 },
-    { "name": "Hird column", "side": 0, "fighter": "warrior", "count": 8,  "formation": "column", "position": [23, 11],  "facing": 90 }
+    { "name": "Hird line",   "side": 0, "body": "man", "men": [{ "count": 10, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line",   "position": [30, 10], "facing": 90 },
+    { "name": "Hird column", "side": 0, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "sword-shield-padded" }],  "formation": "column", "position": [23, 11],  "facing": 90 }
   ],
   "script": [
     { "tick": 10, "order": "move", "squad": "Hird line",   "target": [30, 30] },

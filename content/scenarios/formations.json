@@ -3,10 +3,10 @@
   "description": "M1 step 1: every formation spawned once, facing each other across a 60 x 40 m field; one enemy line at an angle to check rotation. Nothing moves yet.",
   "map": { "width": 60, "height": 40 },
   "squads": [
-    { "name": "Hird line",    "side": 0, "fighter": "warrior", "count": 8, "formation": "line",       "position": [18, 12], "facing": 90 },
-    { "name": "Shield wall",  "side": 0, "fighter": "warrior", "count": 8, "formation": "shieldwall", "position": [32, 12], "facing": 90 },
-    { "name": "Raider line",  "side": 1, "fighter": "warrior", "count": 8, "formation": "line",       "position": [20, 28], "facing": 270 },
-    { "name": "Raider column","side": 1, "fighter": "warrior", "count": 6, "formation": "column",     "position": [34, 27], "facing": 270 },
-    { "name": "Flankers",     "side": 1, "fighter": "warrior", "count": 5, "formation": "line",       "position": [48, 24], "facing": 225 }
+    { "name": "Hird line",    "side": 0, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line",       "position": [18, 12], "facing": 90 },
+    { "name": "Shield wall",  "side": 0, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "shieldwall", "position": [32, 12], "facing": 90 },
+    { "name": "Raider line",  "side": 1, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line",       "position": [20, 28], "facing": 270 },
+    { "name": "Raider column","side": 1, "body": "man", "men": [{ "count": 6, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "column",     "position": [34, 27], "facing": 270 },
+    { "name": "Flankers",     "side": 1, "body": "man", "men": [{ "count": 5, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line",       "position": [48, 24], "facing": 225 }
   ]
 }

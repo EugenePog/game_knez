@@ -5,141 +5,155 @@
       "scenario": "scenarios/bench/s1-clash.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "41cf8e3dce86bcaf",
-      "final": "1a886dad3056f7fe"
+      "trace": "8aec484edaded666",
+      "final": "1c868de3baf0a268"
     },
     {
       "scenario": "scenarios/bench/s2-gate.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "ba184dd369676fc0",
-      "final": "67633fcef52e31d0"
+      "trace": "02bf719ad5e69eff",
+      "final": "17f5f3714224433f"
     },
     {
       "scenario": "scenarios/bench/s3-crossing.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "15847c9421798596",
-      "final": "bfef9c4a639966d5"
+      "trace": "d92b4872a3df3125",
+      "final": "b6bce8aa8474fe44"
     },
     {
       "scenario": "scenarios/bench/s4-wheel.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "6450d1e2c20a4334",
-      "final": "eb2a15381875a64a"
+      "trace": "c571f5ca45e6f4c4",
+      "final": "454c3749f8c98c2f"
     },
     {
       "scenario": "scenarios/bench/s5-shieldwall.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "cf3e7a27db47780d",
-      "final": "484d939d4bae5b12"
+      "trace": "0443b467968b0ae7",
+      "final": "4d25082a05a4547c"
+    },
+    {
+      "scenario": "scenarios/bench/s6-lines.json",
+      "seed": 1,
+      "ticks": 600,
+      "trace": "d77b3400c835b1d7",
+      "final": "b67d362e9374f23d"
+    },
+    {
+      "scenario": "scenarios/bench/s7-flank.json",
+      "seed": 1,
+      "ticks": 600,
+      "trace": "67abcbddc78f9d01",
+      "final": "95b58405e462fdeb"
     },
     {
       "scenario": "scenarios/crowding.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "2a54438fff93c9b1",
-      "final": "a48d0e3c8587f844"
+      "trace": "59a7a9e655ca5262",
+      "final": "211454db7e6d579d"
     },
     {
       "scenario": "scenarios/drill.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "5747ba7a13488e5d",
-      "final": "4f1698258436d51a"
+      "trace": "e6cefa7de1efe00a",
+      "final": "a57e300c00bf7c9e"
     },
     {
       "scenario": "scenarios/formations.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "e305791a356843a9",
-      "final": "52e5e77ffa604aef"
+      "trace": "1eb951fb0c16a456",
+      "final": "4d4ff7daa7232a04"
     },
     {
       "scenario": "scenarios/m3/m3-flank.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "f102c77a864cb04b",
-      "final": "0fffdae290532ba7"
+      "trace": "cd22d94328e5fc01",
+      "final": "c79ee8a890066774"
     },
     {
       "scenario": "scenarios/m3/m3-lines.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "cb5f5647f88c2918",
-      "final": "7f16b2ecccd1a2cd"
+      "trace": "d4c443b6f7155e55",
+      "final": "0ffca8c679ad84bf"
     },
     {
       "scenario": "scenarios/m3/m3-rally.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "319179d1722f8bc8",
-      "final": "a55dbe3186752649"
+      "trace": "366b65703ebc98e2",
+      "final": "88833bb7a579b979"
     },
     {
       "scenario": "scenarios/m3/m3-shieldwall.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "91444deab00ca6e1",
-      "final": "63f0d445010cfcbe"
+      "trace": "4bf7b9a3be33875b",
+      "final": "c7d6e00502b0c076"
     },
     {
       "scenario": "scenarios/m3/m3-spears.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "2c9eb719fcb15e8b",
-      "final": "50ac196256fed32f"
+      "trace": "22efd22af7dfaede",
+      "final": "f38ca6d45de760ba"
     },
     {
       "scenario": "scenarios/m3/m3-veterans.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "46874b820b521bf5",
-      "final": "96d294e483136e24"
+      "trace": "67dfe29f57e173f0",
+      "final": "5a8e2b50e3dbee40"
     },
     {
       "scenario": "scenarios/m3/m3-withdraw.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "ec978409fec3aaa0",
-      "final": "4489590d6d72b758"
+      "trace": "21ada8d795e1618b",
+      "final": "099f71e0f0189099"
     },
     {
       "scenario": "scenarios/march.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "f88232ced70741ae",
-      "final": "96b859196373b89b"
+      "trace": "9df05de09403efe5",
+      "final": "0c1ba2267ab9e305"
     },
     {
       "scenario": "scenarios/paths.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "d7ceff3da4e4688e",
-      "final": "098d3e36e6be9484"
+      "trace": "56a1a720d6ea025b",
+      "final": "646733adc754576c"
     },
     {
       "scenario": "scenarios/sandbox/villages-assault.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "5b6ac9eb8271e7ba",
-      "final": "47613a85376ceccc"
+      "trace": "73c55333f5a553c7",
+      "final": "9c19dba987c400af"
     },
     {
       "scenario": "scenarios/sandbox/villages.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "9304f1698ce19e5c",
-      "final": "e9f01d58b6c0ba70"
+      "trace": "d159c14cf4d21aae",
+      "final": "ceb025dcc75a7208"
     },
     {
       "scenario": "scenarios/walls.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "f8d31558545384a8",
-      "final": "aa6510eea8e65614"
+      "trace": "0a1992eb022bc359",
+      "final": "66a0e25dfa5d40cf"
     }
   ]
 }

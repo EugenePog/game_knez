@@ -12,12 +12,15 @@ namespace Knez.Sim.Content
     /// <code>
     /// { "id": "formations", "description": "…",
     ///   "map": { "width": 60, "height": 40, "walls": [ { "from": [0, 20], "to": [28, 21] } ] },
-    ///   "squads": [ { "name": "Line", "side": 0, "fighter": "warrior", "count": 8, "formation": "line",
-    ///                 "position": [20, 12], "facing": 90 } ],
+    ///   "squads": [ { "name": "Line", "side": 0, "body": "man",
+    ///                 "men": [ { "count": 8, "experience": "experienced", "kit": "sword-shield-padded" } ],
+    ///                 "formation": "line", "position": [20, 12], "facing": 90 } ],
     ///   "script": [ { "tick": 20, "order": "move", "squad": "Line", "target": [20, 24], "facing": 90 } ] }
     /// </code>
     /// Metres for lengths, degrees for <c>facing</c> (0 = east, 90 = north). Numbers may have up to 9 decimals.
     /// <c>script</c> is optional and in tick order; a scripted <c>facing</c> is optional (default: the march direction).
+    /// A squad's men come in groups (M3 step 9, ADR-0005), its slots filled in that order; experience levels and kits are
+    /// the combat rules' (<see cref="DefLibrary.Rules"/>).
     /// </summary>
     public static class ScenarioLoader
     {
@@ -25,7 +28,8 @@ namespace Knez.Sim.Content
         private const string ScriptMembers = "tick, order, squad, target, facing, formation";
         private const string MapMembers = "width, height, walls";
         private const string WallMembers = "from, to";
-        private const string SquadMembers = "name, side, fighter, count, formation, position, facing";
+        private const string SquadMembers = "name, side, body, men, formation, position, facing";
+        private const string MenMembers = "count, experience, kit";
 
         /// <summary>Parses a scenario; throws <see cref="ContentException"/> on the first problem.</summary>
         public static ScenarioDef Parse(SourceText source, DefLibrary defs)
@@ -104,18 +108,35 @@ namespace Knez.Sim.Content
             var item = JsonObjectReader.Of(value, path, sourceName);
             string name = item.RequireString("name");
             int side = item.RequireInt("side");
-            string fighterId = item.RequireString("fighter");
-            int count = item.RequireInt("count");
+            JsonValue? oldFighter = item.Member("fighter");
+            if (oldFighter != null)
+            {
+                throw item.Error(oldFighter, item.MemberPath("fighter"),
+                    "'fighter' and 'count' became 'body' and 'men' (M3 step 9, ADR-0005), e.g. \"body\": \"man\", \"men\": [{ \"count\": 8, \"experience\": \"experienced\", \"kit\": \"sword-shield-padded\" }]");
+            }
+
+            string bodyId = item.RequireString("body");
+            IReadOnlyList<JsonValue> menItems = item.RequireArray("men");
             string formationId = item.RequireString("formation");
             FixVec2 position = item.RequireVec2("position");
             Angle facing = Angle.FromDegrees(item.RequireFix("facing"));
             item.RejectUnknownMembers(SquadMembers);
 
-            FighterDef? fighter = defs.FindFighter(fighterId);
-            if (fighter == null)
+            BodyDef? body = defs.FindBody(bodyId);
+            if (body == null)
             {
-                throw item.Error(value.Get("fighter")!, item.MemberPath("fighter"),
-                    $"unknown fighter '{fighterId}' (known: {defs.FighterIds()})");
+                throw item.Error(value.Get("body")!, item.MemberPath("body"), $"unknown body '{bodyId}' (known: {defs.BodyIds()})");
+            }
+
+            if (menItems.Count == 0)
+            {
+                throw item.Error(value.Get("men")!, item.MemberPath("men"), "a squad needs at least one group of men");
+            }
+
+            var men = new List<SquadMenDef>(menItems.Count);
+            for (int j = 0; j < menItems.Count; j++)
+            {
+                men.Add(ReadMen(menItems[j], item.MemberPath($"men[{j}]"), sourceName, defs.Rules));
             }
 
             FormationDef? formation = defs.FindFormation(formationId);
@@ -125,7 +146,41 @@ namespace Knez.Sim.Content
                     $"unknown formation '{formationId}' (known: {defs.FormationIds()})");
             }
 
-            return Build(item, value, () => new SquadSpawnDef(name, side, fighter, count, formation, position, facing));
+            return Build(item, value, () => new SquadSpawnDef(name, side, body, men, formation, position, facing));
+        }
+
+        private static SquadMenDef ReadMen(JsonValue value, string path, string sourceName, CombatDef rules)
+        {
+            var item = JsonObjectReader.Of(value, path, sourceName);
+            int count = item.RequireInt("count");
+            string experienceId = item.RequireString("experience");
+            string kitId = item.RequireString("kit");
+            item.RejectUnknownMembers(MenMembers);
+            ExperienceDef? experience = rules.FindExperience(experienceId);
+            if (experience == null)
+            {
+                throw item.Error(value.Get("experience")!, item.MemberPath("experience"),
+                    $"unknown experience level '{experienceId}' (known: {Ids(rules.ExperienceLevels, e => e.Id)})");
+            }
+
+            KitDef? kit = rules.FindKit(kitId);
+            if (kit == null)
+            {
+                throw item.Error(value.Get("kit")!, item.MemberPath("kit"), $"unknown kit '{kitId}' (known: {Ids(rules.Kits, k => k.Id)})");
+            }
+
+            return Build(item, value, () => new SquadMenDef(count, experience, kit));
+        }
+
+        private static string Ids<T>(IReadOnlyList<T> defs, Func<T, string> idOf)
+        {
+            var ids = new string[defs.Count];
+            for (int i = 0; i < ids.Length; i++)
+            {
+                ids[i] = idOf(defs[i]);
+            }
+
+            return string.Join(", ", ids);
         }
 
         /// <summary>Runs a def constructor and turns its <see cref="ArgumentException"/> into a located content error.</summary>

@@ -56,7 +56,7 @@ namespace Knez.Sim.Movement
         /// map, clear of walls, on the squad's side of a wall; see <see cref="Terrain.ConstrainToward"/>).</summary>
         public static Fix DistanceToSlot(BattleState state, Squad squad, Fighter fighter)
         {
-            FixVec2 raw = SlotTracking.Position(squad, SlotTracking.Offset(squad, fighter));
+            FixVec2 raw = SlotTracking.Position(squad, SlotTracking.Offset(squad, fighter)) + fighter.TurnLag; // where he means to be
             FixVec2 slot = Terrain.ConstrainToward(state.Scenario.Map, raw, fighter.Radius, squad.Anchor);
             return (slot - fighter.Position).Length;
         }
@@ -261,7 +261,7 @@ namespace Knez.Sim.Movement
                 }
 
                 // A holder always has a squad (see Holding).
-                Fix holderCap = self.Def.WalkPerTick * Combat.Wounds.Pace(state.Scenario.Combat, self.Wound)
+                Fix holderCap = self.Body.WalkPerTick * Combat.Wounds.Pace(state.Scenario.Combat, self.Wound)
                     * state.FindSquad(other.SquadId)!.Formation.AllyPassSpeed;
                 cap = FixMath.Min(cap, holderCap);
             }

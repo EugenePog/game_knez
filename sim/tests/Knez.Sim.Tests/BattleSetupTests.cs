@@ -17,7 +17,9 @@ public class BattleSetupTests
             Assert.That(state.Squads.Select(s => s.Name), Is.EqualTo(new[] { "Line", "Column" }));
             Assert.That(state.Squads.Select(s => s.Members.Count), Is.EqualTo(new[] { 8, 6 }));
             Assert.That(state.Fighters, Has.Count.EqualTo(14));
-            Assert.That(state.Fighters.Select(f => f.Def), Has.All.SameAs(TestDefs.Warrior));
+            Assert.That(state.Fighters.Select(f => f.Body), Has.All.SameAs(TestDefs.Man));
+            Assert.That(state.Fighters.Select(f => f.Kit), Has.All.SameAs(TestDefs.Kit));
+            Assert.That(state.Fighters.Select(f => f.Experience), Has.All.SameAs(TestDefs.Experienced));
             Assert.That(state.Scenario.Id, Is.EqualTo("test-two-squads"));
         });
     }

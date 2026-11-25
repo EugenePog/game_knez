@@ -3,9 +3,9 @@
   "description": "M3 test: the raider line charges your line, which holds. At 7 s your flankers (waiting west) march onto the raiders' left end and strike it from the side: flank blows get +100 and half the shield, cost morale, and the raiders turn to meet them. In Unity, give the flank order yourself (the script gives it at 7 s otherwise).",
   "map": {"width": 60, "height": 40},
   "squads": [
-    {"name": "Hird line", "side": 0, "fighter": "warrior", "count": 8, "formation": "line", "position": [30, 12], "facing": 90},
-    {"name": "Flankers", "side": 0, "fighter": "warrior", "count": 6, "formation": "line", "position": [17, 13], "facing": 90},
-    {"name": "Raider line", "side": 1, "fighter": "warrior", "count": 8, "formation": "line", "position": [30, 28], "facing": 270}
+    {"name": "Hird line", "side": 0, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line", "position": [30, 12], "facing": 90},
+    {"name": "Flankers", "side": 0, "body": "man", "men": [{ "count": 6, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line", "position": [17, 13], "facing": 90},
+    {"name": "Raider line", "side": 1, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line", "position": [30, 28], "facing": 270}
   ],
   "script": [
     {"tick": 10, "order": "move", "squad": "Raider line", "target": [30, 6], "facing": 270},

@@ -150,7 +150,9 @@ public class FrameRecorderTests
             Assert.That(fighter.GetProperty("squad").GetInt32(), Is.EqualTo(1));
             Assert.That(fighter.GetProperty("slot").GetInt32(), Is.EqualTo(0));
             Assert.That(fighter.GetProperty("side").GetInt32(), Is.EqualTo(0));
-            Assert.That(fighter.GetProperty("def").GetString(), Is.EqualTo("test-warrior"));
+            Assert.That(fighter.GetProperty("def").GetString(), Is.EqualTo("test-man"), "his body, since M3 step 9");
+            Assert.That(fighter.GetProperty("experience").GetString(), Is.EqualTo("experienced"));
+            Assert.That(fighter.GetProperty("kit").GetString(), Is.EqualTo("sword-shield-padded"));
             Assert.That(fighter.GetProperty("radius").GetDouble(), Is.EqualTo(0.3).Within(0.0001));
             Assert.That(anchor[0].GetInt32(), Is.EqualTo(10));
             Assert.That(anchor[1].GetDouble(), Is.EqualTo(30.0));
@@ -245,6 +247,32 @@ public class FrameRecorderTests
             Assert.That(root.GetProperty("frames").GetArrayLength(), Is.EqualTo(2));
             Assert.That(root.GetProperty("faulted").GetProperty("tick").GetInt32(), Is.EqualTo(2));
             Assert.That(root.GetProperty("faulted").GetProperty("error").GetString(), Is.EqualTo("boom"));
+        });
+    }
+
+    [Test]
+    public void Frames_SquadBroke_CarriesItsCounts()
+    {
+        // M3 step 8: the counts that decided a break (or a re-form) go into the frames file with the event.
+        var stream = new MemoryStream();
+        var state = BattleSetup.Create(TestDefs.TwoSquads(), seed: 1);
+        using (var recorder = new FrameRecorder(stream, state))
+        {
+            state.BeginTick();
+            state.AddEvent(new Events.SquadBroke(state.Tick, state.Squads[0].Id, reformed: false, inFight: 7, running: 5));
+            recorder.Capture(state);
+            recorder.Complete();
+        }
+
+        using var doc = JsonDocument.Parse(stream.ToArray());
+        var broke = doc.RootElement.GetProperty("frames")[0].GetProperty("events")[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(broke.GetProperty("type").GetString(), Is.EqualTo("SquadBroke"));
+            Assert.That(broke.GetProperty("squad").GetInt32(), Is.EqualTo(state.Squads[0].Id.Value));
+            Assert.That(broke.GetProperty("reformed").GetBoolean(), Is.False);
+            Assert.That(broke.GetProperty("inFight").GetInt32(), Is.EqualTo(7));
+            Assert.That(broke.GetProperty("running").GetInt32(), Is.EqualTo(5));
         });
     }
 

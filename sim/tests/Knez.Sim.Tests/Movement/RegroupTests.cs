@@ -316,7 +316,7 @@ public class RegroupTests
 
             var state = BattleSetup.Create(scenario, 1);
             var squad = state.SquadList[0];
-            squad.Order = SquadOrder.Move(Terrain.Constrain(map, target, TestDefs.Warrior.Radius), Angle.Zero, facingFromMarch: true);
+            squad.Order = SquadOrder.Move(Terrain.Constrain(map, target, TestDefs.Man.Radius), Angle.Zero, facingFromMarch: true);
             var grid = new NavGrid(map);
             PathPlanner.Plan(state, squad, grid, new PathScratch(grid.Count));
             AssertNoDoublingBack(squad, start, $"trial {trial}");
@@ -331,7 +331,7 @@ public class RegroupTests
     {
         var tight = new FormationDef("tight", Fix.Ratio(65, 100), Fix.One, ranks: 2, width: 0, turnRate: Fix.FromInt(45), holdWeight: 3, allyPassSpeed: Fix.Ratio(1, 3));
         var ex = Assert.Throws<ArgumentException>(() => new ScenarioDef("s", "", TestDefs.Map,
-            [new SquadSpawnDef("A", 0, TestDefs.Warrior, 4, tight, FixVec2.FromInts(10, 10), Angle.FromDegrees(90))]));
+            [new SquadSpawnDef("A", 0, TestDefs.Man, TestDefs.Men(4), tight, FixVec2.FromInts(10, 10), Angle.FromDegrees(90))]));
         Assert.That(ex!.Message, Does.Contain("personalSpace"));
     }
 }

@@ -91,7 +91,7 @@ public class CliAppTests
         {
             Directory.CreateDirectory(Path.Combine(dir, "defs"));
             Directory.CreateDirectory(Path.Combine(dir, "scenarios"));
-            File.Copy(Path.Combine(RepoPaths.Content, "defs", "fighters.json"), Path.Combine(dir, "defs", "fighters.json"));
+            File.Copy(Path.Combine(RepoPaths.Content, "defs", "bodies.json"), Path.Combine(dir, "defs", "bodies.json"));
             File.Copy(Path.Combine(RepoPaths.Content, "defs", "formations.json"), Path.Combine(dir, "defs", "formations.json"));
             string scenario = Path.Combine(dir, "scenarios", "broken.json");
             File.WriteAllText(scenario, File.ReadAllText(Formations).Replace("\"shieldwall\"", "\"testudo\""));
@@ -153,6 +153,39 @@ public class CliAppTests
             Assert.That(root.GetProperty("seeds").GetString(), Is.EqualTo("3-5"));
             Assert.That(root.GetProperty("stuck").GetProperty("worstRunFighters").GetInt32(), Is.Zero);
             Assert.That(root.GetProperty("distinctOutcomes").GetInt32(), Is.EqualTo(1), "movement draws no random numbers yet: every seed, the same battle");
+            Assert.That(root.GetProperty("battle").ValueKind, Is.EqualTo(JsonValueKind.Null), "a march has no blows and no decision");
+        });
+    }
+
+    [Test]
+    public void Batch_AFight_PrintsTheBalanceMeasures()
+    {
+        string s6 = Path.Combine(RepoPaths.Content, "scenarios", "bench", "s6-lines.json");
+        var (exit, stdout, stderr) = Invoke("batch", s6, "--seeds", "1-4", "--ticks", "1200");
+        var (jsonExit, json, _) = Invoke("batch", s6, "--seeds", "1-4", "--ticks", "1200", "--json");
+        using var doc = JsonDocument.Parse(json);
+        var battle = doc.RootElement.GetProperty("battle");
+        var ended = battle.GetProperty("ended");
+        double wins = battle.GetProperty("wins").EnumerateObject().Sum(p => p.Value.GetDouble());
+        Assert.Multiple(() =>
+        {
+            Assert.That(exit, Is.EqualTo(CliApp.ExitOk), stderr);
+            Assert.That(jsonExit, Is.EqualTo(CliApp.ExitOk));
+            Assert.That(stdout, Does.Contain("wins:       side 0 "));
+            Assert.That(stdout, Does.Contain("ended:      "));
+            Assert.That(stdout, Does.Contain("length:     decided at "));
+            Assert.That(stdout, Does.Contain("breaks:     "));
+            Assert.That(stdout, Does.Contain("fallen:     side 0 "));
+            Assert.That(ended.GetProperty("rout").GetInt32() + ended.GetProperty("annihilation").GetInt32()
+                + ended.GetProperty("nobody").GetInt32() + ended.GetProperty("undecided").GetInt32(), Is.EqualTo(4));
+            Assert.That(ended.GetProperty("limitSeconds").GetDouble(), Is.EqualTo(60));
+            Assert.That(wins, Is.EqualTo(1 - (ended.GetProperty("nobody").GetInt32() + ended.GetProperty("undecided").GetInt32()) / 4.0).Within(1e-9));
+            Assert.That(battle.GetProperty("lossAtBreak").GetProperty("breaks").GetInt32(), Is.GreaterThan(0));
+            var bySide = battle.GetProperty("lossAtBreak").GetProperty("bySide");
+            Assert.That(bySide.GetProperty("0").GetProperty("breaks").GetInt32() + bySide.GetProperty("1").GetProperty("breaks").GetInt32(),
+                Is.EqualTo(battle.GetProperty("lossAtBreak").GetProperty("breaks").GetInt32()), "every break belongs to a side");
+            Assert.That(stdout, Does.Contain("% of their men mean"));
+            Assert.That(stdout, Does.Match("side [01]: [0-9]+ at [0-9.]+%"));
         });
     }
 

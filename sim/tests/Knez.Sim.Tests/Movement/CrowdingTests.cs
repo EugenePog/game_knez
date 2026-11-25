@@ -24,8 +24,8 @@ public class CrowdingTests
     private static (BattleState State, Fighter A, Fighter B) Pair(int ax100, int bx100, int y = 10, bool allies = false)
     {
         var state = new BattleState(1);
-        var a = state.AddFighter(TestDefs.Warrior, 0, new FixVec2(M(ax100), Fix.FromInt(y)), Angle.Zero);
-        var b = state.AddFighter(TestDefs.Warrior, allies ? 0 : 1, new FixVec2(M(bx100), Fix.FromInt(y)), Angle.Zero);
+        var a = state.AddFighter(TestDefs.Man, TestDefs.Experienced, TestDefs.Kit, 0, new FixVec2(M(ax100), Fix.FromInt(y)), Angle.Zero);
+        var b = state.AddFighter(TestDefs.Man, TestDefs.Experienced, TestDefs.Kit, allies ? 0 : 1, new FixVec2(M(bx100), Fix.FromInt(y)), Angle.Zero);
         return (state, a, b);
     }
 
@@ -148,7 +148,7 @@ public class CrowdingTests
         var roles = new List<CrowdRole>();
         Crowding.Fill(state, weights, roles);
         int i = state.FighterList.IndexOf(man);
-        var north = new FixVec2(Fix.Zero, TestDefs.Warrior.WalkPerTick);
+        var north = new FixVec2(Fix.Zero, TestDefs.Man.WalkPerTick);
         List<FixVec2> Intent(FixVec2 v) => state.FighterList.Select((f, k) => k == i ? v : FixVec2.Zero).ToList();
 
         man.Position = holder.Position - new FixVec2(Fix.Zero, M(65)); // just south of the holder
@@ -178,16 +178,16 @@ public class CrowdingTests
     public void Squeeze_OrderedManInsideAHoldingAllysRanks_MovesAtAThirdOfHisWalk_OthersUnaffected()
     {
         var (state, holder, ordered, _, roles) = AlliedPair(); // bodies overlap by 0.2 m
-        var enemy = state.AddFighter(TestDefs.Warrior, 1, holder.Position - new FixVec2(Fix.Zero, M(50)), Angle.Zero);
+        var enemy = state.AddFighter(TestDefs.Man, TestDefs.Experienced, TestDefs.Kit, 1, holder.Position - new FixVec2(Fix.Zero, M(50)), Angle.Zero);
         roles.Add(CrowdRole.Loose);
         int orderedIndex = state.FighterList.IndexOf(ordered);
         int holderIndex = state.FighterList.IndexOf(holder);
         int enemyIndex = state.FighterList.IndexOf(enemy);
-        var fast = new FixVec2(Fix.Zero, TestDefs.Warrior.RunPerTick);
+        var fast = new FixVec2(Fix.Zero, TestDefs.Man.RunPerTick);
         Assert.Multiple(() =>
         {
             Assert.That(Crowding.Squeeze(state, roles, orderedIndex, fast).Length.Raw,
-                Is.EqualTo((TestDefs.Warrior.WalkPerTick * Fix.Ratio(1, 3)).Raw).Within(1), "a third of 1.4 m/s per tick");
+                Is.EqualTo((TestDefs.Man.WalkPerTick * Fix.Ratio(1, 3)).Raw).Within(1), "a third of 1.4 m/s per tick");
             Assert.That(Crowding.Squeeze(state, roles, enemyIndex, fast), Is.EqualTo(fast), "enemies don't squeeze, they collide");
             Assert.That(Crowding.Squeeze(state, roles, holderIndex, fast), Is.EqualTo(fast), "the holder isn't slowed");
         });
@@ -198,7 +198,7 @@ public class CrowdingTests
     {
         var (state, holder, ordered, _, roles) = AlliedPair();
         ordered.Position = holder.Position + new FixVec2(Fix.Zero, M(65)); // in front of the line, 5 cm clear
-        var fast = new FixVec2(Fix.Zero, TestDefs.Warrior.RunPerTick);
+        var fast = new FixVec2(Fix.Zero, TestDefs.Man.RunPerTick);
         Assert.That(Crowding.Squeeze(state, roles, state.FighterList.IndexOf(ordered), fast), Is.EqualTo(fast));
     }
 
@@ -259,8 +259,8 @@ public class CrowdingTests
         Crowding.Resolve(state, [1, 1], [CrowdRole.Loose, CrowdRole.Loose]);
         Assert.Multiple(() =>
         {
-            Assert.That(a.Position, Is.EqualTo(new FixVec2(TestDefs.Warrior.Radius, TestDefs.Warrior.Radius)), "clamped to one radius from the corner");
-            Assert.That(b.Position, Is.EqualTo(new FixVec2(Fix.FromInt(100) - TestDefs.Warrior.Radius, TestDefs.Warrior.Radius)));
+            Assert.That(a.Position, Is.EqualTo(new FixVec2(TestDefs.Man.Radius, TestDefs.Man.Radius)), "clamped to one radius from the corner");
+            Assert.That(b.Position, Is.EqualTo(new FixVec2(Fix.FromInt(100) - TestDefs.Man.Radius, TestDefs.Man.Radius)));
         });
     }
 
@@ -270,7 +270,7 @@ public class CrowdingTests
         var state = new BattleState(1);
         for (int i = 0; i < 12; i++)
         {
-            state.AddFighter(TestDefs.Warrior, i % 2, new FixVec2(M(1000 + 5 * (i % 4)), M(1000 + 5 * (i / 4))), Angle.Zero);
+            state.AddFighter(TestDefs.Man, TestDefs.Experienced, TestDefs.Kit, i % 2, new FixVec2(M(1000 + 5 * (i % 4)), M(1000 + 5 * (i / 4))), Angle.Zero);
         }
 
         var weights = Enumerable.Repeat(1, 12).ToList();
@@ -288,7 +288,7 @@ public class CrowdingTests
         var sim = new BattleSimulation(BattleSetup.Create(TestDefs.TwoSquads(), 1));
         var state = sim.State;
         var line = state.Squads[0];
-        var loose = state.AddFighter(TestDefs.Warrior, 0, FixVec2.FromInts(5, 5), Angle.Zero);
+        var loose = state.AddFighter(TestDefs.Man, TestDefs.Experienced, TestDefs.Kit, 0, FixVec2.FromInts(5, 5), Angle.Zero);
         Assert.That(WeightOf(state, state.FindFighter(line.Members[0])!), Is.EqualTo(TestDefs.Line.HoldWeight));
 
         line.Order = SquadOrder.Move(FixVec2.FromInts(20, 30), Angle.FromDegrees(90));
@@ -436,7 +436,7 @@ public class CrowdingTests
         var holders = sim.State.Squads[0];
         var movers = sim.State.Squads[1];
         var holderStart = holders.Members.Select(id => sim.State.FindFighter(id)!.Position).ToArray();
-        long squeezeCap = (TestDefs.Warrior.WalkPerTick * Fix.Ratio(1, 3)).Raw;
+        long squeezeCap = (TestDefs.Man.WalkPerTick * Fix.Ratio(1, 3)).Raw;
         bool squeezed = false;
         int overlapWorst = 0;
         for (int i = 0; i < 1500; i++)
@@ -506,7 +506,7 @@ public class CrowdingTests
             worstStep = Math.Max(worstStep, sim.State.Fighters.Select((f, k) => (f.Position - before[k]).Length.Raw).Max());
         }
 
-        long limit = (TestDefs.Warrior.RunPerTick + Fix.Ratio(1, 10)).Raw; // a stride plus at most personal space of parting
+        long limit = (TestDefs.Man.RunPerTick + Fix.Ratio(1, 10)).Raw; // a stride plus at most personal space of parting
         Assert.That(worstStep, Is.LessThanOrEqualTo(limit), "no one-tick jumps when allies stop passing through each other");
     }
 

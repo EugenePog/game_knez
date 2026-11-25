@@ -17,6 +17,8 @@ namespace Knez.Game.Input
     /// <item>Right click: move there; right drag: move there facing the drag's direction.</item>
     /// <item>1 / 2 / 3: line, shield wall, column (formations from the scenario's catalogue).</item>
     /// <item>Space: pause; = / −: faster / slower.</item>
+    /// <item>L: battle log on/off; B: morale bars over the men on/off (M3 step 8).</item>
+    /// <item>Clicks and the wheel over the HUD's panels (<see cref="BattleHud.Covers"/>) don't reach the map.</item>
     /// <item>WASD or arrows, or middle drag: pan; scroll: zoom.</item>
     /// </list>
     /// </summary>
@@ -24,6 +26,7 @@ namespace Knez.Game.Input
     {
         [SerializeField] private BattleRunner? runner;
         [SerializeField] private BattleView? view;
+        [SerializeField] private BattleHud? hud;
         [SerializeField] private Camera? viewCamera;
         [Tooltip("The side the player commands.")]
         [SerializeField] private int side;
@@ -50,6 +53,11 @@ namespace Knez.Game.Input
                 view = GetComponent<BattleView>();
             }
 
+            if (hud == null)
+            {
+                hud = GetComponent<BattleHud>();
+            }
+
             if (viewCamera == null)
             {
                 viewCamera = UnityEngine.Camera.main;
@@ -74,10 +82,11 @@ namespace Knez.Game.Input
             }
 
             Keys(sim, keyboard);
-            PanAndZoom(mouse, keyboard);
+            bool overHud = hud != null && hud.Covers(mouse.position.ReadValue());
+            PanAndZoom(mouse, keyboard, overHud);
             Vector2 world = viewCamera.ScreenToWorldPoint(mouse.position.ReadValue());
 
-            if (mouse.leftButton.wasPressedThisFrame)
+            if (mouse.leftButton.wasPressedThisFrame && !overHud)
             {
                 _leftDown = world;
             }
@@ -100,7 +109,7 @@ namespace Knez.Game.Input
                 }
             }
 
-            if (mouse.rightButton.wasPressedThisFrame)
+            if (mouse.rightButton.wasPressedThisFrame && !overHud)
             {
                 _rightDown = world;
             }
@@ -109,7 +118,7 @@ namespace Knez.Game.Input
             {
                 foreach (ICommand command in OrderBuilder.Moves(sim.State, _selected, _rightDown.Value, world, side))
                 {
-                    sim.Enqueue(command);
+                    runner.Enqueue(command);
                 }
 
                 _rightDown = null;
@@ -159,6 +168,16 @@ namespace Knez.Game.Input
                 runner!.Clock.Slower();
             }
 
+            if (keyboard.lKey.wasPressedThisFrame && hud != null)
+            {
+                hud.ShowLog = !hud.ShowLog;
+            }
+
+            if (keyboard.bKey.wasPressedThisFrame && view != null)
+            {
+                view.ShowMoraleBars = !view.ShowMoraleBars;
+            }
+
             if (keyboard.escapeKey.wasPressedThisFrame)
             {
                 _selected.Clear();
@@ -175,13 +194,13 @@ namespace Knez.Game.Input
                 {
                     foreach (EntityId id in _selected)
                     {
-                        sim.Enqueue(new SetFormationCommand(side, id, FormationKeys[i]));
+                        runner!.Enqueue(new SetFormationCommand(side, id, FormationKeys[i]));
                     }
                 }
             }
         }
 
-        private void PanAndZoom(Mouse mouse, Keyboard keyboard)
+        private void PanAndZoom(Mouse mouse, Keyboard keyboard, bool overHud)
         {
             Transform cam = viewCamera!.transform;
             float speed = viewCamera.orthographicSize * 1.2f * Time.unscaledDeltaTime;
@@ -198,7 +217,7 @@ namespace Knez.Game.Input
                 cam.position -= (Vector3)(delta * metresPerPixel);
             }
 
-            float scroll = mouse.scroll.ReadValue().y;
+            float scroll = overHud ? 0 : mouse.scroll.ReadValue().y; // over the HUD the wheel scrolls its panels
             if (scroll != 0)
             {
                 viewCamera.orthographicSize = Mathf.Clamp(viewCamera.orthographicSize * (scroll > 0 ? 0.9f : 1.1f), 3f, 150f);

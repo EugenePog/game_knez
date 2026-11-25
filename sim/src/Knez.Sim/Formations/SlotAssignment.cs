@@ -72,6 +72,7 @@ namespace Knez.Sim.Formations
                 if (best != null)
                 {
                     best.SlotIndex = gap;
+                    best.TurnLag = FixVec2.Zero; // his lag belonged to his old place (soft wheel, battle-sim.md §10)
                 }
             }
 
@@ -112,7 +113,9 @@ namespace Knez.Sim.Formations
             int count = members.Count;
             for (int m = 0; m < count; m++)
             {
-                state.FindFighter(members[m])!.SlotIndex = Fighter.NoSlot;
+                Fighter man = state.FindFighter(members[m])!;
+                man.SlotIndex = Fighter.NoSlot;
+                man.TurnLag = FixVec2.Zero; // the new place is picked from where he stands, so no lag carries over
             }
 
             int width = FormationLayout.Width(squad.Formation, squad.Frontage, count);

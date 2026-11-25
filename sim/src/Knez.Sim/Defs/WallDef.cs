@@ -21,7 +21,7 @@ namespace Knez.Sim.Defs
         }
 
         /// <summary>Thinnest wall accepted: 10 cm. A body could step through a wall only by moving more than its radius
-        /// plus half this per tick, which <see cref="FighterDef"/> refuses. A sanity bound.</summary>
+        /// plus half this per tick, which <see cref="BodyDef"/> refuses. A sanity bound.</summary>
         public static readonly Fix MinThickness = Fix.Ratio(1, 10);
 
         /// <summary>South-west corner, metres.</summary>

@@ -48,7 +48,7 @@ namespace Knez.Sim.Combat
                         }
 
                         fighter.Action = FighterAction.Recovery;
-                        fighter.ActionTicks = fighter.Def.Kit.Weapon.RecoveryTicks;
+                        fighter.ActionTicks = fighter.Kit.Weapon.RecoveryTicks;
                     }
 
                     continue;
@@ -68,7 +68,7 @@ namespace Knez.Sim.Combat
                 if (target != null && Blows.CanStrike(rules, fighter, target))
                 {
                     fighter.Action = FighterAction.Windup;
-                    fighter.ActionTicks = fighter.Def.Kit.Weapon.WindupTicks;
+                    fighter.ActionTicks = fighter.Kit.Weapon.WindupTicks;
                 }
             }
         }

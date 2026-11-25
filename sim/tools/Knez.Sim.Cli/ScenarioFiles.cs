@@ -6,7 +6,9 @@ namespace Knez.Sim.Cli;
 /// <summary>
 /// Reads content from disk for the CLI (the sim and Knez.Sim.Content never touch files). The defs are every
 /// <c>defs/*.json</c> in the nearest folder above the scenario that has a <c>defs</c> folder — <c>content/</c> in this repo,
-/// so <c>content/scenarios/x.json</c> and <c>content/scenarios/bench/y.json</c> both find <c>content/defs/</c>.
+/// so <c>content/scenarios/x.json</c> and <c>content/scenarios/bench/y.json</c> both find <c>content/defs/</c>. A scenario
+/// outside content (a battle recorded in Unity, <c>artifacts/sessions/*.json</c>) finds the nearest <c>content/defs/</c>
+/// above it instead.
 /// </summary>
 public static class ScenarioFiles
 {
@@ -21,7 +23,7 @@ public static class ScenarioFiles
         }
 
         string defsDir = FindDefsDirectory(fullPath)
-            ?? throw new DirectoryNotFoundException($"no 'defs' folder above {scenarioPath}; scenarios live under content/");
+            ?? throw new DirectoryNotFoundException($"no 'defs' or 'content/defs' folder above {scenarioPath}");
 
         var defFiles = Directory.GetFiles(defsDir, "*.json").Order(StringComparer.Ordinal).Select(Read).ToArray();
         var defs = DefLibrary.Parse(defFiles);
@@ -33,6 +35,12 @@ public static class ScenarioFiles
         for (var dir = Path.GetDirectoryName(scenarioFile); dir != null; dir = Path.GetDirectoryName(dir))
         {
             string candidate = Path.Combine(dir, "defs");
+            if (Directory.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            candidate = Path.Combine(dir, "content", "defs");
             if (Directory.Exists(candidate))
             {
                 return candidate;

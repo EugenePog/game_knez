@@ -34,6 +34,16 @@ namespace Knez.Game.View
         /// <summary>Why the battle didn't load or stopped, or null.</summary>
         public string? Error { get; private set; }
 
+        /// <summary>The orders given so far, written out as a replayable scenario when the battle object goes away.</summary>
+        public SessionRecorder Recorder { get; private set; } = new SessionRecorder();
+
+        /// <summary>Where the last session was written, or null.</summary>
+        public string? SessionFile { get; private set; }
+
+        private SourceText? _scenarioText;
+        private int _battleSeed;
+        private string? _fault;
+
         /// <summary>Raised after every tick stepped, with the state as it now stands (the view keeps the tick before).</summary>
         public event Action<BattleState>? Ticked;
 
@@ -43,8 +53,21 @@ namespace Knez.Game.View
             for (int i = 0; i < ticks && Simulation != null; i++)
             {
                 Simulation.Step();
+                Recorder.Stepped(Simulation.State);
                 Ticked?.Invoke(Simulation.State);
             }
+        }
+
+        /// <summary>Gives <paramref name="command"/> to the battle for the next tick and records it for the session file.</summary>
+        public void Enqueue(Knez.Sim.Commands.ICommand command)
+        {
+            if (Simulation == null)
+            {
+                return;
+            }
+
+            Simulation.Enqueue(command);
+            Recorder.Enqueued(Simulation.State, command);
         }
 
         /// <summary>Pauses or resumes the battle.</summary>
@@ -55,6 +78,8 @@ namespace Knez.Game.View
         {
             Simulation = new BattleSimulation(BattleSetup.Create(scenarioDef, battleSeed));
             Error = null;
+            Recorder = new SessionRecorder();
+            _scenarioText = null; // no file to write the orders into
         }
 
         private void Awake()
@@ -63,9 +88,12 @@ namespace Knez.Game.View
             Clock.Paused = startPaused;
             try
             {
-                var def = ContentFiles.LoadScenario(ContentFiles.DefaultRoot(), scenario);
-                Simulation = new BattleSimulation(BattleSetup.Create(def, (ulong)Math.Max(1, seed)));
-                Debug.Log($"Knez: loaded {def.Id} — {def.Squads.Count} squads, seed {seed}.");
+                string root = ContentFiles.DefaultRoot();
+                var def = ContentFiles.LoadScenario(root, scenario);
+                _scenarioText = new SourceText(scenario, File.ReadAllText(Path.Combine(root, scenario)));
+                _battleSeed = Math.Max(1, seed);
+                Simulation = new BattleSimulation(BattleSetup.Create(def, (ulong)_battleSeed));
+                Debug.Log($"Knez: loaded {def.Id} — {def.Squads.Count} squads, seed {_battleSeed}.");
             }
             catch (Exception ex) when (ex is ContentException or IOException or ArgumentException)
             {
@@ -88,11 +116,54 @@ namespace Knez.Game.View
             catch (Exception ex)
             {
                 // The sim's state is half-updated after a throw (BattleSimulation.IsFaulted): stop, don't limp on.
+                // Keep the faulted tick's orders (applied before the throw) so the session reproduces the fault.
+                Recorder.Stepped(Simulation.State);
+                _fault = $"faulted in tick {Simulation.State.Tick} ({ex.GetType().Name})";
                 Stop($"Knez: simulation error in tick {Simulation.State.Tick}: {ex.GetType().Name}: {ex.Message}");
             }
         }
 
         private void OnValidate() => Clock.Speed = speed;
+
+        // Leaving Play mode or quitting destroys the runner: that's when the session is written.
+        private void OnDestroy() => WriteSession();
+
+        /// <summary>
+        /// Writes the scenario with every applied order in its script to <c>artifacts/sessions/</c> (next to the repo's
+        /// content in the editor, persistentDataPath/sessions in a build), so the battle replays headless with the CLI.
+        /// Nothing is written when no order was given.
+        /// </summary>
+        public void WriteSession()
+        {
+            if (_scenarioText == null || Simulation == null || Recorder.Orders.Count == 0 || SessionFile != null)
+            {
+                return;
+            }
+
+            SourceText source = _scenarioText.Value;
+            try
+            {
+                string id = Path.GetFileNameWithoutExtension(source.Name);
+                int battleSeed = _battleSeed; // as Awake started it, whatever the Inspector says now
+                string stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture);
+                string folder = Application.isEditor
+                    ? Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "artifacts", "sessions"))
+                    : Path.Combine(Application.persistentDataPath, "sessions");
+                string file = Path.Combine(folder, $"{id}-seed{battleSeed}-{stamp}.json");
+                string description = $"Played in Unity on {stamp} with seed {battleSeed} until tick {Simulation.State.Tick}{(_fault != null ? ", where it " + _fault : string.Empty)}; "
+                    + $"{Recorder.Orders.Count} orders in the script. Replay it with --seed {battleSeed}. Scenario: {source.Name}.";
+                string text = Recorder.Write(source, $"{id}-session", description);
+                Directory.CreateDirectory(folder);
+                File.WriteAllText(file, text);
+                SessionFile = file;
+                Debug.Log($"Knez: session written to {file} — replay: dotnet run --project sim/tools/Knez.Sim.Cli -c Release -- "
+                    + $"run {file} --seed {battleSeed} --ticks {Math.Max(1, Simulation.State.Tick)} --frames artifacts/replays/{id}-session.frames.json");
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ContentException)
+            {
+                Debug.LogWarning($"Knez: couldn't write the session: {ex.Message}");
+            }
+        }
 
         private void Stop(string message)
         {

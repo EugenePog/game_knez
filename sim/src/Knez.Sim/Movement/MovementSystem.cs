@@ -29,7 +29,8 @@ namespace Knez.Sim.Movement
                 fighter.Position += velocity;
 
                 Squad? squad = fighter.SquadId.IsNone || fighter.SlotIndex < 0 ? null : state.FindSquad(fighter.SquadId);
-                FixVec2 relative = squad == null ? velocity : velocity - SlotMotion(squad, fighter);
+                FixVec2 relative = squad == null ? velocity : velocity - SlotMotion(squad, fighter)
+                    - (i < context.TurnLagMotion.Count ? context.TurnLagMotion[i] : FixVec2.Zero); // none when steering didn't run
                 Angle look;
                 Fighter? enemy = fighter.IsEngaged ? state.FindFighter(fighter.Target) : null;
                 FixVec2 toEnemy = enemy == null ? FixVec2.Zero : enemy.Position - fighter.Position;
@@ -37,7 +38,7 @@ namespace Knez.Sim.Movement
                 {
                     look = FixMath.Atan2(toEnemy.Y, toEnemy.X); // in melee he faces his enemy (decided 2026-11-23)
                 }
-                else if (relative.Length > fighter.Def.WalkPerTick || (squad == null && velocity != FixVec2.Zero))
+                else if (relative.Length > fighter.Body.WalkPerTick || (squad == null && velocity != FixVec2.Zero))
                 {
                     look = FixMath.Atan2(velocity.Y, velocity.X);
                 }
@@ -50,7 +51,7 @@ namespace Knez.Sim.Movement
                     continue;
                 }
 
-                fighter.Facing = fighter.Facing.TurnToward(look, fighter.Def.TurnPerTick);
+                fighter.Facing = fighter.Facing.TurnToward(look, fighter.Body.TurnPerTick);
             }
 
             List<int> weights = context.FighterWeights;
@@ -59,7 +60,8 @@ namespace Knez.Sim.Movement
             Crowding.Resolve(state, weights, roles);
         }
 
-        /// <summary>The fighter's slot motion this tick: outer slots of a turning squad move faster than its anchor.</summary>
+        /// <summary>The fighter's slot motion this tick: outer slots of a turning squad move faster than its anchor (his
+        /// turn lag's change, added by the caller, takes most of that back).</summary>
         private static FixVec2 SlotMotion(Squad squad, Fighter fighter)
         {
             FixVec2 offset = SlotTracking.Offset(squad, fighter);

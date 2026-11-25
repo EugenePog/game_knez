@@ -3,8 +3,8 @@
   "description": "M3 test: your spearmen hold; raider swordsmen charge. Spears reach 1.8 m, so the spearmen strike first, before the swords can reach them.",
   "map": {"width": 60, "height": 40},
   "squads": [
-    {"name": "Spear line", "side": 0, "fighter": "spearman", "count": 8, "formation": "line", "position": [30, 14], "facing": 90},
-    {"name": "Raider line", "side": 1, "fighter": "warrior", "count": 8, "formation": "line", "position": [30, 30], "facing": 270}
+    {"name": "Spear line", "side": 0, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "spear-shield-padded" }], "formation": "line", "position": [30, 14], "facing": 90},
+    {"name": "Raider line", "side": 1, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line", "position": [30, 30], "facing": 270}
   ],
   "script": [
     {"tick": 10, "order": "move", "squad": "Raider line", "target": [30, 6], "facing": 270}

@@ -51,7 +51,7 @@ public class BattleStateTests
         clone.Squads[0].Anchor = FixVec2.FromInts(40, 40);
         clone.Squads[0].MemberList.RemoveAt(0);
         clone.Rng(RngStream.Combat).NextUInt();
-        clone.AddFighter(TestDefs.Warrior, 1, FixVec2.Zero, Angle.Zero);
+        clone.AddFighter(TestDefs.Man, TestDefs.Experienced, TestDefs.Kit, 1, FixVec2.Zero, Angle.Zero);
 
         Assert.That(StateHasher.Compute(original), Is.EqualTo(before));
     }

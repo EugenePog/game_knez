@@ -20,14 +20,13 @@ public class BlowTests
     private static readonly FormationDef ShieldWall = new("test-shieldwall", Fix.Ratio(3, 4), Fix.One, ranks: 2, width: 0,
         turnRate: Fix.FromInt(30), holdWeight: 3, allyPassSpeed: Fix.Ratio(1, 3), shieldWall: true);
 
-    private static FighterDef Armoured { get; } = new("test-armoured", Fix.Ratio(3, 10), Fix.Ratio(14, 10), Fix.Ratio(35, 10),
-        Fix.FromInt(360), new FighterKit(C.DefaultKit.Weapon, C.FindShield("round")!, C.FindBodyArmour("mail")!,
-            C.FindHeadCover("helm")!, C.FindExperience("elite")!, C.DefaultKit.Type));
+    /// <summary>An elite man in mail and helm with sword and round shield.</summary>
+    private static SquadMenDef Armoured { get; } = TestDefs.Men(1, TestDefs.Level("elite"), TestDefs.KitOf("sword-shield-mail"))[0];
 
     /// <summary>Lone men (squads of one) at points in centimetres, each facing the given way.</summary>
-    private static BattleSimulation Men(params (int side, int xCm, int yCm, int facing, FighterDef? def, FormationDef? formation)[] men)
+    private static BattleSimulation Men(params (int side, int xCm, int yCm, int facing, SquadMenDef? def, FormationDef? formation)[] men)
     {
-        var squads = men.Select((m, i) => new SquadSpawnDef($"m{i}", m.side, m.def ?? TestDefs.Warrior, 1,
+        var squads = men.Select((m, i) => new SquadSpawnDef($"m{i}", m.side, TestDefs.Man, [m.def ?? TestDefs.Men(1)[0]],
             m.formation ?? TestDefs.Line, new FixVec2(Fix.Ratio(m.xCm, 100), Fix.Ratio(m.yCm, 100)),
             Angle.FromDegrees(m.facing))).ToArray();
         var formations = men.Select(m => m.formation ?? TestDefs.Line).Distinct().ToArray();
@@ -54,6 +53,28 @@ public class BlowTests
             Assert.That(s2, Is.EqualTo(BlowSector.Flank));
             Assert.That(Chance(rear, 0, 1, out var s3), Is.EqualTo(500 - 0 - 70 - 30 - 40 + 200), "no shield, +200");
             Assert.That(s3, Is.EqualTo(BlowSector.Rear));
+        });
+    }
+
+    [Test]
+    public void Chance_AttackersWeaponPenetrates_DefendersWeaponDefends()
+    {
+        // M3 step 9: the attacker's weapon penetration takes its share off the defender's armour and head cover; the
+        // defender's own weapon adds its defence (the spear's 30).
+        var spear = TestDefs.Men(1, kit: TestDefs.KitOf("spear-shield-padded"))[0];
+        var newAxe = TestDefs.Men(1, TestDefs.Level("new"), TestDefs.KitOf("axe-shield"))[0];
+        var spearAttacks = Men((0, 2000, 1000, 90, spear, null), (1, 2000, 1100, 270, null, null));
+        var swordAttacksSpear = Men((0, 2000, 1000, 90, null, null), (1, 2000, 1100, 270, spear, null));
+        var axeOnTheFlank = Men((0, 2000, 1000, 90, newAxe, null), (1, 2000, 1100, 0, Armoured, null));
+        Assert.Multiple(() =>
+        {
+            Assert.That(Chance(spearAttacks, 0, 1, out _), Is.EqualTo(460 - 220 - (100 * 800 / 1000) - 40),
+                "spear 200: padded coat and cap count 80 of 100");
+            Assert.That(Chance(swordAttacksSpear, 0, 1, out _), Is.EqualTo(500 - 220 - 100 - 40 - 30),
+                "the defender's spear keeps the sword off: −30; the sword penetrates nothing");
+            Assert.That(Chance(axeOnTheFlank, 0, 1, out var sector), Is.EqualTo(400 - 110 - (200 * 700 / 1000) - 120 + 100),
+                "axe 300 against mail and helm: 140 of 200 count");
+            Assert.That(sector, Is.EqualTo(BlowSector.Flank));
         });
     }
 
@@ -111,7 +132,7 @@ public class BlowTests
     public void Blows_FacingPair_StrikeEveryWindupPlusRecovery()
     {
         var sim = Men((0, 2000, 1000, 90, null, null), (1, 2000, 1100, 270, null, null));
-        var blows = RunCollecting(sim, 80);
+        var blows = RunCollecting(sim, 100); // three cycles of 0.7 + 1.2 s
         var sword = C.FindWeapon("sword")!;
         int first = 1 + sword.WindupTicks; // engaged at tick 1, the windup starts that tick
         int cycle = sword.WindupTicks + sword.RecoveryTicks;
@@ -142,7 +163,7 @@ public class BlowTests
         int off = Man(sim, 0).Facing.DeltaTo(towardEnemy);
         Assert.Multiple(() =>
         {
-            Assert.That(Math.Abs(off), Is.LessThanOrEqualTo(Man(sim, 0).Def.TurnPerTick), "he turned to face his enemy");
+            Assert.That(Math.Abs(off), Is.LessThanOrEqualTo(Man(sim, 0).Body.TurnPerTick), "he turned to face his enemy");
             Assert.That(firstBack, Is.GreaterThan(firstIn), "turning cost him the first blow");
         });
     }
@@ -209,7 +230,7 @@ public class BlowTests
         defender.Position = new FixVec2(defender.Position.X, defender.Position.Y + Fix.FromInt(3)); // he steps away
         defender.Action = FighterAction.Idle; // and drops his own blow, so only the attacker's could roll
         ulong rngBefore = sim.State.Rng(RngStream.Combat).State;
-        var blows = RunCollecting(sim, attacker.Def.Kit.Weapon.WindupTicks);
+        var blows = RunCollecting(sim, attacker.Kit.Weapon.WindupTicks);
         Assert.Multiple(() =>
         {
             Assert.That(blows, Is.Empty, "no blow struck at nobody");

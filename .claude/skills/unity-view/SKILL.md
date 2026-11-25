@@ -31,8 +31,9 @@ inside the package folder (`Directory.Build.props` redirects it to `sim/artifact
 
 1. **Read, don't own.** The view reads `IReadOnlyBattleState`/snapshots and `SimEvent`s. GameObjects hold only
    view caches keyed by `EntityId` (sprite, label, previous position).
-2. **Input = commands.** Clicks and hotkeys build `ICommand`s and enqueue them. Selection, camera and UI state stay in
-   the view.
+2. **Input = commands.** Clicks and hotkeys build `ICommand`s and enqueue them through `BattleRunner.Enqueue` (not
+   `Simulation.Enqueue`), so they land in the session file written when Play stops (`artifacts/sessions/`, see
+   `battle-run`). Selection, camera and UI state stay in the view.
 3. **Real time lives here.** A `BattleRunner` MonoBehaviour accumulates `Time.unscaledDeltaTime`, calls `Step()`
    while the accumulator ≥ 50 ms × speed, and interpolates positions with `alpha = accumulator / tickDuration`.
    Pause = stop stepping; commands are still accepted while paused.
@@ -40,6 +41,13 @@ inside the package folder (`Directory.Build.props` redirects it to `sim/artifact
 5. **No gameplay in Unity:** no NavMesh, no Rigidbody/Collider for fighters, no animation-driven timing.
 6. **Phase 1 look:** primitives only — circles, facing ticks, squad colours, order arrows, morale bars, a battle log.
    No art, no asset-store packages without asking.
+7. **What the view remembers lives in `BattleRecord`** (M3 step 8): `SquadTally` (who started where, blows),
+   `MoraleLedger` (per man, morale moved by reason since the start or his squad's last re-form) and `BattleLog` (the
+   battle in words), all plain C# fed from events after each tick; the words come from `HudText`. Keep logic there,
+   out of `MonoBehaviour`s, so it can be tested without the editor (below). battle-sim.md §16 says what the view
+   explains.
+8. **Input over the HUD isn't for the map:** `BattleInput` asks `BattleHud.Covers(screenPoint)` before starting a
+   click or zooming with the wheel. A new IMGUI panel adds its rect to the HUD's panel list.
 
 ## Unity's null
 
@@ -80,6 +88,15 @@ Add `CS0649` to `NoWarn` (Unity fills `[SerializeField]` fields; its compiler do
 `<Nullable>disable</Nullable>` and `TreatWarningsAsErrors`: Unity compiles with nullable off, so a `?` annotation in a
 file without `#nullable enable` warns (CS8632) — every `game/` file that uses `?` on a reference type needs the directive. It proves the code
 compiles, not that it behaves — the user's Play (or batch mode later) is still the test.
+
+### Testing view logic while the editor is open
+
+The plain-C# view classes (`HudText`, `SquadTally`, `MoraleLedger`, `BattleLog`, `BattleRecord`, …) and their EditMode
+tests run under .NET too: a throwaway `net10.0` test project in the scratchpad that compiles those files and the test
+files (`<Compile Include=…>`), references `sim/src/Knez.Sim` and `Knez.Sim.Content` as projects and NUnit 3.14 (the
+3.x API, like Unity's 3.5), and a small `ContentFiles` stand-in in namespace `Knez.Game.View` whose `DefaultRoot()`
+returns the repo's `content/` (the real one asks `UnityEngine.Application`). It proves the logic; the typecheck above
+proves the MonoBehaviours compile; Play (or batch mode once the editor is closed) is still the test of the rest.
 
 ## Cross-runtime determinism (M2 checkpoint)
 

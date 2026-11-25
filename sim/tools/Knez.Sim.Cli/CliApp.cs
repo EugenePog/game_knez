@@ -35,8 +35,11 @@ public static class CliApp
         Commands:
           run     Simulate a scenario; print its squads, the tick count, the movement metrics (overlap, stuck,
                   slot error) and the final state hash.
-                  Defs come from the 'defs' folder above the scenario (content/defs/*.json).
-          batch   Run a scenario once per seed (default 1-20) and print the metrics over all runs.
+                  Defs come from the 'defs' folder above the scenario (content/defs/*.json), or the
+                  nearest content/defs above it (Unity session files in artifacts/sessions/).
+          batch   Run a scenario once per seed (default 1-20) and print the metrics over all runs; for a
+                  fight also the balance measures (D-026): wins per side, how battles ended, how long they
+                  took, losses when a squad broke. Give fights time to end: --ticks 3600 is 3 minutes.
           bench   Time every tick over several runs (default 5, after a 1 s warm-up): p50, p99, max.
           help    Show this text.
 
@@ -370,9 +373,9 @@ public static class CliApp
     }
 
     /// <summary>
-    /// batch: the scenario once per seed; per-run metrics summed (stuck, open orders: the worst run). Movement draws no
-    /// random numbers yet, so every seed gives the same battle until combat (M3) — "distinct outcomes" shows it (it
-    /// compares squads and fighters, not the seed, which the core hash section carries).
+    /// batch: the scenario once per seed; per-run movement metrics summed (stuck, open orders: the worst run), and the
+    /// D-026 measures of each run (<see cref="OutcomeMeter"/>) summarised (<see cref="OutcomeSummary"/>). "Distinct
+    /// outcomes" compares squads and fighters as they ended, not the seed, which the core hash section carries.
     /// </summary>
     private static int BatchCommand(string[] args, TextWriter stdout, TextWriter stderr)
     {
@@ -397,17 +400,22 @@ public static class CliApp
         double worstOverlap = 0;
         double slotErrorSum = 0;
         var outcomes = new HashSet<(ulong, ulong)>(); // what moved: the seed itself sits in the core section
+        var summary = new OutcomeSummary();
         try
         {
             for (ulong seed = seeds.From; seed <= seeds.To; seed++)
             {
                 var sim = new BattleSimulation(BattleSetup.Create(scenario, seed));
                 var meter = new MovementMeter();
+                var outcome = new OutcomeMeter(sim.State);
                 for (int i = 0; i < ticks; i++)
                 {
                     sim.Step();
                     meter.Observe(sim.State);
+                    outcome.Observe(sim.State);
                 }
+
+                summary.Add(outcome);
 
                 var m = Metrics.Of(meter);
                 runs++;
@@ -448,6 +456,7 @@ public static class CliApp
                 meanSlotError = Math.Round(slotErrorSum / runs, 4),
                 longestFarFromSlotTicks = longestFar,
                 distinctOutcomes = outcomes.Count,
+                battle = IsFight(summary) ? OutcomeJson(summary, ticks) : null,
             }));
         }
         else
@@ -459,10 +468,78 @@ public static class CliApp
             stdout.WriteLine(string.Format(inv, "engaged:    mean {0:0.00}% of members' ticks; worst run {1} orders still open", engagedSum / runs * 100, openOrders));
             stdout.WriteLine(string.Format(inv, "slot error: mean {0:0.000} m; longest spell > 1 m from a slot {1:0.0} s", slotErrorSum / runs, longestFar / (double)BattleState.TicksPerSecond));
             stdout.WriteLine($"outcomes:   {outcomes.Count} distinct (squads and fighters as they ended; the seed itself is left out)");
+            if (IsFight(summary))
+            {
+                WriteOutcome(stdout, summary, ticks);
+            }
         }
 
         return ExitOk;
     }
+
+    /// <summary>A run with blows or a decision: one worth the D-026 measures (a drill has neither).</summary>
+    private static bool IsFight(OutcomeSummary s) => s.Blows > 0 || s.EndCount(BattleEnd.Time) < s.Runs;
+
+    /// <summary>The D-026 measures as text (battle-sim.md §11, M3 step 7).</summary>
+    private static void WriteOutcome(TextWriter stdout, OutcomeSummary s, int ticks)
+    {
+        var inv = CultureInfo.InvariantCulture;
+        string wins = string.Join(", ", s.Sides.Select(side => string.Format(inv, "side {0} {1:0.0}%", side, s.WinRate(side) * 100)));
+        stdout.WriteLine(string.Format(inv, "wins:       {0}; nobody {1:0.0}%; undecided {2:0.0}%", wins,
+            s.EndRate(BattleEnd.Nobody) * 100, s.EndRate(BattleEnd.Time) * 100));
+        stdout.WriteLine(string.Format(inv, "ended:      {0} by rout, {1} by annihilation ({2:0.0}%), {3} with nobody left, {4} undecided at {5:0.0} s",
+            s.EndCount(BattleEnd.Rout), s.EndCount(BattleEnd.Annihilation), s.EndRate(BattleEnd.Annihilation) * 100,
+            s.EndCount(BattleEnd.Nobody), s.EndCount(BattleEnd.Time), ticks / (double)BattleState.TicksPerSecond));
+        if (s.EndSeconds.Count > 0)
+        {
+            stdout.WriteLine(string.Format(inv, "length:     decided at {0:0.0} s mean (±{1:0.0} SE; 10–50–90 %: {2:0.0} / {3:0.0} / {4:0.0} s); first blow to decision {5:0.0} s mean (±{6:0.0})",
+                OutcomeSummary.Mean(s.EndSeconds), OutcomeSummary.StandardError(s.EndSeconds), OutcomeSummary.Quantile(s.EndSeconds, 0.1),
+                OutcomeSummary.Quantile(s.EndSeconds, 0.5), OutcomeSummary.Quantile(s.EndSeconds, 0.9),
+                OutcomeSummary.Mean(s.FightSeconds), OutcomeSummary.StandardError(s.FightSeconds)));
+        }
+
+        stdout.WriteLine(s.LossAtBreak.Count == 0 ? "breaks:     no squad broke"
+            : string.Format(inv, "breaks:     {0} squads broke, having lost {1:0.0}% of their men mean (±{2:0.0} SE); {3}", s.LossAtBreak.Count,
+                OutcomeSummary.Mean(s.LossAtBreak) * 100, OutcomeSummary.StandardError(s.LossAtBreak) * 100,
+                string.Join(", ", s.Sides.Select(side => s.LossAtBreakOf(side)).Select((l, i) => (l, side: s.Sides[i])).Where(x => x.l.Count > 0)
+                    .Select(x => string.Format(inv, "side {0}: {1} at {2:0.0}%", x.side, x.l.Count, OutcomeSummary.Mean(x.l) * 100)))));
+        stdout.WriteLine(string.Format(inv, "fallen:     {0} (share of each side's men down at the decision or the time limit)",
+            string.Join(", ", s.Sides.Select(side => string.Format(inv, "side {0} {1:0.0}%", side, s.FallenShare(side) * 100)))));
+        stdout.WriteLine(string.Format(inv, "blows:      {0} struck up to the decisions, {1:0.0}% got through", s.Blows, s.LandedRate * 100));
+    }
+
+    /// <summary>The D-026 measures for --json; shares 0..1, times in seconds.</summary>
+    private static object OutcomeJson(OutcomeSummary s, int ticks) => new
+    {
+        wins = s.Sides.ToDictionary(side => side.ToString(CultureInfo.InvariantCulture), side => Math.Round(s.WinRate(side), 4)),
+        ended = new
+        {
+            rout = s.EndCount(BattleEnd.Rout),
+            annihilation = s.EndCount(BattleEnd.Annihilation),
+            nobody = s.EndCount(BattleEnd.Nobody),
+            undecided = s.EndCount(BattleEnd.Time),
+            limitSeconds = ticks / (double)BattleState.TicksPerSecond,
+        },
+        decidedAtSeconds = new
+        {
+            mean = Math.Round(OutcomeSummary.Mean(s.EndSeconds), 2),
+            se = Math.Round(OutcomeSummary.StandardError(s.EndSeconds), 2),
+            p10 = OutcomeSummary.Quantile(s.EndSeconds, 0.1),
+            p50 = OutcomeSummary.Quantile(s.EndSeconds, 0.5),
+            p90 = OutcomeSummary.Quantile(s.EndSeconds, 0.9),
+        },
+        firstBlowToDecisionSeconds = new { mean = Math.Round(OutcomeSummary.Mean(s.FightSeconds), 2), se = Math.Round(OutcomeSummary.StandardError(s.FightSeconds), 2) },
+        lossAtBreak = new
+        {
+            breaks = s.LossAtBreak.Count,
+            mean = Math.Round(OutcomeSummary.Mean(s.LossAtBreak), 4),
+            se = Math.Round(OutcomeSummary.StandardError(s.LossAtBreak), 4),
+            bySide = s.Sides.ToDictionary(side => side.ToString(CultureInfo.InvariantCulture),
+                side => new { breaks = s.LossAtBreakOf(side).Count, mean = Math.Round(OutcomeSummary.Mean(s.LossAtBreakOf(side)), 4) }),
+        },
+        fallenShare = s.Sides.ToDictionary(side => side.ToString(CultureInfo.InvariantCulture), side => Math.Round(s.FallenShare(side), 4)),
+        blows = new { struck = s.Blows, landedRate = Math.Round(s.LandedRate, 4) },
+    };
 
     /// <summary>
     /// bench: warm-up runs for at least a second (so .NET's tiered JIT has optimised the hot code — one short run isn't

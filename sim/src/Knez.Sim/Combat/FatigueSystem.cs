@@ -1,6 +1,6 @@
 namespace Knez.Sim.Combat
 {
-    /// <summary>Tick stage 11: fatigue gain and recovery from movement, combat and stance (battle-sim.md §9). Empty until M3.</summary>
+    /// <summary>Tick stage 11: fatigue (battle-sim.md §9). Empty: built only if M6 tuning asks for it.</summary>
     public sealed class FatigueSystem : ISimSystem
     {
         /// <inheritdoc/>

@@ -27,7 +27,7 @@ namespace Knez.Sim.Combat
         /// or <see cref="EntityId.None"/>. <paramref name="fighters"/> is the state's list, in id order.</summary>
         internal static EntityId Nearest(List<Fighter> fighters, Fighter self)
         {
-            Fix reach = self.Def.Kit.Weapon.Reach;
+            Fix reach = self.Kit.Weapon.Reach;
             EntityId best = EntityId.None;
             Fix bestGap = Fix.Zero;
             for (int j = 0; j < fighters.Count; j++)

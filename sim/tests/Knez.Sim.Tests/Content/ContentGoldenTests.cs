@@ -14,9 +14,9 @@ public class ContentGoldenTests
 {
     private const string Defs = """
         {
-          "fighters": [
-            { "id": "warrior", "radius": 0.3, "walkSpeed": 1.4, "runSpeed": 3.5, "turnRate": 360 },
-            { "id": "veteran", "radius": 0.325, "walkSpeed": 1.35, "runSpeed": 3.25, "turnRate": 300.5 }
+          "bodies": [
+            { "id": "man", "radius": 0.3, "walkSpeed": 1.4, "runSpeed": 3.5, "turnRate": 360 },
+            { "id": "big", "radius": 0.325, "walkSpeed": 1.35, "runSpeed": 3.25, "turnRate": 300.5 }
           ],
           "formations": [
             { "id": "line", "spacing": 1.1, "rankSpacing": 1.25, "ranks": 2, "turnRate": 45, "holdWeight": 3, "allyPassSpeed": 0.333333333 },
@@ -31,8 +31,10 @@ public class ContentGoldenTests
           "description": "Fixture for ContentGoldenTests; never edit — re-record the constants on purpose instead.",
           "map": { "width": 80.5, "height": 50.25 },
           "squads": [
-            { "name": "A", "side": 0, "fighter": "warrior", "count": 7, "formation": "line", "position": [20.125, 10.7], "facing": 100.3 },
-            { "name": "B", "side": 1, "fighter": "veteran", "count": 5, "formation": "column", "position": [40.333, 30.1], "facing": -37.25 }
+            { "name": "A", "side": 0, "body": "man", "men": [{ "count": 7, "experience": "experienced", "kit": "sword-shield-padded" }],
+              "formation": "line", "position": [20.125, 10.7], "facing": 100.3 },
+            { "name": "B", "side": 1, "body": "big", "men": [{ "count": 2, "experience": "new", "kit": "spear-shield" },
+              { "count": 3, "experience": "elite", "kit": "axe-shield-mail" }], "formation": "column", "position": [40.333, 30.1], "facing": -37.25 }
           ],
           "script": [
             { "tick": 3, "order": "move", "squad": "A", "target": [25.5, 18.25] },
@@ -42,9 +44,9 @@ public class ContentGoldenTests
         """;
 
     /// <summary>A change means content parsing, def hashing or slot placement changed: on purpose → re-record and say why.</summary>
-    private const ulong GoldenFingerprint = 0xe32c84ed29bc2a2bUL;
+    private const ulong GoldenFingerprint = 0x1ebe5234d89fd91cUL;
 
-    private const ulong GoldenSpawnHash = 0x09baf43f8fc1d873UL;
+    private const ulong GoldenSpawnHash = 0x63335dc950948fd7UL;
 
     [Test]
     public void Fixture_FingerprintAndSpawnedState_MatchRecordedValues()

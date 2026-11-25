@@ -6,8 +6,25 @@ namespace Knez.Sim.Tests.Support;
 /// <summary>Defs built in code, independent of the repo's content files (those are covered by RepoContentTests).</summary>
 public static class TestDefs
 {
-    /// <summary>Walks 1.4 m/s, runs 3.5 m/s, turns 360°/s (the agreed content values).</summary>
-    public static readonly FighterDef Warrior = Fighter("test-warrior", walkTenths: 14);
+    /// <summary>A man's body: walks 1.4 m/s, runs 3.5 m/s, turns 360°/s (the agreed content values).</summary>
+    public static readonly BodyDef Man = Body("test-man", walkTenths: 14);
+
+    /// <summary>The standard rules' "experienced" (defence 40, morale 750).</summary>
+    public static readonly ExperienceDef Experienced = CombatDef.Standard.FindExperience("experienced")!;
+
+    /// <summary>The standard rules' "sword-shield-padded": sword, round shield, padded coat, cap — what a fighter carried
+    /// by default before M3 step 9.</summary>
+    public static readonly KitDef Kit = CombatDef.Standard.FindKit("sword-shield-padded")!;
+
+    /// <summary>One group of <paramref name="count"/> experienced men in <see cref="Kit"/> (or the given ones).</summary>
+    public static SquadMenDef[] Men(int count, ExperienceDef? experience = null, KitDef? kit = null) =>
+        [new SquadMenDef(count, experience ?? Experienced, kit ?? Kit)];
+
+    /// <summary>A kit of the standard rules by id.</summary>
+    public static KitDef KitOf(string id) => CombatDef.Standard.FindKit(id) ?? throw new ArgumentException($"no kit '{id}'");
+
+    /// <summary>An experience level of the standard rules by id.</summary>
+    public static ExperienceDef Level(string id) => CombatDef.Standard.FindExperience(id) ?? throw new ArgumentException($"no level '{id}'");
 
     /// <summary>Two ranks, 1 m apart sideways, 1.5 m between ranks, turns 45°/s: round numbers for exact assertions.</summary>
     public static readonly FormationDef Line = new("test-line", Fix.One, Fix.Ratio(3, 2), ranks: 2, width: 0, turnRate: Fix.FromInt(45), holdWeight: 3, allyPassSpeed: Fix.Ratio(1, 3));
@@ -15,7 +32,7 @@ public static class TestDefs
     /// <summary>Two files wide, ranks follow from the squad size; turns 90°/s.</summary>
     public static readonly FormationDef Column = new("test-column", Fix.One, Fix.Ratio(3, 2), ranks: 0, width: 2, turnRate: Fix.FromInt(90), holdWeight: 3, allyPassSpeed: Fix.Ratio(1, 3));
 
-    public static FighterDef Fighter(string id, int walkTenths, int radiusHundredths = 30) =>
+    public static BodyDef Body(string id, int walkTenths, int radiusHundredths = 30) =>
         new(id, Fix.Ratio(radiusHundredths, 100), Fix.Ratio(walkTenths, 10), Fix.Ratio(35, 10), Fix.FromInt(360));
 
     public static readonly MapDef Map = new(Fix.FromInt(60), Fix.FromInt(40));
@@ -26,7 +43,13 @@ public static class TestDefs
     private static MovementDef WithoutCloseIn(MovementDef s) => new(s.PivotTolerance, Fix.Ratio(s.SlotCatchUpTicks, 20),
         s.PersonalSpace, Fix.Ratio(s.SeparationTicks, 20), s.HoldingReach, s.FormedUpReach, s.CollisionPasses, s.AllyPartingDepth,
         s.PathBudget, s.RegroupLead, Fix.Ratio(s.RegroupMaxWaitTicks, 20), s.RegroupCost, s.ReformPace, s.StepBackPace,
-        s.WithdrawClearance, closeInRange: Fix.Zero);
+        s.WithdrawClearance, closeInRange: Fix.Zero, turnLagTime: Fix.Ratio(s.TurnLagTicks, 20));
+
+    /// <summary><paramref name="s"/> with <paramref name="turnLagTime"/> seconds of turn lag (0 = men swing rigidly with their slots).</summary>
+    public static MovementDef WithTurnLag(MovementDef s, Fix turnLagTime) => new(s.PivotTolerance, Fix.Ratio(s.SlotCatchUpTicks, 20),
+        s.PersonalSpace, Fix.Ratio(s.SeparationTicks, 20), s.HoldingReach, s.FormedUpReach, s.CollisionPasses, s.AllyPartingDepth,
+        s.PathBudget, s.RegroupLead, Fix.Ratio(s.RegroupMaxWaitTicks, 20), s.RegroupCost, s.ReformPace, s.StepBackPace,
+        s.WithdrawClearance, s.CloseInRange, turnLagTime);
 
     /// <summary><paramref name="scenario"/> with <see cref="NoCloseIn"/> movement rules.</summary>
     public static ScenarioDef WithoutCloseIn(ScenarioDef scenario) =>
@@ -43,15 +66,15 @@ public static class TestDefs
     {
         var s = CombatDef.Standard;
         var zeros = s.Weapons.Select(_ => (IReadOnlyList<int>)new int[s.ExperienceLevels.Count]).ToArray();
-        return new CombatDef(s.Weapons, s.Shields, s.BodyArmours, s.HeadCovers, s.ExperienceLevels, s.WarriorTypes, zeros,
-            s.DefaultKit, minHit: 0, maxHit: s.MaxHit, s.FlankBonus, s.RearBonus, s.ShieldFromFlank, s.ShieldFromRear,
+        return new CombatDef(s.Weapons, s.Shields, s.BodyArmours, s.HeadCovers, s.ExperienceLevels, s.Kits, zeros,
+            minHit: 0, maxHit: s.MaxHit, s.FlankBonus, s.RearBonus, s.ShieldFromFlank, s.ShieldFromRear,
             s.ShieldWallBonus, s.LightWoundPenalty, s.HeavyWoundPenalty, s.LightWoundPace, s.HeavyWoundPace, s.FrontArc,
             s.RearArc, s.StrikeArc);
     }
 
     public static SquadSpawnDef Squad(string name, int side, int count, FixVec2 position, int facingDegrees,
         FormationDef? formation = null) =>
-        new(name, side, Warrior, count, formation ?? Line, position, Angle.FromDegrees(facingDegrees));
+        new(name, side, Man, Men(count), formation ?? Line, position, Angle.FromDegrees(facingDegrees));
 
     /// <summary>
     /// The determinism-test battle: two squads of two (a short file each), 10 m apart. Fighters 0–1 are side 0,

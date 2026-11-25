@@ -92,13 +92,11 @@ public class MarchTests
         var sim = OneLine();
         Order(sim, 20, 20, facingDegrees: 0);
         sim.StepTicks(143 + 40 + 1); // march, turn 90° at 45°/s (40 ticks), one spare
-        Assert.Multiple(() =>
-        {
-            Assert.That(Line(sim).Order, Is.EqualTo(SquadOrder.None));
-            Assert.That(Line(sim).Facing, Is.EqualTo(Angle.FromDegrees(0)));
-        });
+        Assert.That(Line(sim).Facing, Is.EqualTo(Angle.FromDegrees(0)));
 
-        sim.StepTicks(40); // members finish closing in
+        // The men lag the turn (soft wheel) and close up over turnLagTime (4 s); the order ends once they're formed up.
+        sim.StepTicks(100);
+        Assert.That(Line(sim).Order, Is.EqualTo(SquadOrder.None));
         foreach (var fighter in sim.State.Fighters)
         {
             Assert.Multiple(() =>
@@ -140,8 +138,8 @@ public class MarchTests
     [Test]
     public void SquadSpeed_IsTheSlowestLivingMembersWalk()
     {
-        var slow = TestDefs.Fighter("slow", walkTenths: 7); // 0.7 m/s
-        var scenario = new ScenarioDef("t", "", TestDefs.Map, [new SquadSpawnDef("S", 0, slow, 4, TestDefs.Line, FixVec2.FromInts(20, 10), Angle.FromDegrees(90))]);
+        var slow = TestDefs.Body("slow", walkTenths: 7); // 0.7 m/s
+        var scenario = new ScenarioDef("t", "", TestDefs.Map, [new SquadSpawnDef("S", 0, slow, TestDefs.Men(4), TestDefs.Line, FixVec2.FromInts(20, 10), Angle.FromDegrees(90))]);
         var sim = new BattleSimulation(BattleSetup.Create(scenario, 1));
         sim.Enqueue(new MoveSquadCommand(0, sim.State.Squads[0].Id, FixVec2.FromInts(20, 20)));
         sim.Step();
@@ -157,7 +155,7 @@ public class MarchTests
         sim.StepTicks(10);
         Assert.Multiple(() =>
         {
-            Assert.That(fighter.Velocity.Length.Raw, Is.EqualTo(fighter.Def.RunPerTick.Raw).Within(2), "running");
+            Assert.That(fighter.Velocity.Length.Raw, Is.EqualTo(fighter.Body.RunPerTick.Raw).Within(2), "running");
             Assert.That(Math.Abs(fighter.Facing.DeltaTo(Angle.FromDegrees(0))), Is.LessThanOrEqualTo(2), "looks east, where it runs");
         });
 
@@ -176,7 +174,7 @@ public class MarchTests
         for (int i = 0; i < 600; i++)
         {
             sim.Step();
-            Assert.That(sim.State.Fighters.Max(f => f.Velocity.Length.Raw), Is.LessThanOrEqualTo(TestDefs.Warrior.RunPerTick.Raw));
+            Assert.That(sim.State.Fighters.Max(f => f.Velocity.Length.Raw), Is.LessThanOrEqualTo(TestDefs.Man.RunPerTick.Raw));
         }
     }
 
