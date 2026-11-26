@@ -9,7 +9,8 @@ using NUnit.Framework;
 
 namespace Knez.Game.Tests
 {
-    /// <summary>The HUD's words (M2 step 6, M3): squad states, refused orders, kits, wounds, morale, actions, the tally.</summary>
+    /// <summary>The HUD's words (M2 step 6, M3): squad states, refused orders, kits, wounds, morale, actions, the tally,
+    /// Retainers (M3 step 10).</summary>
     public class HudTextTests
     {
         private static BattleSimulation Formations() =>
@@ -50,10 +51,87 @@ namespace Knez.Game.Tests
         public void Kit_InWords()
         {
             var sim = M3("m3-veterans");
-            var veteran = sim.State.Fighters.First(f => f.SideId == 0);
+            var veteran = sim.State.Fighters.First(f => f.SideId == 0 && !f.IsRetainer);
+            var hrafn = sim.State.Fighters.Single(f => f.IsRetainer);
             var levy = sim.State.Fighters.First(f => f.SideId == 1);
-            Assert.That(HudText.Kit(veteran.Kit, veteran.Experience), Is.EqualTo("sword · round shield · mail · helm · elite"));
+            Assert.That(HudText.Kit(veteran.Kit, veteran.Experience), Is.EqualTo("sword · round shield · mail · helm · experienced"));
+            Assert.That(HudText.Kit(hrafn.Kit, hrafn.Experience), Is.EqualTo("sword · round shield · mail · helm · elite"));
             Assert.That(HudText.Kit(levy.Kit, levy.Experience), Is.EqualTo("axe · round shield · no armour · bare head · new"));
+        }
+
+        [Test]
+        public void Retainer_InWords_NameTraitLeadershipAndHisLoneOrder()
+        {
+            // M3 step 10.
+            var sim = M3("m3-veterans");
+            var hrafn = sim.State.Fighters.Single(f => f.IsRetainer);
+            Assert.That(HudText.Retainer(hrafn), Is.EqualTo("Hrafn (loyal, elite)"));
+            Assert.That(HudText.Name(sim.State, hrafn.Id), Is.EqualTo("Hrafn (Veterans)"));
+            Assert.That(HudText.Leadership(hrafn.Experience), Is.EqualTo("leads: losses \u221220%, recovers +20%"));
+            Assert.That(HudText.Leadership(sim.State.Scenario.Combat.FindExperience("new")!), Is.EqualTo("no leadership"));
+            Assert.That(HudText.Reason(Knez.Sim.Morale.MoraleReason.LeaderFell), Is.EqualTo("their leader fell"));
+
+            sim.Enqueue(new DetachRetainerCommand(0, hrafn.Id));
+            sim.Enqueue(new MoveRetainerCommand(0, hrafn.Id, FixVec2.FromInts(30, 10)));
+            sim.Step();
+            Assert.That(HudText.Name(sim.State, hrafn.Id), Is.EqualTo("Hrafn"));
+            Assert.That(HudText.LoneOrder(sim.State, hrafn), Is.EqualTo("walking to (30.0, 10.0)"));
+            var levy = sim.State.Fighters.First(f => f.SideId == 1);
+            sim.Enqueue(new RetainerAttackCommand(0, hrafn.Id, levy.Id));
+            sim.Step();
+            Assert.That(HudText.LoneOrder(sim.State, hrafn), Is.EqualTo($"going at #{levy.Id.Value} (Levy)"));
+        }
+
+        [Test]
+        public void Ability_InWords_ReadyThenCoolingDown_TheSquadsEffect_TheRefusals()
+        {
+            // M3 step 11: Hrafn (loyal) has the Veterans stand to the death.
+            var sim = M3("m3-veterans");
+            var hrafn = sim.State.Fighters.Single(f => f.IsRetainer);
+            var veterans = sim.State.Squads.First(s => s.SideId == 0);
+            Assert.That(HudText.AbilityState(sim.State, hrafn), Is.EqualTo("stand to the death: ready"));
+            Assert.That(HudText.AbilityReady(sim.State, hrafn), Is.True);
+            Assert.That(HudText.Effects(sim.State, veterans), Is.Empty);
+
+            sim.Enqueue(new UseAbilityCommand(0, hrafn.Id));
+            sim.Step();
+            Assert.That(HudText.AbilityState(sim.State, hrafn), Is.EqualTo("stand to the death: in 120 s"));
+            Assert.That(HudText.AbilityReady(sim.State, hrafn), Is.False);
+            Assert.That(HudText.Effects(sim.State, veterans), Is.EqualTo("standing to the death 5.0 s"));
+
+            sim.Enqueue(new UseAbilityCommand(0, hrafn.Id));
+            sim.Step();
+            var rejected = sim.State.Events.OfType<CommandRejected>().Single();
+            Assert.That(HudText.Refusal(sim.State, rejected.Command, rejected.Reason), Is.EqualTo("Hrafn: his ability is still cooling down"));
+            Assert.That(HudText.Reason(Knez.Sim.Morale.MoraleReason.BattleCry), Is.EqualTo("a battle cry"));
+            Assert.That(HudText.Reason(Knez.Sim.Morale.MoraleReason.EnemyBattleCry), Is.EqualTo("an enemy's battle cry"));
+            Assert.That(HudText.AbilityName(Knez.Sim.Defs.TraitDef.StandardOf("bold").Ability), Is.EqualTo("front-rank rush"));
+        }
+
+        [Test]
+        public void ARetainersRefusedOrder_NamesHim_InPlainWords()
+        {
+            var sim = M3("m3-veterans");
+            var hrafn = sim.State.Fighters.Single(f => f.IsRetainer);
+            var mate = sim.State.Fighters.First(f => f.SideId == 0 && !f.IsRetainer);
+            var levy = sim.State.Squads.Single(s => s.SideId == 1);
+            string RefusalOf(ICommand command)
+            {
+                sim.Enqueue(command);
+                sim.Step();
+                var rejected = sim.State.Events.OfType<CommandRejected>().Single();
+                return HudText.Refusal(sim.State, rejected.Command, rejected.Reason);
+            }
+
+            Assert.That(RefusalOf(new MoveRetainerCommand(0, hrafn.Id, FixVec2.FromInts(30, 10))),
+                Is.EqualTo("Hrafn: he is in a squad: take him out of it first (X)"));
+            Assert.That(RefusalOf(new AttachRetainerCommand(0, hrafn.Id, hrafn.SquadId)), Is.EqualTo("Hrafn: he is in that squad already"));
+            Assert.That(RefusalOf(new AttachRetainerCommand(0, hrafn.Id, levy.Id)), Is.EqualTo("Hrafn: that squad isn't yours"));
+            sim.Enqueue(new DetachRetainerCommand(0, hrafn.Id));
+            sim.Step();
+            Assert.That(RefusalOf(new DetachRetainerCommand(0, hrafn.Id)), Is.EqualTo("Hrafn: he isn't in a squad"));
+            Assert.That(RefusalOf(new RetainerAttackCommand(0, hrafn.Id, mate.Id)), Is.EqualTo("Hrafn: that man is on his side"));
+            Assert.That(RefusalOf(new DetachRetainerCommand(1, hrafn.Id)), Is.EqualTo("Hrafn: not your Retainer"));
         }
 
         [Test]

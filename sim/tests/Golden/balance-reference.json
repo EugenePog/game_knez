@@ -32,6 +32,66 @@
       }
     },
     {
+      "scenario": "scenarios/bench/s8-leader.json",
+      "seeds": 1000,
+      "measures": {
+        "side0Wins": { "value": 0.511, "tolerance": 0.0791 },
+        "side1Wins": { "value": 0.487, "tolerance": 0.0791 },
+        "undecided": { "value": 0, "tolerance": 0.0087 },
+        "annihilations": { "value": 0, "tolerance": 0.0087 },
+        "decidedAtSeconds": { "value": 22.6923, "tolerance": 1.1541 },
+        "lossAtBreak": { "value": 0.2529, "tolerance": 0.02 },
+        "fallenSide0": { "value": 0.1621, "tolerance": 0.02 },
+        "fallenSide1": { "value": 0.1605, "tolerance": 0.02 },
+        "landed": { "value": 0.1227, "tolerance": 0.006 }
+      }
+    },
+    {
+      "scenario": "scenarios/bench/s9-battle-cry.json",
+      "seeds": 1000,
+      "measures": {
+        "side0Wins": { "value": 0.598, "tolerance": 0.0776 },
+        "side1Wins": { "value": 0.399, "tolerance": 0.0775 },
+        "undecided": { "value": 0, "tolerance": 0.0087 },
+        "annihilations": { "value": 0, "tolerance": 0.0087 },
+        "decidedAtSeconds": { "value": 24.6161, "tolerance": 1.3329 },
+        "lossAtBreak": { "value": 0.2511, "tolerance": 0.02 },
+        "fallenSide0": { "value": 0.1721, "tolerance": 0.02 },
+        "fallenSide1": { "value": 0.1634, "tolerance": 0.02 },
+        "landed": { "value": 0.1212, "tolerance": 0.0057 }
+      }
+    },
+    {
+      "scenario": "scenarios/bench/s10-close-ranks.json",
+      "seeds": 1000,
+      "measures": {
+        "side0Wins": { "value": 0.598, "tolerance": 0.0776 },
+        "side1Wins": { "value": 0.4, "tolerance": 0.0775 },
+        "undecided": { "value": 0, "tolerance": 0.0087 },
+        "annihilations": { "value": 0, "tolerance": 0.0087 },
+        "decidedAtSeconds": { "value": 23.5814, "tolerance": 1.205 },
+        "lossAtBreak": { "value": 0.2534, "tolerance": 0.02 },
+        "fallenSide0": { "value": 0.1438, "tolerance": 0.02 },
+        "fallenSide1": { "value": 0.1776, "tolerance": 0.02 },
+        "landed": { "value": 0.1159, "tolerance": 0.0054 }
+      }
+    },
+    {
+      "scenario": "scenarios/bench/s11-stand-fast.json",
+      "seeds": 1000,
+      "measures": {
+        "side0Wins": { "value": 0.61, "tolerance": 0.0772 },
+        "side1Wins": { "value": 0.385, "tolerance": 0.077 },
+        "undecided": { "value": 0, "tolerance": 0.0087 },
+        "annihilations": { "value": 0, "tolerance": 0.0087 },
+        "decidedAtSeconds": { "value": 23.9622, "tolerance": 1.2066 },
+        "lossAtBreak": { "value": 0.2756, "tolerance": 0.02 },
+        "fallenSide0": { "value": 0.1905, "tolerance": 0.0235 },
+        "fallenSide1": { "value": 0.1808, "tolerance": 0.02 },
+        "landed": { "value": 0.1236, "tolerance": 0.0059 }
+      }
+    },
+    {
       "scenario": "scenarios/m3/m3-flank.json",
       "seeds": 1000,
       "measures": {
@@ -95,45 +155,45 @@
       "scenario": "scenarios/m3/m3-veterans.json",
       "seeds": 1000,
       "measures": {
-        "side0Wins": { "value": 0.994, "tolerance": 0.0123 },
-        "side1Wins": { "value": 0.006, "tolerance": 0.0123 },
+        "side0Wins": { "value": 0.936, "tolerance": 0.0387 },
+        "side1Wins": { "value": 0.064, "tolerance": 0.0387 },
         "undecided": { "value": 0, "tolerance": 0.0087 },
         "annihilations": { "value": 0, "tolerance": 0.0087 },
-        "decidedAtSeconds": { "value": 16.7376, "tolerance": 1 },
-        "lossAtBreak": { "value": 0.15, "tolerance": 0.02 },
-        "fallenSide0": { "value": 0.0292, "tolerance": 0.02 },
-        "fallenSide1": { "value": 0.1484, "tolerance": 0.02 },
-        "landed": { "value": 0.241, "tolerance": 0.0094 }
+        "decidedAtSeconds": { "value": 18.9023, "tolerance": 1 },
+        "lossAtBreak": { "value": 0.1557, "tolerance": 0.02 },
+        "fallenSide0": { "value": 0.0597, "tolerance": 0.02 },
+        "fallenSide1": { "value": 0.138, "tolerance": 0.02 },
+        "landed": { "value": 0.182, "tolerance": 0.0082 }
       }
     },
     {
       "scenario": "scenarios/m3/m3-rally.json",
       "seeds": 1000,
       "measures": {
-        "side0Wins": { "value": 0.006, "tolerance": 0.0123 },
-        "side1Wins": { "value": 0.994, "tolerance": 0.0123 },
+        "side0Wins": { "value": 0.064, "tolerance": 0.0387 },
+        "side1Wins": { "value": 0.936, "tolerance": 0.0387 },
         "undecided": { "value": 0, "tolerance": 0.0087 },
         "annihilations": { "value": 0, "tolerance": 0.0087 },
-        "decidedAtSeconds": { "value": 14.4452, "tolerance": 1 },
-        "lossAtBreak": { "value": 0.1789, "tolerance": 0.02 },
-        "fallenSide0": { "value": 0.1772, "tolerance": 0.02 },
-        "fallenSide1": { "value": 0.0218, "tolerance": 0.02 },
-        "landed": { "value": 0.2604, "tolerance": 0.0107 }
+        "decidedAtSeconds": { "value": 15.8994, "tolerance": 1 },
+        "lossAtBreak": { "value": 0.1722, "tolerance": 0.02 },
+        "fallenSide0": { "value": 0.1535, "tolerance": 0.02 },
+        "fallenSide1": { "value": 0.0565, "tolerance": 0.02 },
+        "landed": { "value": 0.2161, "tolerance": 0.0109 }
       }
     },
     {
       "scenario": "scenarios/sandbox/villages-assault.json",
       "seeds": 50,
       "measures": {
-        "side0Wins": { "value": 0.16, "tolerance": 0.2593 },
+        "side0Wins": { "value": 0.06, "tolerance": 0.168 },
         "side1Wins": { "value": 0.14, "tolerance": 0.2454 },
-        "undecided": { "value": 0.7, "tolerance": 0.3241 },
+        "undecided": { "value": 0.8, "tolerance": 0.2829 },
         "annihilations": { "value": 0, "tolerance": 0.168 },
-        "decidedAtSeconds": { "value": 103.7067, "tolerance": 11.4563 },
-        "lossAtBreak": { "value": 0.1997, "tolerance": 0.0385 },
-        "fallenSide0": { "value": 0.1489, "tolerance": 0.0645 },
-        "fallenSide1": { "value": 0.1342, "tolerance": 0.0414 },
-        "landed": { "value": 0.0949, "tolerance": 0.015 }
+        "decidedAtSeconds": { "value": 102.115, "tolerance": 12.3976 },
+        "lossAtBreak": { "value": 0.2009, "tolerance": 0.034 },
+        "fallenSide0": { "value": 0.1447, "tolerance": 0.0519 },
+        "fallenSide1": { "value": 0.1216, "tolerance": 0.0407 },
+        "landed": { "value": 0.0802, "tolerance": 0.0138 }
       }
     }
   ]

@@ -41,6 +41,10 @@ public class BalanceReferenceTests
     [
         ("scenarios/bench/s6-lines.json", 4000, true),
         ("scenarios/bench/s7-flank.json", 1000, false),
+        ("scenarios/bench/s8-leader.json", 1000, false),
+        ("scenarios/bench/s9-battle-cry.json", 1000, false), // M3 step 11: one per built ability, against S8
+        ("scenarios/bench/s10-close-ranks.json", 1000, false),
+        ("scenarios/bench/s11-stand-fast.json", 1000, false),
         ("scenarios/m3/m3-flank.json", 1000, false),
         ("scenarios/m3/m3-spears.json", 1000, false),
         ("scenarios/m3/m3-shieldwall.json", 1000, false),

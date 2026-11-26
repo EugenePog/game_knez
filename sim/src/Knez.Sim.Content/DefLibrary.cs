@@ -16,10 +16,10 @@ namespace Knez.Sim.Content
     /// </summary>
     public sealed class DefLibrary
     {
-        private const string FileMembers = "description, bodies, formations, movement, combat, morale";
+        private const string FileMembers = "description, bodies, formations, movement, combat, morale, traits";
         private const string MoraleMembers = "shaken, wavering, routing, hysteresis, lossWeight, ownLightWound, ownHeavyWound, " +
             "mateHeavyWound, flankBlow, rearBlow, mateFlankBlow, mateRearBlow, mateRouts, allySquadBroke, enemySquadBroke, nearby, " +
-            "recoveryPerSecond, safeDistance, rallyAt, breakShare, reformShare, waveringHitPenalty";
+            "recoveryPerSecond, safeDistance, rallyAt, breakShare, reformShare, waveringHitPenalty, leaderFell";
         private const string MovementMembers = "pivotTolerance, slotCatchUpTime, personalSpace, separationTime, holdingReach, " +
             "formedUpReach, collisionPasses, allyPartingDepth, pathBudget, regroupLead, regroupMaxWait, regroupCost, reformPace, stepBackPace, withdrawClearance, closeInRange, turnLagTime";
         private const string BodyMembers = "id, radius, walkSpeed, runSpeed, turnRate";
@@ -30,11 +30,20 @@ namespace Knez.Sim.Content
         private const string FormationMembers = "id, spacing, rankSpacing, ranks, width, turnRate, holdWeight, allyPassSpeed, shieldWall, keepsRanks";
 
         private readonly Dictionary<string, BodyDef> _bodies;
+        private readonly Dictionary<string, TraitDef> _traits;
         private readonly Dictionary<string, FormationDef> _formations;
 
         private DefLibrary(List<BodyDef> bodies, List<FormationDef> formations, MovementDef? movement, CombatDef? combat,
-            MoraleDef? morale)
+            MoraleDef? morale, List<TraitDef> traits)
         {
+            traits.Sort((a, b) => string.CompareOrdinal(a.Id, b.Id));
+            Traits = new ReadOnlyCollection<TraitDef>(traits);
+            _traits = new Dictionary<string, TraitDef>(StringComparer.Ordinal);
+            for (int i = 0; i < traits.Count; i++)
+            {
+                _traits.Add(traits[i].Id, traits[i]);
+            }
+
             Movement = movement;
             Morale = morale;
             Combat = combat;
@@ -61,6 +70,9 @@ namespace Knez.Sim.Content
         /// <summary>Formation defs sorted by id.</summary>
         public IReadOnlyList<FormationDef> Formations { get; }
 
+        /// <summary>Retainers' traits (<c>retainers.json</c>, M3 step 10), sorted by id.</summary>
+        public IReadOnlyList<TraitDef> Traits { get; }
+
         /// <summary>The movement rules, or null when no def file has a <c>movement</c> object.</summary>
         public MovementDef? Movement { get; }
 
@@ -79,6 +91,7 @@ namespace Knez.Sim.Content
         {
             var bodies = new List<BodyDef>();
             var formations = new List<FormationDef>();
+            var traits = new List<TraitDef>();
             var seen = new Dictionary<string, string>(StringComparer.Ordinal); // "kind:id" → where it was defined
             MovementDef? movement = null;
             CombatDef? combat = null;
@@ -110,6 +123,17 @@ namespace Knez.Sim.Content
                     item.RejectUnknownMembers(BodyMembers);
                     Claim(seen, "body", id, item, bodyItems[i], file.Name);
                     bodies.Add(Build(item, bodyItems[i], () => new BodyDef(id, radius, walkSpeed, runSpeed, turnRate)));
+                }
+
+                IReadOnlyList<JsonValue> traitItems = root.OptionalArray("traits");
+                for (int i = 0; i < traitItems.Count; i++)
+                {
+                    var item = JsonObjectReader.Of(traitItems[i], $"traits[{i}]", file.Name);
+                    string id = item.RequireString("id");
+                    AbilityDef ability = ReadAbility(item.RequireObject("ability"), item.Member("ability")!);
+                    item.RejectUnknownMembers("id, ability");
+                    Claim(seen, "trait", id, item, traitItems[i], file.Name);
+                    traits.Add(Build(item, traitItems[i], () => new TraitDef(id, ability)));
                 }
 
                 IReadOnlyList<JsonValue> formationItems = root.OptionalArray("formations");
@@ -182,7 +206,7 @@ namespace Knez.Sim.Content
                 root.RejectUnknownMembers(FileMembers);
             }
 
-            return new DefLibrary(bodies, formations, movement, combat, morale);
+            return new DefLibrary(bodies, formations, movement, combat, morale, traits);
         }
 
         private static CombatDef ReadCombat(JsonObjectReader item, JsonValue at)
@@ -288,10 +312,11 @@ namespace Knez.Sim.Content
             int breakShare = m.RequireInt("breakShare");
             int reformShare = m.RequireInt("reformShare");
             int waveringPenalty = m.RequireInt("waveringHitPenalty");
+            Fix leaderFell = m.RequireFix("leaderFell");
             m.RejectUnknownMembers(MoraleMembers);
             return Build(m, at, () => new MoraleDef(shaken, wavering, routing, hysteresis, lossWeight, ownLight, ownHeavy, mateHeavy,
                 flank, rear, mateFlank, mateRear, mateRouts, allyBroke, enemyBroke, nearby, recovery, safe, rallyAt, breakShare,
-                reformShare, waveringPenalty));
+                reformShare, waveringPenalty, leaderFell));
         }
 
         private static List<ExperienceDef> ReadExperience(JsonObjectReader combat)
@@ -305,8 +330,10 @@ namespace Knez.Sim.Content
                 UniqueId(list, id, "experience level", level, d => d.Id);
                 int defence = Permille(level, "defence");
                 int morale = Permille(level, "morale");
-                level.RejectUnknownMembers("id, defence, morale");
-                list.Add(Build(level, items[i], () => new ExperienceDef(id, defence, morale)));
+                int leadership = Permille(level, "leadership");
+                bool retainerOnly = level.RequireBool("retainerOnly");
+                level.RejectUnknownMembers("id, defence, morale, leadership, retainerOnly");
+                list.Add(Build(level, items[i], () => new ExperienceDef(id, defence, morale, leadership, retainerOnly)));
             }
 
             return list;
@@ -409,6 +436,12 @@ namespace Knez.Sim.Content
         /// <summary>The body def with <paramref name="id"/>, or null.</summary>
         public BodyDef? FindBody(string id) => _bodies.TryGetValue(id, out BodyDef? def) ? def : null;
 
+        /// <summary>The trait with <paramref name="id"/>, or null.</summary>
+        public TraitDef? FindTrait(string id) => _traits.TryGetValue(id, out TraitDef? def) ? def : null;
+
+        /// <summary>Known trait ids, for "unknown trait" messages.</summary>
+        public string TraitIds() => JoinIds(Traits, d => d.Id);
+
         /// <summary>The formation def with <paramref name="id"/>, or null.</summary>
         public FormationDef? FindFormation(string id) => _formations.TryGetValue(id, out FormationDef? def) ? def : null;
 
@@ -429,6 +462,52 @@ namespace Knez.Sim.Content
             }
 
             seen.Add(key, here);
+        }
+
+        /// <summary>A trait's ability (M3 step 11): <c>id</c> and <c>cooldown</c> (s), then the numbers its kind needs —
+        /// battle cry <c>radius</c>, <c>ownMorale</c>, <c>enemyMorale</c>; close ranks <c>duration</c>, <c>frontHit</c>,
+        /// <c>pace</c>; stand to the death <c>duration</c>; the abilities not built yet nothing more.</summary>
+        private static AbilityDef ReadAbility(JsonObjectReader a, JsonValue at)
+        {
+            string id = a.RequireString("id");
+            AbilityKind? kind = AbilityDef.KindOf(id);
+            if (kind == null)
+            {
+                throw a.Error(a.Member("id")!, a.MemberPath("id"), $"unknown ability '{id}' (known: {AbilityDef.Ids})");
+            }
+
+            Fix cooldown = a.RequireFix("cooldown");
+            switch (kind.Value)
+            {
+                case AbilityKind.BattleCry:
+                {
+                    Fix radius = a.RequireFix("radius");
+                    int own = a.RequireInt("ownMorale");
+                    int enemy = a.RequireInt("enemyMorale");
+                    a.RejectUnknownMembers("id, cooldown, radius, ownMorale, enemyMorale");
+                    return Build(a, at, () => AbilityDef.BattleCry(cooldown, radius, own, enemy));
+                }
+
+                case AbilityKind.CloseRanks:
+                {
+                    Fix duration = a.RequireFix("duration");
+                    int frontHit = a.RequireInt("frontHit");
+                    Fix pace = a.RequireFix("pace");
+                    a.RejectUnknownMembers("id, cooldown, duration, frontHit, pace");
+                    return Build(a, at, () => AbilityDef.CloseRanks(cooldown, duration, frontHit, pace));
+                }
+
+                case AbilityKind.StandToTheDeath:
+                {
+                    Fix duration = a.RequireFix("duration");
+                    a.RejectUnknownMembers("id, cooldown, duration");
+                    return Build(a, at, () => AbilityDef.StandToTheDeath(cooldown, duration));
+                }
+
+                default:
+                    a.RejectUnknownMembers("id, cooldown"); // not built yet: its numbers come when it is (M3 step 11)
+                    return Build(a, at, () => AbilityDef.NotBuilt(kind.Value, cooldown));
+            }
         }
 
         private static T Build<T>(JsonObjectReader item, JsonValue at, Func<T> create)

@@ -1,0 +1,23 @@
+{
+  "id": "m3-retainers",
+  "description": "M3 test of Retainers' orders (M3 step 10, battle-sim.md §13): Hrafn (loyal, elite) leaves the Hird line and walks out alone to face north-east; Vesti (cautious, professional), standing alone, joins the Shield line; as the raiders close, Hrafn goes at the nearest of them; later Vesti leaves the Shield line and walks east. Scripted so the cross-runtime goldens cover joining, leaving, lone moves and a lone attack. Don't edit it to play.",
+  "map": {"width": 60, "height": 40},
+  "squads": [
+    {"name": "Hird line", "side": 0, "body": "man", "men": [{ "count": 6, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line", "position": [20, 14], "facing": 90},
+    {"name": "Shield line", "side": 0, "body": "man", "men": [{ "count": 6, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line", "position": [40, 14], "facing": 90},
+    {"name": "Raiders", "side": 1, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "axe-shield-padded" }], "formation": "line", "position": [30, 32], "facing": 270}
+  ],
+  "retainers": [
+    { "name": "Hrafn", "side": 0, "trait": "loyal", "body": "man", "experience": "elite", "kit": "sword-shield-mail", "squad": "Hird line" },
+    { "name": "Vesti", "side": 0, "trait": "cautious", "body": "man", "experience": "professional", "kit": "axe-shield-mail", "position": [30, 8], "facing": 90 }
+  ],
+  "script": [
+    {"tick": 10, "order": "move", "squad": "Raiders", "target": [30, 18], "facing": 270},
+    {"tick": 20, "order": "detach", "retainer": "Hrafn"},
+    {"tick": 21, "order": "move", "retainer": "Hrafn", "target": [28, 17], "facing": 45},
+    {"tick": 40, "order": "attach", "retainer": "Vesti", "squad": "Shield line"},
+    {"tick": 200, "order": "attack", "retainer": "Hrafn", "enemy": 16},
+    {"tick": 400, "order": "detach", "retainer": "Vesti"},
+    {"tick": 401, "order": "move", "retainer": "Vesti", "target": [52, 12]}
+  ]
+}

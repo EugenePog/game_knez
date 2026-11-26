@@ -14,7 +14,7 @@ namespace Knez.Sim.Defs
         public MoraleDef(int shaken, int wavering, int routing, int hysteresis, Fix lossWeight, int ownLightWound,
             int ownHeavyWound, int mateHeavyWound, int flankBlow, int rearBlow, int mateFlankBlow, int mateRearBlow,
             int mateRouts, int allySquadBroke, int enemySquadBroke, Fix nearby, int recoveryPerSecond, Fix safeDistance,
-            int rallyAt, int breakShare, int reformShare, int waveringHitPenalty)
+            int rallyAt, int breakShare, int reformShare, int waveringHitPenalty, Fix leaderFell)
         {
             Shaken = DefChecks.Permille(shaken, "shaken");
             Wavering = DefChecks.Permille(wavering, "wavering");
@@ -48,6 +48,7 @@ namespace Knez.Sim.Defs
             BreakShare = DefChecks.Range(breakShare, 1, 999, nameof(breakShare));
             ReformShare = DefChecks.Range(reformShare, 1, 999, nameof(reformShare));
             WaveringHitPenalty = DefChecks.Permille(waveringHitPenalty, nameof(waveringHitPenalty));
+            LeaderFell = DefChecks.NonNegative(leaderFell, 10, string.Empty, nameof(leaderFell));
             Fingerprint = ComputeFingerprint();
         }
 
@@ -59,7 +60,7 @@ namespace Knez.Sim.Defs
             lossWeight: Fix.FromInt(2), ownLightWound: 50, ownHeavyWound: 150, mateHeavyWound: 20, flankBlow: 20, rearBlow: 40,
             mateFlankBlow: 5, mateRearBlow: 10, mateRouts: 30, allySquadBroke: 150, enemySquadBroke: 100, nearby: Fix.FromInt(20),
             recoveryPerSecond: 20, safeDistance: Fix.FromInt(10), rallyAt: 350, breakShare: 500, reformShare: 500,
-            waveringHitPenalty: 40);
+            waveringHitPenalty: 40, leaderFell: Fix.One);
 
         /// <summary>Below this a steady man is shaken.</summary>
         public int Shaken { get; }
@@ -130,6 +131,10 @@ namespace Knez.Sim.Defs
         /// <summary>Permille taken off the chance of a wavering man's blows.</summary>
         public int WaveringHitPenalty { get; }
 
+        /// <summary>A Retainer falling costs each man of his squad this many times what a fallen squadmate costs (battle-sim.md
+        /// §13; decided 2026-11-26: as one mate), instead of it.</summary>
+        public Fix LeaderFell { get; }
+
         /// <summary>FNV-1a hash of every number above, in order; part of the scenario's fingerprint.</summary>
         public ulong Fingerprint { get; }
 
@@ -160,6 +165,7 @@ namespace Knez.Sim.Defs
             hash.Add(BreakShare);
             hash.Add(ReformShare);
             hash.Add(WaveringHitPenalty);
+            hash.Add(LeaderFell.Raw);
             return hash.Value;
         }
     }

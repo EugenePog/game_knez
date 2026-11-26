@@ -14,6 +14,7 @@ namespace Knez.Sim.Units
         private readonly List<EntityId> _members;
         private readonly List<FixVec2> _path;
         private readonly List<int> _pathFiles;
+        private readonly List<AbilityEffect> _effects;
 
         internal Squad(EntityId id, int sideId, string name, FormationDef formation, FixVec2 anchor, Angle facing)
         {
@@ -26,6 +27,7 @@ namespace Knez.Sim.Units
             _members = new List<EntityId>();
             _path = new List<FixVec2>();
             _pathFiles = new List<int>();
+            _effects = new List<AbilityEffect>();
             PathRequestTick = -1;
             RegroupSince = -1;
         }
@@ -44,6 +46,7 @@ namespace Knez.Sim.Units
             _members = new List<EntityId>(source._members);
             _path = new List<FixVec2>(source._path);
             _pathFiles = new List<int>(source._pathFiles);
+            _effects = new List<AbilityEffect>(source._effects); // values: a list copy is a deep copy
             PathIndex = source.PathIndex;
             PathRequestTick = source.PathRequestTick;
             Files = source.Files;
@@ -117,7 +120,8 @@ namespace Knez.Sim.Units
         /// </summary>
         public bool Withdrawing { get; internal set; }
 
-        /// <summary>Men the squad started the battle with: a fallen man costs morale in proportion (battle-sim.md §12).</summary>
+        /// <summary>Men the squad started the battle with, ± 1 as a Retainer joins or leaves alive (§13): a fallen man costs
+        /// morale in proportion (battle-sim.md §12).</summary>
         public int StartCount { get; internal set; }
 
         /// <summary>Broken: more than half its men were routing, so all of them run; its order is dropped. It re-forms
@@ -153,6 +157,12 @@ namespace Knez.Sim.Units
 
         /// <summary>The members list itself, for systems (index with <c>for</c>).</summary>
         internal List<EntityId> MemberList => _members;
+
+        /// <summary>Lasting abilities used on the squad (M3 step 11), one per kind, in the order first used; an entry whose
+        /// <see cref="AbilityEffect.Until"/> has passed no longer acts but stays until the kind is used again.</summary>
+        public IReadOnlyList<AbilityEffect> Effects => _effects;
+
+        internal List<AbilityEffect> EffectList => _effects;
 
         internal Squad Clone() => new Squad(this);
     }

@@ -34,13 +34,73 @@ namespace Knez.Sim.Commands
             IReadOnlyList<ScriptedOrderDef> script = state.Scenario.Script;
             for (int i = FirstAtOrAfter(script, state.Tick); i < script.Count && script[i].Tick == state.Tick; i++)
             {
-                ScriptedOrderDef entry = script[i];
-                Squad squad = FindByName(state.SquadList, entry.SquadName);
-                ICommand command = entry.FormationId != null
-                    ? new SetFormationCommand(squad.SideId, squad.Id, entry.FormationId)
-                    : (ICommand)new MoveSquadCommand(squad.SideId, squad.Id, entry.Target, entry.Facing);
-                Run(command, state, context);
+                Run(CommandOf(state, script[i]), state, context);
             }
+        }
+
+        /// <summary>The command a script entry stands for, issued by the side of the squad or Retainer it names.</summary>
+        private static ICommand CommandOf(BattleState state, ScriptedOrderDef entry)
+        {
+            switch (entry.Kind)
+            {
+                case ScriptedOrderKind.Formation:
+                {
+                    Squad squad = FindByName(state.SquadList, entry.SquadName!);
+                    return new SetFormationCommand(squad.SideId, squad.Id, entry.FormationId!);
+                }
+
+                case ScriptedOrderKind.AttachRetainer:
+                {
+                    Fighter retainer = FindRetainer(state, entry.RetainerName!);
+                    return new AttachRetainerCommand(retainer.SideId, retainer.Id, FindByName(state.SquadList, entry.SquadName!).Id);
+                }
+
+                case ScriptedOrderKind.DetachRetainer:
+                {
+                    Fighter retainer = FindRetainer(state, entry.RetainerName!);
+                    return new DetachRetainerCommand(retainer.SideId, retainer.Id);
+                }
+
+                case ScriptedOrderKind.MoveRetainer:
+                {
+                    Fighter retainer = FindRetainer(state, entry.RetainerName!);
+                    return new MoveRetainerCommand(retainer.SideId, retainer.Id, entry.Target, entry.Facing);
+                }
+
+                case ScriptedOrderKind.RetainerAttack:
+                {
+                    Fighter retainer = FindRetainer(state, entry.RetainerName!);
+                    return new RetainerAttackCommand(retainer.SideId, retainer.Id, entry.Enemy);
+                }
+
+                case ScriptedOrderKind.UseAbility:
+                {
+                    Fighter retainer = FindRetainer(state, entry.RetainerName!);
+                    return new UseAbilityCommand(retainer.SideId, retainer.Id);
+                }
+
+                default:
+                {
+                    Squad squad = FindByName(state.SquadList, entry.SquadName!);
+                    return new MoveSquadCommand(squad.SideId, squad.Id, entry.Target, entry.Facing);
+                }
+            }
+        }
+
+        private static Fighter FindRetainer(BattleState state, string name)
+        {
+            List<Fighter> fighters = state.FighterList;
+            for (int i = 0; i < fighters.Count; i++)
+            {
+                RetainerPart? part = fighters[i].Retainer;
+                if (part.HasValue && string.Equals(part.Value.Name, name, StringComparison.Ordinal))
+                {
+                    return fighters[i];
+                }
+            }
+
+            // ScenarioDef checks every scripted Retainer name, and fighters are never removed.
+            throw new InvalidOperationException($"The script names Retainer '{name}', which this battle doesn't have.");
         }
 
         private static void Run(ICommand command, BattleState state, TickContext context)

@@ -157,9 +157,46 @@ namespace Knez.Sim.Content
                     return squad == null ? null : ScriptedOrderDef.Formation(tick, squad.Name, formation.FormationId);
                 }
 
+                case AttachRetainerCommand attach:
+                {
+                    string? name = RetainerName(state, attach.RetainerId);
+                    Squad? squad = state.FindSquad(attach.SquadId);
+                    return name == null || squad == null ? null : ScriptedOrderDef.Attach(tick, name, squad.Name);
+                }
+
+                case DetachRetainerCommand detach:
+                {
+                    string? name = RetainerName(state, detach.RetainerId);
+                    return name == null ? null : ScriptedOrderDef.Detach(tick, name);
+                }
+
+                case MoveRetainerCommand move:
+                {
+                    string? name = RetainerName(state, move.RetainerId);
+                    return name == null ? null : ScriptedOrderDef.MoveRetainer(tick, name, move.Target, move.Facing);
+                }
+
+                case RetainerAttackCommand attack:
+                {
+                    string? name = RetainerName(state, attack.RetainerId);
+                    return name == null ? null : ScriptedOrderDef.Attack(tick, name, attack.EnemyId);
+                }
+
+                case UseAbilityCommand ability:
+                {
+                    string? name = RetainerName(state, ability.RetainerId);
+                    return name == null ? null : ScriptedOrderDef.Ability(tick, name);
+                }
+
                 default:
                     return null;
             }
+        }
+
+        private static string? RetainerName(BattleState state, EntityId id)
+        {
+            RetainerPart? part = state.FindFighter(id)?.Retainer;
+            return part.HasValue ? part.Value.Name : null;
         }
 
         private void Script(JsonWriter writer, JsonValue? existing, string sourceName)
@@ -199,15 +236,35 @@ namespace Knez.Sim.Content
         private static void Order(JsonWriter writer, ScriptedOrderDef order)
         {
             writer.Raw("{ \"tick\": ").Raw(order.Tick.ToString(CultureInfo.InvariantCulture));
-            if (order.FormationId != null)
+            switch (order.Kind)
             {
-                writer.Raw(", \"order\": \"formation\", \"squad\": ").String(order.SquadName)
-                    .Raw(", \"formation\": ").String(order.FormationId).Raw(" }");
-                return;
+                case ScriptedOrderKind.Formation:
+                    writer.Raw(", \"order\": \"formation\", \"squad\": ").String(order.SquadName!)
+                        .Raw(", \"formation\": ").String(order.FormationId!).Raw(" }");
+                    return;
+                case ScriptedOrderKind.AttachRetainer:
+                    writer.Raw(", \"order\": \"attach\", \"retainer\": ").String(order.RetainerName!)
+                        .Raw(", \"squad\": ").String(order.SquadName!).Raw(" }");
+                    return;
+                case ScriptedOrderKind.DetachRetainer:
+                    writer.Raw(", \"order\": \"detach\", \"retainer\": ").String(order.RetainerName!).Raw(" }");
+                    return;
+                case ScriptedOrderKind.UseAbility:
+                    writer.Raw(", \"order\": \"ability\", \"retainer\": ").String(order.RetainerName!).Raw(" }");
+                    return;
+                case ScriptedOrderKind.RetainerAttack:
+                    writer.Raw(", \"order\": \"attack\", \"retainer\": ").String(order.RetainerName!)
+                        .Raw(", \"enemy\": ").Raw(order.Enemy.Value.ToString(CultureInfo.InvariantCulture)).Raw(" }");
+                    return;
+                case ScriptedOrderKind.MoveRetainer:
+                    writer.Raw(", \"order\": \"move\", \"retainer\": ").String(order.RetainerName!);
+                    break;
+                default:
+                    writer.Raw(", \"order\": \"move\", \"squad\": ").String(order.SquadName!);
+                    break;
             }
 
-            writer.Raw(", \"order\": \"move\", \"squad\": ").String(order.SquadName)
-                .Raw(", \"target\": [").Raw(Number(order.Target.X)).Raw(", ").Raw(Number(order.Target.Y)).Raw("]");
+            writer.Raw(", \"target\": [").Raw(Number(order.Target.X)).Raw(", ").Raw(Number(order.Target.Y)).Raw("]");
             if (order.Facing.HasValue)
             {
                 writer.Raw(", \"facing\": ").Raw(Degrees(order.Facing.Value));

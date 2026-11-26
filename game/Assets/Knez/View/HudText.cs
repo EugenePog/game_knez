@@ -5,6 +5,7 @@ using Knez.Sim.Commands;
 using Knez.Sim.Defs;
 using Knez.Sim.Events;
 using Knez.Sim.Morale;
+using Knez.Sim.Numerics;
 using Knez.Sim.Orders;
 using Knez.Sim.Units;
 
@@ -59,8 +60,131 @@ namespace Knez.Game.View
             "off-map" => "that point is off the map",
             "unknown-formation" => "that formation isn't available here",
             "squad-broken" => "its men are running",
+            "routing" => "he is running",
+            "squad-full" => "that squad is full",
+            "in-squad" => "he is in a squad",
+            "not-in-squad" => "he isn't in a squad",
+            "not-an-enemy" => "that man is on his side",
+            "cooling-down" => "his ability is still cooling down",
+            "not-built" => "that ability isn't built yet",
             _ => reason.Code ?? "refused",
         };
+
+        /// <summary>Why a Retainer's order was refused (M3 step 10): the same codes read differently per command.</summary>
+        public static string RetainerRefusal(ICommand command, RejectReason reason) => (command, reason.Code) switch
+        {
+            (AttachRetainerCommand _, "in-squad") => "he is in that squad already",
+            (AttachRetainerCommand _, "unknown-entity") => "that squad is gone",
+            (AttachRetainerCommand _, "wrong-side") => "that squad isn't yours",
+            (AttachRetainerCommand _, "not-alive") => "he, or that squad, is out of the fight",
+            (AttachRetainerCommand _, "squad-broken") => "that squad is running",
+            (AttachRetainerCommand _, "squad-full") => "that squad is full",
+            (RetainerAttackCommand _, "unknown-entity") => "that man is gone",
+            (RetainerAttackCommand _, "not-alive") => "he, or that man, is out of the fight",
+            (UseAbilityCommand _, "not-in-squad") => "he must stand in a squad to use it",
+            (_, "in-squad") => "he is in a squad: take him out of it first (X)",
+            (_, "unknown-entity") => "no such Retainer",
+            (_, "wrong-side") => "not your Retainer",
+            (_, "not-alive") => "he is out of the fight",
+            _ => Refusal(reason),
+        };
+
+        /// <summary>"Hrafn (loyal, elite)" — a Retainer's name, trait and experience; a plain "#5" for other men.</summary>
+        public static string Retainer(Fighter fighter) =>
+            fighter.Retainer is RetainerPart part ? $"{part.Name} ({part.Trait.Id}, {fighter.Experience.Id})" : $"#{fighter.Id.Value}";
+
+        /// <summary>"leads: losses −20%, recovers +20%" — what his leadership does for the squad he is in (M3 step 10);
+        /// "no leadership" at 0.</summary>
+        public static string Leadership(ExperienceDef experience)
+        {
+            int percent = experience.Leadership / 10;
+            return percent > 0 ? $"leads: losses \u2212{percent}%, recovers +{percent}%" : "no leadership";
+        }
+
+        /// <summary>An ability's name in words: "battle cry", "stand to the death", … (M3 step 11).</summary>
+        public static string AbilityName(AbilityDef ability) => ability.Kind switch
+        {
+            AbilityKind.BattleCry => "battle cry",
+            AbilityKind.CloseRanks => "close ranks",
+            AbilityKind.PromiseLoot => "promise loot",
+            AbilityKind.StandToTheDeath => "stand to the death",
+            AbilityKind.FrontRankRush => "front-rank rush",
+            AbilityKind.NoQuarter => "no quarter",
+            _ => ability.Id,
+        };
+
+        /// <summary>Whether <paramref name="retainer"/> could use his ability now (the command would pass): built, cooled
+        /// down, in the fight and not running, and in a squad when it acts on one.</summary>
+        public static bool AbilityReady(BattleState state, Fighter retainer)
+        {
+            if (!(retainer.Retainer is RetainerPart part) || !retainer.IsAlive || retainer.IsRouting)
+            {
+                return false;
+            }
+
+            AbilityDef ability = part.Trait.Ability;
+            return ability.Built && state.Tick >= part.AbilityReadyTick && (!ability.OnSquad || !retainer.SquadId.IsNone);
+        }
+
+        /// <summary>"battle cry: ready", "battle cry: in 72 s", "close ranks: needs a squad", "promise loot: not built
+        /// yet"; empty for a man who isn't a Retainer.</summary>
+        public static string AbilityState(BattleState state, Fighter retainer)
+        {
+            if (!(retainer.Retainer is RetainerPart part))
+            {
+                return string.Empty;
+            }
+
+            AbilityDef ability = part.Trait.Ability;
+            string name = AbilityName(ability);
+            if (!ability.Built)
+            {
+                return name + ": not built yet";
+            }
+
+            if (state.Tick < part.AbilityReadyTick)
+            {
+                int seconds = (part.AbilityReadyTick - state.Tick + BattleState.TicksPerSecond - 1) / BattleState.TicksPerSecond;
+                return $"{name}: in {seconds} s";
+            }
+
+            return ability.OnSquad && retainer.SquadId.IsNone ? name + ": needs a squad" : name + ": ready";
+        }
+
+        /// <summary>"ranks closed 6.0 s · standing to the death 2.0 s": the lasting abilities acting on a squad and the time
+        /// they have left; empty when none (M3 step 11).</summary>
+        public static string Effects(BattleState state, Squad squad)
+        {
+            var parts = new System.Collections.Generic.List<string>();
+            foreach (AbilityEffect effect in squad.Effects)
+            {
+                if (state.Tick < effect.Until)
+                {
+                    string what = effect.Ability.Kind == AbilityKind.CloseRanks ? "ranks closed"
+                        : effect.Ability.Kind == AbilityKind.StandToTheDeath ? "standing to the death" : AbilityName(effect.Ability);
+                    parts.Add(what + " " + Seconds(effect.Until - state.Tick));
+                }
+            }
+
+            return string.Join(" \u00b7 ", parts);
+        }
+
+        /// <summary>What a Retainer standing alone has been told: "walking to (30.0, 12.5)", "going at #33 (Raider line)",
+        /// "standing alone".</summary>
+        public static string LoneOrder(BattleState state, Fighter fighter)
+        {
+            LoneOrder order = fighter.LoneOrder;
+            if (order.Kind == LoneOrderKind.Move)
+            {
+                return "walking to (" + Metres(order.Target.X) + ", " + Metres(order.Target.Y) + ")";
+            }
+
+            return order.Kind == LoneOrderKind.Attack ? "going at " + Name(state, order.Enemy) : "standing alone";
+        }
+
+        // Plain C# here (no Unity vectors): HudText runs in the .NET test harness too.
+        private static string Metres(Fix value) =>
+            (value.Raw / (double)Fix.OneRaw).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
 
         /// <summary>"sword · round shield · padded · cap" — what a kit holds (M3 step 9).</summary>
         public static string Kit(KitDef kit)
@@ -134,7 +258,7 @@ namespace Knez.Game.View
         public static string Blow(BlowStruck blow) =>
             $"{blow.Chance}‰ from the {blow.Sector.ToString().ToLowerInvariant()}, {(blow.Landed ? "got through" : "turned aside")}";
 
-        /// <summary>"#33 (Raider line)".</summary>
+        /// <summary>"#33 (Raider line)"; a Retainer by name: "Hrafn (Veterans)", "Vesti".</summary>
         public static string Name(BattleState state, EntityId fighterId)
         {
             Fighter? fighter = fighterId.IsNone ? null : state.FindFighter(fighterId);
@@ -144,7 +268,14 @@ namespace Knez.Game.View
             }
 
             Squad? squad = fighter.SquadId.IsNone ? null : state.FindSquad(fighter.SquadId);
-            return squad != null ? $"#{fighter.Id.Value} ({squad.Name})" : $"#{fighter.Id.Value}";
+            return Name(fighter, squad);
+        }
+
+        /// <summary>"#33 (Raider line)" or a Retainer's "Hrafn (Veterans)", with the squad given (null: none).</summary>
+        public static string Name(Fighter fighter, Squad? squad)
+        {
+            string who = fighter.Retainer is RetainerPart part ? part.Name : $"#{fighter.Id.Value}";
+            return squad != null ? $"{who} ({squad.Name})" : who;
         }
 
         /// <summary>Why a man's morale moved, in a few words (battle-sim.md §12 reason codes).</summary>
@@ -160,6 +291,9 @@ namespace Knez.Game.View
             MoraleReason.SquadmateRouted => "mates ran",
             MoraleReason.AlliedSquadBroke => "an allied squad broke",
             MoraleReason.EnemySquadBroke => "an enemy squad broke",
+            MoraleReason.LeaderFell => "their leader fell",
+            MoraleReason.BattleCry => "a battle cry",
+            MoraleReason.EnemyBattleCry => "an enemy's battle cry",
             _ => reason.ToString(),
         };
 
@@ -227,9 +361,25 @@ namespace Knez.Game.View
             return $"{running}{lost} Morale {Account(account)}.";
         }
 
-        /// <summary>"Hird line: that point is off the map" — the squad's name when the command names one.</summary>
+        /// <summary>"Hird line: that point is off the map" — the squad's name when the command names one; a Retainer's
+        /// order names him: "Hrafn: that squad is full".</summary>
         public static string Refusal(BattleState state, ICommand command, RejectReason reason)
         {
+            EntityId retainerId = command switch
+            {
+                AttachRetainerCommand attach => attach.RetainerId,
+                DetachRetainerCommand detach => detach.RetainerId,
+                MoveRetainerCommand move => move.RetainerId,
+                RetainerAttackCommand attack => attack.RetainerId,
+                UseAbilityCommand ability => ability.RetainerId,
+                _ => EntityId.None,
+            };
+            if (!retainerId.IsNone)
+            {
+                Fighter? retainer = state.FindFighter(retainerId);
+                return (retainer?.Retainer is RetainerPart part ? part.Name + ": " : "Order refused: ") + RetainerRefusal(command, reason);
+            }
+
             EntityId squadId = command switch
             {
                 MoveSquadCommand move => move.SquadId,

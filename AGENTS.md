@@ -137,15 +137,15 @@ text aren't in the code yet, and the roadmap step that builds them may still cha
 | Русский | Code | Note |
 |---|---|---|
 | дружина | `Retinue` | the chief's band of Retainers (D-015; formerly `Warband`) |
-| дружинник, герой | `Retainer` | a named fighter with experience, a trait, leadership and one active ability; leads from a squad's front rank, can leave it and join another; under direct control in battle, own AI only on independent tasks (D-010, D-014, D-015, D-019, D-023). battle-sim.md's "hero" becomes `Retainer` (roadmap M3 step 6) |
+| дружинник, герой | `Retainer` | a named fighter with experience, a trait, leadership and one active ability; leads from a squad's front rank, can leave it and join another; under direct control in battle, own AI only on independent tasks (D-010, D-014, D-015, D-019, D-023). In code since M3 step 10: a `Fighter` with a `RetainerPart` (name, trait); alone he takes a `LoneOrder` |
 | вождь (клана) | chief | the player's own character, not a Retainer (D-010) |
 | отряд | `Squad` | 5–8 fighters, controlled by orders |
 | боец | `Fighter` | any combatant; Retainers are fighters too |
 | ополчение, ополченец | militia | settlement men who muster on alarm, one squad per settlement; experience new or experienced only (D-007, D-018); in content, men of `new`/`experienced` in kits such as `axe-shield` or `spear-shield` (the `levy` fighter type went in M3 step 9) |
 | опыт | `Experience` | `new` / `experienced` / `professional` / `elite` (новичок / опытный / профессионал / элита); professional and elite only for Retainers (D-019); independent of kit (D-022) |
 | снаряжение | kit | weapon, shield, body armour, head cover (`KitDef`, named by what it holds, e.g. `sword-shield-mail`); independent of experience, may differ within a squad (D-022, M3 step 9) |
-| черта (характера) | trait | proud, cautious, greedy, loyal, bold, cruel (гордый, осторожный, жадный, верный, напористый, жестокий): each gives one active ability and shifts AI decisions (D-025) |
-| способность | ability | a Retainer's active ability, cooldown in seconds (D-023) |
+| черта (характера) | `TraitDef` | proud, cautious, greedy, loyal, bold, cruel (гордый, осторожный, жадный, верный, напористый, жестокий): each gives one active ability and shifts AI decisions (D-025) |
+| способность | `AbilityDef` | a Retainer's active ability from his trait, cooldown in seconds (D-023); used by `UseAbility`; a lasting one is an `AbilityEffect` on his squad (M3 step 11) |
 | стояние | standoff | morale pressure before contact; nobody strikes until the first blow (D-009) |
 | поединок / вызов / требование | duel / challenge / demand | a Retainer's one-on-one fight before the troops; the call to it; the terms put to the enemy (D-009) |
 | правитель | ruler | the local ruler, main enemy of the удел; his warriors are his Retainers (D-007, D-020) |
@@ -160,7 +160,7 @@ text aren't in the code yet, and the roadmap step that builds them may still cha
 | усталость | `Fatigue` | |
 | ранение | `Wound` | Light / Heavy / Down (`WoundLevel`); Down = out of the fight, life or death settled after the battle |
 | бегство | `Rout` | |
-| лидерство | `Leadership` | a Retainer's passive morale bonus to his squad, stronger with experience (D-023) |
+| лидерство | `Leadership` | a Retainer's passive morale bonus to his squad, stronger with experience (D-023): `ExperienceDef.Leadership` ‰ cuts its men's morale losses and speeds recovery (M3 step 10) |
 | побратим / соперник | `SwornBrother` / `Rival` | relationship tags (morale modifiers) |
 | колдун | `Sorcerer` | enemy leader; source of `Fear` (no real magic) |
 | князь | `Knez` | the town's prince (campaign, later) |

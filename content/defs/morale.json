@@ -1,5 +1,5 @@
 {
-  "description": "Morale rules (battle-sim.md §12). Morale is 0..1000 per man; he starts with his experience level's morale (combat.json). States fall at the thresholds (shaken, wavering, routing) and climb back only hysteresis above them. Costs are points off each man affected; lossWeight: a fallen squadmate costs everyone in the squad lossWeight x 1000 / the squad's starting size (decided 2026-11-23: 2, a squad breaks after losing about a quarter). nearby: metres within which a breaking squad shakes allies or heartens enemies. A man with no enemy within safeDistance (m) recovers recoveryPerSecond up to his starting morale; a routing man rallies at rallyAt and goes back (decided 2026-11-23). A squad breaks when more than breakShare (‰) of its men in the fight rout (decided: more than half) and re-forms when more than reformShare are back. Numbers other than the decided ones are proposals of 2026-11-23, tuned on the M3 bench.",
+  "description": "Morale rules (battle-sim.md §12). Morale is 0..1000 per man; he starts with his experience level's morale (combat.json). States fall at the thresholds (shaken, wavering, routing) and climb back only hysteresis above them. Costs are points off each man affected; lossWeight: a fallen squadmate costs everyone in the squad lossWeight x 1000 / the squad's starting size (decided 2026-11-23: 2, a squad breaks after losing about a quarter). nearby: metres within which a breaking squad shakes allies or heartens enemies. A man with no enemy within safeDistance (m) recovers recoveryPerSecond up to his starting morale; a routing man rallies at rallyAt and goes back (decided 2026-11-23). A squad breaks when more than breakShare (‰) of its men in the fight rout (decided: more than half) and re-forms when more than reformShare are back. Numbers other than the decided ones are proposals of 2026-11-23, tuned on the M3 bench. leaderFell: when a Retainer leading a squad falls, each of its men loses this many times what a fallen squadmate costs, instead of it (decided by the user 2026-11-26: as one mate, after S8 measured an experienced leader losing at 2).",
   "morale": {
     "shaken": 600, "wavering": 400, "routing": 200, "hysteresis": 50,
     "lossWeight": 2,
@@ -8,6 +8,7 @@
     "mateRouts": 30, "allySquadBroke": 150, "enemySquadBroke": 100, "nearby": 20,
     "recoveryPerSecond": 20, "safeDistance": 10, "rallyAt": 350,
     "breakShare": 500, "reformShare": 500,
-    "waveringHitPenalty": 40
+    "waveringHitPenalty": 40,
+    "leaderFell": 1
   }
 }

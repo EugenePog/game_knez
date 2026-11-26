@@ -1,4 +1,5 @@
 using Knez.Sim.Cli;
+using Knez.Sim.Content;
 using Knez.Sim.Tests.Support;
 
 namespace Knez.Sim.Tests.Content;
@@ -22,7 +23,7 @@ public class RepoContentTests
             Assert.That(Path.GetFileNameWithoutExtension(relativePath), Is.EqualTo(scenario.Id),
                 "a scenario's id matches its file name");
             Assert.That(state.Squads, Has.Count.EqualTo(scenario.Squads.Count));
-            Assert.That(state.Fighters, Has.Count.EqualTo(scenario.Squads.Sum(s => s.Count)));
+            Assert.That(state.Fighters, Has.Count.EqualTo(scenario.Squads.Sum(s => s.Count) + scenario.Retainers.Count));
         });
     }
 
@@ -58,6 +59,24 @@ public class RepoContentTests
             Assert.That(combat, Is.Not.SameAs(Knez.Sim.Defs.CombatDef.Standard));
             Assert.That(combat.Fingerprint, Is.EqualTo(Knez.Sim.Defs.CombatDef.Standard.Fingerprint),
                 "combat.json and CombatDef.Standard differ; change both together");
+        });
+    }
+
+    [Test]
+    public void Repo_Traits_EqualTheCodesStandardCopy_AllSixAbilities()
+    {
+        // M3 step 11: retainers.json holds every trait's ability; code-built scenarios use TraitDef.Standard.
+        string defs = Path.Combine(RepoPaths.Content, "defs");
+        var library = DefLibrary.Parse(Directory.GetFiles(defs, "*.json").Order(StringComparer.Ordinal)
+            .Select(f => new SourceText(Path.GetFileName(f), File.ReadAllText(f))).ToArray());
+        static object Numbers(Knez.Sim.Defs.TraitDef t) => (t.Id, t.Ability.Id, t.Ability.Kind, t.Ability.Built, t.Ability.CooldownTicks,
+            t.Ability.DurationTicks, t.Ability.Radius, t.Ability.OwnMorale, t.Ability.EnemyMorale, t.Ability.FrontHit, t.Ability.Pace);
+        Assert.Multiple(() =>
+        {
+            Assert.That(library.Traits.Select(Numbers), Is.EqualTo(Knez.Sim.Defs.TraitDef.Standard.Select(Numbers)),
+                "retainers.json and TraitDef.Standard differ; change both together");
+            Assert.That(library.Traits.Select(t => t.Ability.Kind).Distinct().Count(), Is.EqualTo(6), "one ability per trait, all six");
+            Assert.That(library.Traits.Where(t => t.Ability.Built).Select(t => t.Id), Is.EqualTo(new[] { "cautious", "loyal", "proud" }));
         });
     }
 

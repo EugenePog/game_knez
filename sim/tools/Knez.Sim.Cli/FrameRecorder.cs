@@ -24,7 +24,7 @@ public sealed class FrameRecorder : IDisposable
     /// <summary>Event types whose fields <see cref="WriteEvent"/> writes; any other type is written as its name only.
     /// A test fails when a <see cref="SimEvent"/> subclass is missing here.</summary>
     public static readonly IReadOnlyList<Type> DescribedEventTypes = [typeof(CommandRejected), typeof(BlowStruck), typeof(Wounded),
-        typeof(MoraleChanged), typeof(MoraleStateChanged), typeof(SquadBroke), typeof(BattleEnded)];
+        typeof(MoraleChanged), typeof(MoraleStateChanged), typeof(SquadBroke), typeof(BattleEnded), typeof(AbilityUsed)];
 
     /// <summary>Flush to the stream once this much is buffered, so long battles don't sit in memory.</summary>
     private const int FlushThresholdBytes = 64 * 1024;
@@ -56,6 +56,7 @@ public sealed class FrameRecorder : IDisposable
             _json.WriteNumberValue(Metres(wall.Min.Y));
             _json.WriteNumberValue(Metres(wall.Max.X));
             _json.WriteNumberValue(Metres(wall.Max.Y));
+            _json.WriteStringValue(wall.Kind == Knez.Sim.Defs.WallKind.House ? "house" : "obstacle"); // drawn by kind (a later column: still version 1)
             _json.WriteEndArray();
         }
 
@@ -87,6 +88,11 @@ public sealed class FrameRecorder : IDisposable
             _json.WriteNumber("radius", Metres(fighter.Radius));
             _json.WriteString("experience", fighter.Experience.Id);
             _json.WriteString("kit", fighter.Kit.Id);
+            if (fighter.Retainer.HasValue)
+            {
+                _json.WriteString("retainer", fighter.Retainer.Value.Name); // M3 step 10
+                _json.WriteString("trait", fighter.Retainer.Value.Trait.Id);
+            }
             _json.WriteEndObject();
         }
 
@@ -263,6 +269,11 @@ public sealed class FrameRecorder : IDisposable
                 break;
             case BattleEnded ended:
                 _json.WriteNumber("winner", ended.Winner);
+                break;
+            case AbilityUsed used:
+                _json.WriteNumber("retainer", used.Retainer.Value);
+                _json.WriteString("ability", used.Ability);
+                _json.WriteNumber("squad", used.Squad.Value);
                 break;
         }
 

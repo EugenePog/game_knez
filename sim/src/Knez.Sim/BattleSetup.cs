@@ -8,9 +8,25 @@ namespace Knez.Sim
     /// <summary>Builds the starting <see cref="BattleState"/> of a scenario.</summary>
     public static class BattleSetup
     {
+        private static Squad FindSquad(BattleState state, string name)
+        {
+            var squads = state.SquadList;
+            for (int i = 0; i < squads.Count; i++)
+            {
+                if (string.Equals(squads[i].Name, name, System.StringComparison.Ordinal))
+                {
+                    return squads[i];
+                }
+            }
+
+            throw new System.InvalidOperationException($"No squad '{name}' (ScenarioDef checks Retainers' squads).");
+        }
+
         /// <summary>
         /// The state at tick 0: squads in scenario order, each followed by its fighters in slot order (so ids follow the
-        /// scenario file), every fighter standing on its formation slot and facing with its squad.
+        /// scenario file), every fighter standing on its formation slot and facing with its squad. Then the Retainers, in
+        /// list order (battle-sim.md §13): one who starts in a squad joins its front rank and the squad stands formed in the
+        /// layout for one more man; one who starts alone stands where the scenario puts him.
         /// </summary>
         public static BattleState Create(ScenarioDef scenario, ulong seed)
         {
@@ -24,6 +40,17 @@ namespace Knez.Sim
                 {
                     FixVec2 position = FormationLayout.SlotPosition(spawn.Formation, spawn.Count, slot, spawn.Position, spawn.Facing);
                     state.AddSquadMember(squad, spawn.Body, spawn.GroupAt(slot), position, slot); // groups fill slots in order
+                }
+            }
+
+            for (int i = 0; i < scenario.Retainers.Count; i++)
+            {
+                RetainerSpawnDef spawn = scenario.Retainers[i];
+                Fighter retainer = state.AddFighter(spawn.Body, spawn.Experience, spawn.Kit, spawn.SideId, spawn.Position, spawn.Facing);
+                retainer.Retainer = new RetainerPart(spawn.Name, spawn.Trait);
+                if (spawn.SquadName != null)
+                {
+                    SquadMembership.Join(state, FindSquad(state, spawn.SquadName), retainer, atSpawn: true);
                 }
             }
 

@@ -29,7 +29,7 @@ namespace Knez.Sim
 
         /// <summary>
         /// The battle is decided once at most one side has a man in the fight who isn't routing (battle-sim.md §12): that
-        /// side holds the field, or nobody (−1). Sides are those the scenario's squads belong to.
+        /// side holds the field, or nobody (−1). Sides are those the scenario's squads and Retainers belong to.
         /// </summary>
         private static void Decide(BattleState state)
         {
@@ -43,6 +43,12 @@ namespace Knez.Sim
                 for (int s = 0; s < scenarioSquads.Count && !present; s++)
                 {
                     present = scenarioSquads[s].SideId == side;
+                }
+
+                var retainers = state.Scenario.Retainers;
+                for (int r = 0; r < retainers.Count && !present; r++)
+                {
+                    present = retainers[r].SideId == side; // a side of Retainers alone still fights
                 }
 
                 if (!present)
@@ -62,20 +68,33 @@ namespace Knez.Sim
                 }
             }
 
-            if (sides <= 1 && scenarioSquads.Count > 0 && HasTwoSides(state))
+            if (sides <= 1 && HasTwoSides(state))
             {
                 state.Winner = sides == 1 ? standing : -1;
                 state.AddEvent(new Events.BattleEnded(state.Tick, state.Winner));
             }
         }
 
-        /// <summary>A battle needs two sides to be decided; a drill with one side never ends.</summary>
+        /// <summary>A battle needs two sides to be decided — among its squads and its Retainers (a side may be Retainers
+        /// alone, M3 step 10); a drill with one side never ends.</summary>
         private static bool HasTwoSides(BattleState state)
         {
+            int first = -1;
             var squads = state.Scenario.Squads;
-            for (int s = 1; s < squads.Count; s++)
+            for (int s = 0; s < squads.Count; s++)
             {
-                if (squads[s].SideId != squads[0].SideId)
+                first = first < 0 ? squads[s].SideId : first;
+                if (squads[s].SideId != first)
+                {
+                    return true;
+                }
+            }
+
+            var retainers = state.Scenario.Retainers;
+            for (int r = 0; r < retainers.Count; r++)
+            {
+                first = first < 0 ? retainers[r].SideId : first;
+                if (retainers[r].SideId != first)
                 {
                     return true;
                 }

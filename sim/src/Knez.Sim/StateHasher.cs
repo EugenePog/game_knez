@@ -67,6 +67,14 @@ namespace Knez.Sim
                 squads.Add(squad.StartCount);
                 squads.Add(squad.Broken);
                 squads.Add(squad.RegroupSince);
+                List<AbilityEffect> effects = squad.EffectList; // M3 step 11; the numbers are in the fingerprint
+                squads.Add(effects.Count);
+                for (int e = 0; e < effects.Count; e++)
+                {
+                    squads.Add((int)effects[e].Ability.Kind);
+                    squads.Add(effects[e].Until);
+                    squads.Add(effects[e].By.Value);
+                }
 
                 List<EntityId> members = squad.MemberList;
                 squads.Add(members.Count);
@@ -86,6 +94,21 @@ namespace Knez.Sim
                 fighters.Add(fighter.Body.Id);
                 fighters.Add(fighter.Experience.Id);
                 fighters.Add(fighter.Kit.Id);
+                fighters.Add(fighter.IsRetainer);
+                if (fighter.Retainer.HasValue)
+                {
+                    fighters.Add(fighter.Retainer.Value.Name);
+                    fighters.Add(fighter.Retainer.Value.Trait.Id);
+                    fighters.Add(fighter.Retainer.Value.AbilityReadyTick);
+                }
+
+                Orders.LoneOrder order = fighter.LoneOrder;
+                fighters.Add((int)order.Kind);
+                fighters.Add(order.Target.X.Raw);
+                fighters.Add(order.Target.Y.Raw);
+                fighters.Add(order.HasFacing);
+                fighters.Add((int)order.Facing.Raw);
+                fighters.Add(order.Enemy.Value);
                 fighters.Add(fighter.SideId);
                 fighters.Add(fighter.IsAlive);
                 fighters.Add(fighter.Position.X.Raw);

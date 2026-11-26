@@ -16,8 +16,11 @@ namespace Knez.Game.View
     /// the clock, speed and pause and, once decided, the result; then every squad (scrolling when they don't fit) with
     /// its formation, men in the fight and state, who it started with, how its men are hurt, its blows, its average
     /// morale as a bar, one cell per man coloured by his morale state, how many must run before it breaks, and what has
-    /// cost it morale — once broken, why it broke (M3 step 8). Bottom left: the battle log (L hides it). Top right: the
-    /// man under the mouse, with what moved his morale. Refused orders fade after a few seconds. Reads the state only;
+    /// cost it morale — once broken, why it broke (M3 step 8); its Retainers by name, trait, experience and leadership,
+    /// and after the squads the Retainers standing alone with what they were told (M3 step 10). Bottom left: the battle
+    /// log (L hides it). Top right: the man under the mouse, with what moved his morale. M3 step 11: each Retainer's
+    /// ability and its cooldown, the abilities acting on a squad, and for the selected Retainer a button that uses his
+    /// ability (as Q does). Refused orders fade after a few seconds. Reads the state only;
     /// <see cref="Covers"/> tells input which screen areas are the HUD's.
     /// </summary>
     public sealed class BattleHud : MonoBehaviour
@@ -39,6 +42,12 @@ namespace Knez.Game.View
         private Vector2 _squadScroll;
         private Vector2 _logScroll;
         private bool _followLog = true;
+
+        /// <summary>The Retainer the player has selected (set by input), or none: his ability gets a button.</summary>
+        public EntityId SelectedRetainer { get; set; } = EntityId.None;
+
+        /// <summary>The side the player commands (set by input).</summary>
+        public int PlayerSide { get; set; }
 
         /// <summary>Whether the battle log panel is shown (L).</summary>
         public bool ShowLog { get; set; } = true;
@@ -128,7 +137,7 @@ namespace Knez.Game.View
 
             BattleState state = sim.State;
             EnsureRecord(state);
-            float logTop = ShowLog ? Screen.height - 36 - LogHeight : Screen.height - 36;
+            float logTop = ShowLog ? Screen.height - 54 - LogHeight : Screen.height - 54; // two help lines below
             DrawSquads(state, runner, logTop - 8);
             if (ShowLog)
             {
@@ -136,6 +145,7 @@ namespace Knez.Game.View
             }
 
             DrawHovered(state);
+            DrawAbilityButton(state, runner, logTop - 8);
 
             float now = Time.unscaledTime;
             _refusals.RemoveAll(r => r.Until < now);
@@ -146,8 +156,11 @@ namespace Knez.Game.View
                 ry += 20;
             }
 
-            GUI.Label(new Rect(12, Screen.height - 30, Screen.width - 24, 22),
+            GUI.Label(new Rect(12, Screen.height - 48, Screen.width - 24, 22),
                 "<color=#cccccc>Left: select (drag: box, Shift: add, Esc: clear) · Right: move (drag: facing) · 1/2/3: line/shield wall/column · Space: pause · =/−: speed · WASD/middle drag: pan · scroll: zoom · L: log · B: morale bars · point at a man for details</color>",
+                _small);
+            GUI.Label(new Rect(12, Screen.height - 30, Screen.width - 24, 22),
+                "<color=#e8c35a>Retainer (gold ring):</color><color=#cccccc> drag him onto a squad: he joins it · onto open ground: he leaves his squad and walks there · click him, then right-click ground / an enemy / a squad: walk there / go at him / join it · X: leave his squad · Q: his ability</color>",
                 _small);
         }
 
@@ -163,6 +176,10 @@ namespace Knez.Game.View
                 blocks.Add((squad, height));
                 content += height;
             }
+
+            List<Fighter> alone = _record.Tally.RetainersOf(state, EntityId.None);
+            float aloneHeight = alone.Count > 0 ? 15 + (alone.Count * 30) + 6 : 0;
+            content += aloneHeight;
 
             float header = _result != null ? 48 : 28;
             float panelHeight = Mathf.Min(header + content + 8, Mathf.Max(120, bottom - 6));
@@ -186,12 +203,19 @@ namespace Knez.Game.View
                 y += height;
             }
 
+            if (alone.Count > 0)
+            {
+                DrawAlone(state, alone, new Rect(6, y, inner, aloneHeight));
+            }
+
             GUI.EndScrollView();
         }
 
         private float SquadHeight(BattleState state, Squad squad, float width)
         {
-            int groups = Mathf.Max(1, _record.Tally.Composition(state, squad).Count);
+            int composition = _record.Tally.Composition(state, squad).Count;
+            int retainers = _record.Tally.RetainersOf(state, squad.Id).Count;
+            int groups = composition + retainers > 0 ? composition + retainers : 1;
             string? why = Why(state, squad);
             float whyHeight = why != null ? _wrap!.CalcHeight(new GUIContent(why), width) : 0;
             return 15 + (groups * 15) + 17 + 16 + 14 + whyHeight + 10; // as DrawSquad lays them out
@@ -220,7 +244,8 @@ namespace Knez.Game.View
             MoraleDef rules = state.Scenario.Morale;
             SquadStats stats = _record.Tally.Of(state, squad);
             var composition = _record.Tally.Composition(state, squad);
-            int total = 0;
+            List<Fighter> retainers = _record.Tally.RetainersOf(state, squad.Id);
+            int total = retainers.Count;
             foreach (var group in composition)
             {
                 total += group.Count;
@@ -229,8 +254,10 @@ namespace Knez.Game.View
             float x = at.x;
             float y = at.y;
             string side = squad.SideId == 0 ? "#7fb2ff" : "#ff8f7f";
+            string effects = HudText.Effects(state, squad);
             GUI.Label(new Rect(x, y, at.width, 18),
-                $"<color={side}><b>{squad.Name}</b></color>  {squad.Formation.Id} · {stats.InFight}/{total} · {HudText.Status(squad)}", _small);
+                $"<color={side}><b>{squad.Name}</b></color>  {squad.Formation.Id} · {stats.InFight}/{total} · {HudText.Status(squad)}"
+                + (effects.Length > 0 ? " · <color=#e8c35a>" + effects + "</color>" : string.Empty), _small);
             y += 15;
             foreach (var (sample, count, inFight) in composition)
             {
@@ -238,7 +265,15 @@ namespace Knez.Game.View
                 y += 15;
             }
 
-            if (composition.Count == 0)
+            foreach (Fighter retainer in retainers)
+            {
+                string condition = Condition(retainer);
+                GUI.Label(new Rect(x, y, at.width, 18), "<color=#e8c35a><b>" + HudText.Retainer(retainer) + "</b></color><color=#d8d8d8> · "
+                    + (condition.Length > 0 ? condition + " · " : string.Empty) + HudText.AbilityState(state, retainer) + "</color>", _small);
+                y += 15;
+            }
+
+            if (composition.Count + retainers.Count == 0)
             {
                 y += 15;
             }
@@ -263,6 +298,70 @@ namespace Knez.Game.View
                 float h = _wrap!.CalcHeight(new GUIContent(why), at.width);
                 GUI.Label(new Rect(x, y, at.width, h), why, _wrap);
             }
+        }
+
+        /// <summary>The Retainers standing alone, two lines each: who and how he is; what he was told or is doing.</summary>
+        private void DrawAlone(BattleState state, List<Fighter> alone, Rect at)
+        {
+            float y = at.y;
+            GUI.Label(new Rect(at.x, y, at.width, 18), "<color=#e8c35a><b>Standing alone</b></color>", _small);
+            y += 15;
+            foreach (Fighter retainer in alone)
+            {
+                string side = retainer.SideId == 0 ? "#7fb2ff" : "#ff8f7f";
+                string condition = Condition(retainer);
+                string how = retainer.IsAlive
+                    ? $"morale {retainer.Morale} ({HudText.MoraleWord(retainer.MoraleState)})" + (condition.Length > 0 ? " · " + condition : string.Empty)
+                    : condition;
+                GUI.Label(new Rect(at.x, y, at.width, 18), $"<color={side}><b>{HudText.Retainer(retainer)}</b></color><color=#d8d8d8> · {how}</color>", _small);
+                y += 15;
+                string doing = !retainer.IsAlive || retainer.IsRouting || retainer.IsEngaged || retainer.Action != FighterAction.Idle
+                    ? HudText.Action(state, retainer)
+                    : HudText.LoneOrder(state, retainer);
+                GUI.Label(new Rect(at.x + 12, y, at.width - 12, 18), "<color=#bdbdbd>" + doing + "</color>", _small);
+                y += 15;
+            }
+        }
+
+        /// <summary>A man's condition in a word or two, empty when he is unhurt and steady in the fight.</summary>
+        private static string Condition(Fighter man)
+        {
+            if (man.Wound == WoundLevel.Down)
+            {
+                return "fallen";
+            }
+
+            if (man.MoraleState == MoraleState.Fled)
+            {
+                return "fled";
+            }
+
+            string wound = man.Wound == WoundLevel.Heavy ? "badly hurt" : man.Wound == WoundLevel.Light ? "hurt" : string.Empty;
+            string running = man.IsRouting ? "running" : string.Empty;
+            return wound.Length > 0 && running.Length > 0 ? wound + ", " + running : wound + running;
+        }
+
+        /// <summary>The selected Retainer's ability as a button above the bottom-left panels: pressed, it uses the ability
+        /// (a command for the next tick, like Q); greyed while it can't be used, saying why.</summary>
+        private void DrawAbilityButton(BattleState state, BattleRunner battle, float bottom)
+        {
+            Fighter? retainer = SelectedRetainer.IsNone ? null : state.FindFighter(SelectedRetainer);
+            if (retainer == null || !(retainer.Retainer is RetainerPart part) || retainer.SideId != PlayerSide)
+            {
+                return;
+            }
+
+            var rect = new Rect(PanelWidth + 20, bottom - 34, 360, 30);
+            _panels.Add(rect);
+            bool ready = HudText.AbilityReady(state, retainer);
+            bool enabled = GUI.enabled;
+            GUI.enabled = ready;
+            if (GUI.Button(rect, $"Q · {part.Name}: {HudText.AbilityState(state, retainer)}"))
+            {
+                battle.Enqueue(new Knez.Sim.Commands.UseAbilityCommand(PlayerSide, retainer.Id));
+            }
+
+            GUI.enabled = enabled;
         }
 
         /// <summary>"2 of 7 running · breaks when 4 run" / "broken · re-forms when 4 are back".</summary>
@@ -375,14 +474,23 @@ namespace Knez.Game.View
             }
 
             Squad? home = state.FindSquad(_record.Tally.HomeOf(man));
+            string where = home != null ? home.Name : man.IsRetainer ? "standing alone" : "no squad";
             var lines = new List<string>
             {
-                $"<b>#{man.Id.Value}</b> · {(home != null ? home.Name : "no squad")} (side {man.SideId})",
+                man.Retainer is RetainerPart part
+                    ? $"<color=#e8c35a><b>{part.Name}</b></color> #{man.Id.Value} · {part.Trait.Id} · {where} (side {man.SideId})"
+                    : $"<b>#{man.Id.Value}</b> · {where} (side {man.SideId})",
                 HudText.Kit(man.Kit, man.Experience),
                 $"{HudText.Wound(man.Wound)} · morale {man.Morale} ({HudText.MoraleWord(man.MoraleState)})",
                 "morale " + HudText.Account(_record.Ledger.Of(man), 4),
                 HudText.Action(state, man),
             };
+            if (man.IsRetainer)
+            {
+                lines.Insert(2, HudText.Leadership(man.Experience) + " · " + HudText.AbilityState(state, man)
+                    + (home == null && man.IsAlive ? " · " + HudText.LoneOrder(state, man) : string.Empty));
+            }
+
             BlowStruck? by = _record.Tally.LastBlowBy(man);
             if (by != null)
             {
@@ -416,6 +524,7 @@ namespace Knez.Game.View
             LogKind.Broke => "#ff6a5a",
             LogKind.Reformed => "#8fe0a0",
             LogKind.Refused => "#ff9f7f",
+            LogKind.Ability => "#e8c35a",
             _ => "#ffe08a",
         };
 

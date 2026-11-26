@@ -10,7 +10,9 @@ namespace Knez.Game.View
 {
     /// <summary>
     /// View-side bookkeeping for the HUD (M3): which squad each man started in (the fallen and the fled leave their squad
-    /// in the sim), blows struck per squad, and each man's last blow. Plain C#, keyed by ids; never touches the state.
+    /// in the sim), blows struck per squad, and each man's last blow. A Retainer moves between squads (M3 step 10): he
+    /// counts for the squad he is in now, once he has fallen or fled for the last one he was in, and while he stands alone
+    /// on his feet for none. Plain C#, keyed by ids; never touches the state.
     /// </summary>
     public sealed class SquadTally
     {
@@ -38,6 +40,7 @@ namespace Knez.Game.View
         /// <summary>Counts the tick's blows; call after every tick.</summary>
         public void Observe(BattleState state)
         {
+            FollowRetainers(state);
             foreach (SimEvent simEvent in state.Events)
             {
                 if (simEvent is BlowStruck blow)
@@ -53,7 +56,27 @@ namespace Knez.Game.View
             }
         }
 
-        /// <summary>The squad <paramref name="fighter"/> started in, or none.</summary>
+        private void FollowRetainers(BattleState state)
+        {
+            foreach (Fighter fighter in state.Fighters)
+            {
+                if (!fighter.IsRetainer)
+                {
+                    continue;
+                }
+
+                if (!fighter.SquadId.IsNone)
+                {
+                    _home[fighter.Id.Value] = fighter.SquadId.Value;
+                }
+                else if (fighter.IsAlive)
+                {
+                    _home.Remove(fighter.Id.Value); // alone on his feet: no squad's
+                }
+            }
+        }
+
+        /// <summary>The squad <paramref name="fighter"/> started in (a Retainer: the one he counts for), or none.</summary>
         public EntityId HomeOf(Fighter fighter) =>
             _home.TryGetValue(fighter.Id.Value, out int squad) ? new EntityId(squad) : fighter.SquadId;
 
@@ -63,14 +86,15 @@ namespace Knez.Game.View
 
         /// <summary>
         /// Who a squad started with (M3 step 8): its men grouped by experience and kit (M3 step 9: one squad may mix them),
-        /// in the order they first appear, with how many of each are still in the fight.
+        /// in the order they first appear, with how many of each are still in the fight. Retainers aren't in it: they are
+        /// named apart (<see cref="RetainersOf"/>).
         /// </summary>
         public IReadOnlyList<(Fighter Sample, int Count, int InFight)> Composition(BattleState state, Squad squad)
         {
             var groups = new List<(Fighter Sample, int Count, int InFight)>();
             foreach (Fighter fighter in state.Fighters)
             {
-                if (HomeOf(fighter) != squad.Id)
+                if (fighter.IsRetainer || HomeOf(fighter) != squad.Id)
                 {
                     continue;
                 }
@@ -88,6 +112,21 @@ namespace Knez.Game.View
             }
 
             return groups;
+        }
+
+        /// <summary>The Retainers who count for <paramref name="squad"/> (none: those standing alone), in id order.</summary>
+        public List<Fighter> RetainersOf(BattleState state, EntityId squad)
+        {
+            var retainers = new List<Fighter>();
+            foreach (Fighter fighter in state.Fighters)
+            {
+                if (fighter.IsRetainer && HomeOf(fighter) == squad)
+                {
+                    retainers.Add(fighter);
+                }
+            }
+
+            return retainers;
         }
 
         /// <summary>The last blow <paramref name="fighter"/> struck, or null.</summary>

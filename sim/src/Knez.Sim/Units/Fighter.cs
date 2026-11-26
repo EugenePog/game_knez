@@ -7,7 +7,7 @@ namespace Knez.Sim.Units
 {
     /// <summary>
     /// A combatant (боец): a body, an experience level and a kit (M3 step 9, ADR-0005), with his side, place, squad,
-    /// morale, wound and action (battle-sim.md §6). Retainers will be fighters too, with a Retainer part.
+    /// morale, wound and action (battle-sim.md §6). A Retainer is a fighter with a <see cref="Retainer"/> part (§13).
     /// </summary>
     public sealed class Fighter : IHasEntityId
     {
@@ -103,6 +103,15 @@ namespace Knez.Sim.Units
         /// <summary>False once the fighter is out of the fight — fallen (<see cref="Wound"/> Down) or fled the field
         /// (<see cref="MoraleState"/> Fled); "alive" predates morale and means "in the fight". Such fighters stay in the list for the view.</summary>
         public bool IsAlive { get; internal set; }
+
+        /// <summary>His Retainer part (name, trait) when he is a Retainer (battle-sim.md §13), else null.</summary>
+        public RetainerPart? Retainer { get; internal set; }
+
+        /// <summary>True for a Retainer.</summary>
+        public bool IsRetainer => Retainer.HasValue;
+
+        /// <summary>A Retainer's own order while he stands alone (no squad); <see cref="Orders.LoneOrder.None"/> otherwise.</summary>
+        public Orders.LoneOrder LoneOrder { get; internal set; }
 
         /// <summary>Collision radius in metres, from <see cref="Body"/>.</summary>
         public Fix Radius => Body.Radius;

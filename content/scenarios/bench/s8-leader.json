@@ -1,0 +1,16 @@
+{
+  "id": "s8-leader",
+  "description": "Bench S8, the leadership reference (M3 step 10, battle-sim.md §13): S6's two lines of 8 marching into each other head-on, but one man of the Hird line is Hrafn, an experienced Retainer in the same kit, in its front rank — the only difference from S6 is his leadership (experienced: 100 ‰ off every morale loss of his squad, faster recovery) and his fall costing as one mate (decided 2026-11-26). Batch it against S6 to see what a leader is worth; BalanceReferenceTests pins it. Don't edit it to play.",
+  "map": {"width": 60, "height": 40},
+  "squads": [
+    {"name": "Hird line", "side": 0, "body": "man", "men": [{ "count": 7, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line", "position": [30, 12], "facing": 90},
+    {"name": "Raider line", "side": 1, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line", "position": [30, 28], "facing": 270}
+  ],
+  "retainers": [
+    { "name": "Hrafn", "side": 0, "trait": "loyal", "body": "man", "experience": "experienced", "kit": "sword-shield-padded", "squad": "Hird line" }
+  ],
+  "script": [
+    {"tick": 10, "order": "move", "squad": "Hird line", "target": [30, 30], "facing": 90},
+    {"tick": 10, "order": "move", "squad": "Raider line", "target": [30, 10], "facing": 270}
+  ]
+}

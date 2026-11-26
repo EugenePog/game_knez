@@ -151,6 +151,54 @@ public class SessionRecorderTests
         }
     }
 
+    [Test]
+    public void Write_RetainerOrders_ReplayToTheSameState()
+    {
+        // M3 step 10: Hrafn leaves the Veterans, walks out, goes at Ulfr, then joins the Hird line; ordering Ulfr (the
+        // other side's) is refused and left out. M3 step 11: first Hrafn (loyal) has the Veterans stand to the death;
+        // Ulfr's front-rank rush (bold, side 1) isn't built: refused and left out.
+        string file = RepoPaths.Scenario("sandbox/villages");
+        var (live, recorder) = Play(file, seed: 5, RetainerOrders);
+        Assert.That(recorder.Orders.Select(o => o.Kind), Is.EqualTo(new[]
+        {
+            ScriptedOrderKind.UseAbility, ScriptedOrderKind.DetachRetainer, ScriptedOrderKind.MoveRetainer, ScriptedOrderKind.RetainerAttack,
+            ScriptedOrderKind.AttachRetainer,
+        }));
+
+        ScenarioDef replayDef = ParseWritten(recorder, file);
+        Assert.That(replayDef.Script.Select(o => (o.Kind, o.RetainerName, o.SquadName)), Is.EqualTo(recorder.Orders.Select(o => (o.Kind, o.RetainerName, o.SquadName))));
+        var replay = new BattleSimulation(BattleSetup.Create(replayDef, 5));
+        replay.StepTicks(Ticks);
+        AssertSameBattle(live, replay);
+    }
+
+    private static void RetainerOrders(BattleSimulation sim, List<ICommand> enqueue)
+    {
+        BattleState state = sim.State;
+        Fighter hrafn = state.Fighters.Single(f => f.Retainer.HasValue && f.Retainer.Value.Name == "Hrafn");
+        Fighter ulfr = state.Fighters.Single(f => f.Retainer.HasValue && f.Retainer.Value.Name == "Ulfr");
+        switch (state.Tick)
+        {
+            case 4:
+                enqueue.Add(new UseAbilityCommand(0, hrafn.Id));
+                enqueue.Add(new UseAbilityCommand(1, ulfr.Id)); // not built: refused
+                break;
+            case 9:
+                enqueue.Add(new DetachRetainerCommand(0, hrafn.Id));
+                enqueue.Add(new DetachRetainerCommand(0, ulfr.Id)); // not his side: refused
+                break;
+            case 29:
+                enqueue.Add(new MoveRetainerCommand(0, hrafn.Id, new FixVec2(Fix.Ratio(1001, 20), Fix.FromInt(66)), Angle.FromRaw(1234)));
+                break;
+            case 119:
+                enqueue.Add(new RetainerAttackCommand(0, hrafn.Id, ulfr.Id));
+                break;
+            case 299:
+                enqueue.Add(new AttachRetainerCommand(0, hrafn.Id, state.Squads.First(s => s.Name == "Hird line").Id));
+                break;
+        }
+    }
+
     private static void OrdersAtTwenty(BattleSimulation sim, List<ICommand> enqueue)
     {
         BattleState state = sim.State;

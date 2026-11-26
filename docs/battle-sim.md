@@ -1,6 +1,8 @@
 # Battle simulation — technical design
 
-Status: **draft v0.11** (2026-11-25, M3 step 9: a fighter is a body, an experience level and a kit, §7; step 7: the
+Status: **draft v0.13** (2026-11-26, M3 step 11: all six trait abilities defined, battle cry, close ranks and stand to
+the death built, §8, §11, §12, §13; M3 step 10: Retainers built — joining and leaving squads, lone orders,
+leadership, the leader's fall, §8, §12, §13; 2026-11-25, M3 step 9: a fighter is a body, an experience level and a kit, §7; step 7: the
 balance reference measured and pinned, §11; step 6: the game design's terms and the contracts for M3 steps 10–11, M4
 and M5). Owner: Eugene. Scope: phase 1 skirmish; the same sim later drives the 3D view
 and campaign battles. Code names follow the glossary in [AGENTS.md](../AGENTS.md#glossary-russian-design-term--code-name);
@@ -125,7 +127,8 @@ Assemblies:
   defs he is made of — body, experience and kit (M3 step 9, §7). Now: id, body, experience, kit, side,
   position, velocity (m per tick), facing, squad id, slot index, alive, `PassingThrough` (step 4), `TurnLag` (soft wheel, 2026-11-23: how far behind his slot the squad's turn left him), `Target` (M3 step 2:
   the enemy he is in melee with, or none), `Action` + `ActionTicks` (M3 step 3: idle, windup or recovery, ticks left), `Wound` (M3 step 4: none, light,
-  heavy, down; down = fallen, alive false), `Morale`, `MoraleState` (step 5). A fighter who falls leaves his squad (squad id
+  heavy, down; down = fallen, alive false), `Morale`, `MoraleState` (step 5), `Retainer` (M3 step 10: his name and
+  trait, or none) and `LoneOrder` (a Retainer standing alone: move or attack, §13). A fighter who falls leaves his squad (squad id
   none, slot −1) at the end of the tick and stays in the list, dead, for the view.
 - `Squad`: id, side, name, formation def, anchor (centre of the front rank), facing, order (`SquadOrder`: kind,
   target, arrival facing, whether that facing is "the way it marched"), route (`Path`: waypoints, the last one the
@@ -133,10 +136,12 @@ Assemblies:
   set when it forms up; `Reforming`: changing formation, at reduced pace; `PathIndex`: the one it heads
   for; `PathRequestTick`: waiting for a route since that tick, or −1), `Files` (narrowed to this many files for a gap,
   0 = its own width), `RegroupSince` (waiting for its men to regroup since that tick, or −1), `Withdrawing` (M3 step 2:
-  stepping back out of melee, facing the enemy, until clear), `StartCount`, `Broken` (step 5), velocity and spin (how far the anchor moved and the front turned this tick — they give each
+  stepping back out of melee, facing the enemy, until clear), `StartCount` (the men it started with, ± 1 as a Retainer
+  joins or leaves alive, §13), `Broken` (step 5), velocity and spin (how far the anchor moved and the front turned this tick — they give each
   slot's own motion), member ids (sorted). Build the
   starting state with `BattleSetup.Create(scenario, seed)`: squads in scenario order, each followed by its fighters in
-  slot order, every fighter on its slot facing with its squad.
+  slot order, every fighter on its slot facing with its squad; then the Retainers in `retainers[]` order, each joining
+  his squad's front rank (which re-lays it) or standing where the scenario puts him (§13).
 
 ## 7. Content definitions
 
@@ -144,19 +149,19 @@ Immutable classes in `Knez.Sim.Defs`, referenced directly by state (hashed by th
 if profiling asks): `BodyDef` (radius, speeds, turn rate), `WeaponDef` (reach, timings, wounds, penetration, defence),
 `ProtectionDef` (shields, body armour, head covers), `ExperienceDef`, `KitDef` (weapon, shield, body armour, head cover;
 M3 step 9), `CombatDef` (the combat rules),
-`FormationDef` (slot layout, spacing, stance modifiers), trait defs (`retainers.json`, M3 step 11, §13), `MapDef`, `ScenarioDef` (map, sides, squads,
+`FormationDef` (slot layout, spacing, stance modifiers), trait defs (`TraitDef`, `retainers.json` `traits[]`: `id` and `ability`, an `AbilityDef` — `id`, `cooldown` (s) and the numbers its kind needs, M3 step 11, §13), `MapDef`, `ScenarioDef` (map, sides, squads,
 spawn positions, victory conditions, seed defaults). Balance numbers live here, never as constants in systems. Each
 def gets the fields its systems need when they arrive; M1 step 1 has:
 
 | Def | Fields |
 |---|---|
 | `BodyDef` (`bodies.json`, array `bodies`; M3 step 9, was `FighterDef`) | `id`, `radius` (m), `walkSpeed`, `runSpeed` (m/s, at most 8, and under radius + 5 cm per tick so nobody steps through a 10 cm wall), `turnRate` (°/s) — the body only. One body, `man`, until riders come |
-| `CombatDef` (`combat.json`, M3 step 1, numbers in §11) | `weapons[]`: `id`, `reach` (m, gap between bodies), `windup`, `recovery` (s, whole ticks), `wounds` {`light`, `heavy`, `down`} (‰, sum 1000), `penetration` (‰ of the defender's body armour and head cover its blows ignore; shields aren't affected), `defence` (‰ off blows at the man who carries it); `shields[]`, `bodyArmour[]`, `headCover[]`: `id`, `protection` (‰); `experience[]` (lowest first): `id`, `defence` (‰), `morale` (start, 0..1000); `kits[]`: `id`, `weapon`, `shield`, `bodyArmour`, `headCover` (ids from these lists, all required); `hitChance` {weapon: {experience level: ‰}} — every cell required, keyed by id; `hitLimits` {`min`, `max`}; `position` {`frontArc`, `rearArc` (°), `flank`, `rear`, `shieldFromFlank`, `shieldFromRear`, `shieldWall` (‰)}; `strikeArc` (°); `wounded` {`lightPenalty`, `heavyPenalty` (‰), `lightPace`, `heavyPace` (fractions)}. Catalogues keep file order; at most one def file holds it; code-built scenarios use `CombatDef.Standard`, which a test keeps equal to the file (by fingerprint). A scenario is refused when a squad's kit or experience level isn't its combat rules' own |
+| `CombatDef` (`combat.json`, M3 step 1, numbers in §11) | `weapons[]`: `id`, `reach` (m, gap between bodies), `windup`, `recovery` (s, whole ticks), `wounds` {`light`, `heavy`, `down`} (‰, sum 1000), `penetration` (‰ of the defender's body armour and head cover its blows ignore; shields aren't affected), `defence` (‰ off blows at the man who carries it); `shields[]`, `bodyArmour[]`, `headCover[]`: `id`, `protection` (‰); `experience[]` (lowest first): `id`, `defence` (‰), `morale` (start, 0..1000), `leadership` (‰, 0..900: while a Retainer of this level leads a squad its men's morale losses are cut and their recovery sped by this share; M3 step 10, §13), `retainerOnly` (only Retainers may have this level, D-019); `kits[]`: `id`, `weapon`, `shield`, `bodyArmour`, `headCover` (ids from these lists, all required); `hitChance` {weapon: {experience level: ‰}} — every cell required, keyed by id; `hitLimits` {`min`, `max`}; `position` {`frontArc`, `rearArc` (°), `flank`, `rear`, `shieldFromFlank`, `shieldFromRear`, `shieldWall` (‰)}; `strikeArc` (°); `wounded` {`lightPenalty`, `heavyPenalty` (‰), `lightPace`, `heavyPace` (fractions)}. Catalogues keep file order; at most one def file holds it; code-built scenarios use `CombatDef.Standard`, which a test keeps equal to the file (by fingerprint). A scenario is refused when a squad's kit or experience level isn't its combat rules' own |
 | `FormationDef` | `id`, `spacing` (m between neighbours), `rankSpacing` (m between ranks), `ranks` *or* `width`, `turnRate` (°/s), `holdWeight` (how much harder men holding their ground are to push; moving men weigh 1), `allyPassSpeed` (fraction of walking speed at which allies squeeze through this formation while it holds), optional `shieldWall` (M3: frontal blows at men with shields get through less) |
 | `MovementDef` (`movement.json`, decided 2026-11-21: tunables in content, not code) | `pivotTolerance` (° off the heading a squad still marches at, 30), `slotCatchUpTime` (s, 0.5), `personalSpace` (m, 0.1), `separationTime` (s, 0.25), `holdingReach` (m, 1.5), `formedUpReach` (m, 0.3), `collisionPasses` (6), `allyPartingDepth` (m, 0.25), `pathBudget` (search nodes per tick, 4 000), `regroupLead` (m, 1), `regroupMaxWait` (s, 5), `regroupCost` (route metres per metre of extra depth, 1), `reformPace` (fraction of the pace while changing formation, 0.5), `stepBackPace` (fraction of the pace when stepping back onto a target just behind, and when withdrawing from melee, 0.5), `withdrawClearance` (m beyond each man's weapon reach a withdrawing squad keeps facing the enemy, 3; decided 2026-11-22), `closeInRange` (m, edge to edge: in a squad standing in melee a man not yet fighting steps toward an enemy this near, 3; asked for 2026-11-23, the number a proposal; 0 = off), `turnLagTime` (s: the soft wheel — the lag a turn leaves closes over this, 4; asked for 2026-11-23 as 3–5 s; 0 = men swing rigidly with their slots). Times are rounded to the nearest whole tick (0.05 s). At most one def file holds it; scenarios built in code use `MovementDef.Standard`, which a test keeps equal to the file. A scenario is refused when `personalSpace` doesn't fit between two of its men side by side or rank behind rank |
-| `MoraleDef` (`morale.json`, M3 step 5, numbers in §12) | thresholds `shaken`, `wavering`, `routing`, `hysteresis`; `lossWeight` (× 1000 / start size per fallen squadmate); costs `ownLightWound`, `ownHeavyWound`, `mateHeavyWound`, `flankBlow`, `rearBlow`, `mateFlankBlow`, `mateRearBlow`, `mateRouts`, `allySquadBroke`, `enemySquadBroke` (a gain), `nearby` (m); `recoveryPerSecond`, `safeDistance` (m), `rallyAt`; `breakShare`, `reformShare` (‰); `waveringHitPenalty` (‰). At most one def file holds it; code uses `MoraleDef.Standard`, kept equal by fingerprint. A scenario is refused when a squad's experience starts below `routing` |
-| `MapDef` | `width`, `height` (m, at most 250: 500 route cells), optional `walls[]` (at most 64): `from` `[x, y]`, `to` `[x, y]` (opposite corners of an axis-aligned rectangle, ≥ 0.1 m thick, on the map) |
-| `ScenarioDef` | `id`, `description`, `map`, `squads[]`: `name`, `side`, `body`, `men[]` (`count`, `experience`, `kit`; M3 step 9), `formation`, `position` `[x, y]`, `facing` (degrees); optional `script[]`: `tick`, `order`, `squad` (name), then for `"move"` `target` `[x, y]` and optional `facing`, for `"formation"` `formation` (an id from the catalogue). Built from content it also carries the whole formation catalogue (`Formations`) |
+| `MoraleDef` (`morale.json`, M3 step 5, numbers in §12) | thresholds `shaken`, `wavering`, `routing`, `hysteresis`; `lossWeight` (× 1000 / start size per fallen squadmate); costs `ownLightWound`, `ownHeavyWound`, `mateHeavyWound`, `flankBlow`, `rearBlow`, `mateFlankBlow`, `mateRearBlow`, `mateRouts`, `allySquadBroke`, `enemySquadBroke` (a gain), `nearby` (m); `recoveryPerSecond`, `safeDistance` (m), `rallyAt`; `breakShare`, `reformShare` (‰); `waveringHitPenalty` (‰); `leaderFell` (M3 step 10: the fall of a Retainer in a squad costs its men this many times a fallen mate, instead of it; 1, decided 2026-11-26). At most one def file holds it; code uses `MoraleDef.Standard`, kept equal by fingerprint. A scenario is refused when a squad's experience starts below `routing` |
+| `MapDef` | `width`, `height` (m, at most 250: 500 route cells), optional `walls[]` (at most 64): `from` `[x, y]`, `to` `[x, y]` (opposite corners of an axis-aligned rectangle, ≥ 0.1 m thick, on the map), optional `kind`: `"house"` or `"obstacle"` (the default; rocks, fences, palisades) — drawn by kind (houses timber brown, obstacles stone grey), the same to every rule, so it is left out of the fingerprint until a rule (cover, line of sight) reads it |
+| `ScenarioDef` | `id`, `description`, `map`, `squads[]`: `name`, `side`, `body`, `men[]` (`count`, `experience`, `kit`; M3 step 9), `formation`, `position` `[x, y]`, `facing` (degrees); optional `retainers[]` (M3 step 10, §13): `name`, `side`, `trait`, `body`, `experience`, `kit`, then `squad` (the name of the squad he starts in) or `position` + `facing` (standing alone); optional `script[]`: `tick`, `order`, `squad` (name), then for `"move"` `target` `[x, y]` and optional `facing`, for `"formation"` `formation` (an id from the catalogue); since step 10 also `"attach"` (`retainer`, `squad`), `"detach"` (`retainer`), `"move"` with `retainer` in place of `squad`, and `"attack"` (`retainer`, `enemy`: a fighter id); since step 11 `"ability"` (`retainer`). Built from content it also carries the whole formation catalogue (`Formations`) |
 
 Agreed values (2026-11-20): walk 1.4 m/s, run 3.5 m/s; squad turn rate column 90°/s, line 45°/s, shield wall 30°/s;
 a standing squad gives way less than one on the move; (2026-11-21) a holding squad opens its ranks to its own side,
@@ -202,8 +207,9 @@ old `warrior`/`spearman`/`levy`/`veteran` fighter types, their default kit and t
   type's). Shields aren't affected by penetration.
 - **Experience** is unchanged (`id`, `defence`, `morale`; the hit matrix weapon × experience is the weapon buff D-022
   asks for). Whether experience also shortens recovery: **not yet** (the user, 2026-11-25) — measure "one level ahead"
-  against D-026's 65–70 % first (M6). Step 10 adds `retainerOnly` (true for professional and elite, D-019; a squad man at
-  such a level is an error at `squads[i].men[j].experience`) and `leadership` (§13).
+  against D-026's 65–70 % first (M6). Since step 10 each level also has `retainerOnly` (true for professional and elite,
+  D-019; a squad man at such a level is an error at `squads[i].men[j].experience`) and `leadership` (new 0,
+  experienced 100, professional 150, elite 200; §13).
 - **Squads** name one `body` for their men (a Retainer who joins keeps his own — a squad marches at its slowest man's
   pace anyway) and list `men[]`: `count`, `experience`, `kit`. The squad's size is the sum, 1..64. Slots are filled in
   `men` order, front rank first, so listing shields first and spears last puts the spears behind. Errors are located
@@ -234,17 +240,12 @@ rank; an incomplete rank is the rearmost and is centred. Width = `width`, or ⌈
 ## 8. Commands
 
 - `ICommand` with `SideId` and a type-specific payload; the tick and enqueue order live in `ScheduledCommand`.
-  Phase 1 commands — built: `MoveSquad(squad, target, facing?)`, `SetFormation(squad, formation)`. **Planned:**
+  Phase 1 commands — built: `MoveSquad(squad, target, facing?)`, `SetFormation(squad, formation)`; since M3 step 10
+  (§13) `AttachRetainer(retainer, squad)`, `DetachRetainer(retainer)`, `MoveRetainer(retainer, target, facing?)`,
+  `RetainerAttack(retainer, enemy fighter)` — a Retainer standing alone is under direct control (D-014); since M3 step 11
+  `UseAbility(retainer)` (§13). **Planned:**
   - M4 step 1: `AttackSquad(squad, enemy squad)` (go at it and fight it — today a move order stops at its point),
     `SetStance(squad, Hold|Advance|Pursue)`;
-  - M3 step 10 (§13): `AttachRetainer(retainer, squad)`, `DetachRetainer(retainer)`, `MoveRetainer(retainer, target,
-    facing?)`, `RetainerAttack(retainer, enemy fighter)` — a Retainer standing alone is under direct control (D-014).
-    Rejections (proposal): `unknown-entity`, `wrong-side` (also attaching to the other side's squad), `not-alive`
-    (down or fled), `routing`, `squad-broken`, `squad-full` (64 men), `in-squad` / `not-in-squad` (move or detach
-    orders that don't fit where he stands);
-  - M3 step 11 (§13): `UseAbility(retainer)` — every trait ability acts round him or on his squad, so it takes no
-    target; a squad ability used by a Retainer standing alone is rejected as `not-in-squad`, and one still cooling down
-    as `cooling-down` (proposal);
   - M5 (§12, §13): `StepForward(squad)`, `Demand(side, terms)` (phase 1: only "leave the field"),
     `Challenge(retainer, enemy, terms)`.
   The AI (§14) issues the same orders inside the sim, not as commands.
@@ -265,6 +266,18 @@ rank; an incomplete rank is the rearmost and is centred. Width = `width`, or ⌈
   a scenario outside `content/`.
 - `SetFormation(side, squad, formation)` (M1 step 7): rejected as `unknown-entity`, `wrong-side`, `not-alive` (no
   members left) or `unknown-formation` (not in the scenario's catalogue). Applying it re-forms the squad on the move (§10).
+- The Retainer commands (M3 step 10) first check the Retainer: `unknown-entity` (no such Retainer), `wrong-side`,
+  `not-alive` (down or fled), `routing`. Then `AttachRetainer`: `unknown-entity` / `wrong-side` for the squad,
+  `in-squad` (he is in it already), `not-alive` (no members left), `squad-broken`, `squad-full` (64 men) — from
+  another squad he moves straight across. `DetachRetainer`: `not-in-squad`. `MoveRetainer` and `RetainerAttack` are
+  for a Retainer standing alone: `in-squad` otherwise (the view sends a detach first); `MoveRetainer` also `off-map`;
+  `RetainerAttack` `unknown-entity` (no such fighter), `not-an-enemy`, `not-alive`. Joining and leaving re-lay the
+  squad (§13); a move or attack replaces his lone order, which ends on arrival (at the point, facing the ordered way
+  exactly), when his enemy is out of the fight, when he routs, falls or joins a squad.
+- `UseAbility(side, retainer)` (M3 step 11): no target — a battle cry acts round him, the lasting abilities on his
+  squad. Rejected as the Retainer checks above, then `not-built` (promise loot, front-rank rush, no quarter),
+  `cooling-down` (before his ready tick), `not-in-squad` (close ranks or stand to the death while he stands alone),
+  `squad-broken` (either on a broken squad, which takes no orders until it re-forms).
 - `MoveSquad(side, squad, target, facing?)` (M1 step 3): rejected as `unknown-entity`, `wrong-side`, `not-alive` (no
   living member) or `off-map` (target outside the map). Applying it replaces the squad's order; without a facing the
   squad will end facing the direction from its anchor to the target (its current facing if the target is the anchor).
@@ -284,9 +297,9 @@ rank; an incomplete rank is the rearmost and is centred. Width = `width`, or ⌈
 | 0 | `BattleSimulation.Step()` | advance tick counter, clear events (not a system) |
 | 1 | `CommandSystem` | apply this tick's commands |
 | 2 | `AiSystem` | side → squad → fighter decisions; squads evaluated staggered (every 5 ticks, offset by id) |
-| 3 | `OrderSystem` | squad orders → anchor goal, facing, formation slots, slot assignment |
-| 4 | `PathSystem` | A* for squads waiting for a route, first come first served (request tick, then id), 4 000 search nodes per tick; Retainers standing alone later (M3 step 10) |
-| 5 | `SteeringSystem` | turn lag (soft wheel, §10), then desired velocity: slot seek/arrive, separation, obstacle avoidance; routers flee; closing in (§11) |
+| 3 | `OrderSystem` | squad orders → anchor goal, facing, formation slots, slot assignment; ends lone Retainers' done orders (§13) |
+| 4 | `PathSystem` | A* for squads waiting for a route, first come first served (request tick, then id), 4 000 search nodes per tick; Retainers standing alone walk straight for now (§13) |
+| 5 | `SteeringSystem` | turn lag (soft wheel, §10), then desired velocity: slot seek/arrive, separation, obstacle avoidance; routers flee; closing in (§11); a lone Retainer follows his own order (§13) |
 | 6 | `MovementSystem` | integrate, resolve collisions (circle–circle, circle–wall), update facing (engaged men face their target, M3) |
 | 7 | `TargetingSystem` | engagement and target choice in reach; tie-break by distance, then id |
 | 8 | `CombatSystem` | advance actions (windup → strike → recovery), roll hits with `SimRng` |
@@ -351,7 +364,7 @@ their milestone. Scratch buffers live in `TickContext`, never in system fields.
   into a gap's mouth one man's slot can graze the wall's corner for a few ticks (sideways room is sampled at cell
   centres); no re-planning yet, so a squad shoved off its route marches on to the next waypoint.
 - **Move order (step 3; along the route since step 6; turning since step 7).** `OrderSystem` marches the anchor at the
-  walk speed of the slowest living member toward the next waypoint, finishing turns of up to 30° (`pivotTolerance`)
+  walk speed of the slowest living member (× close ranks' pace while it has closed ranks, §13) toward the next waypoint, finishing turns of up to 30° (`pivotTolerance`)
   about the anchor while marching. A sharper turn (decided 2026-11-21):
   - **more than a quarter turn: face about.** Every man turns round and the rear rank becomes the front: the anchor
     moves to where the rear rank's centre was and each new place goes to the nearest man (`SlotAssignment.Nearest`), so
@@ -541,7 +554,8 @@ reference new mechanics are tuned from, and it replaces the 2026-11-22 aim of "a
 Every number that moves balance lives in content defs — experience buffs, weapon stats, ability strength and
 cooldowns, standoff distance and pressure, morale thresholds — never in code.
 
-**The reference, measured (M3 step 7, 2026-11-25; re-pinned for weapon penetration in M3 step 9, the same day).** Each scenario runs for seeds 1–n (4000 for S6, 1000 for the
+**The reference, measured (M3 step 7, 2026-11-25; re-pinned for weapon penetration in M3 step 9, the same day; in
+step 10, 2026-11-26, S8 added and the rows with elite men re-pinned as men led by Retainers).** Each scenario runs for seeds 1–n (4000 for S6, 1000 for the
 other small fights, 50 for the sandbox) to its decision or 3 minutes; "decided at" counts from the start, so it
 includes the march into contact (about 6.5 s in S6). No run of any of them ended in annihilation, so that column is
 left out.
@@ -554,9 +568,13 @@ left out.
 | `m3-spears`: 8 spearmen hold vs 8 warriors charging (1000) | 72.0 % | 28.0 % | 0 | 28.3 s | 25.8 % | 9.8 / 20.8 % | 10.3 % |
 | `m3-shieldwall`: a wall of 8 holds vs a line of 10 (1000) | 50.0 % | 50.0 % | 0 | 26.1 s | 22.0 % | 15.0 / 14.8 % | 11.9 % |
 | `m3-withdraw`: two walls of 8; side 0 steps back at 10 s (1000) | 50.9 % | 48.6 % | 0.2 % | 70.1 s | 25.4 % | 15.9 / 16.4 % | 4.2 % |
-| `m3-veterans`: 6 elite in mail hold vs 12 new levies (1000) | 99.4 % | 0.6 % | 0 | 16.7 s | 15.0 % | 2.9 / 14.8 % | 24.1 % |
-| `m3-rally`: 8 new levies hold vs 6 elite charging (1000) | 0.6 % | 99.4 % | 0 | 14.4 s | 17.9 % | 17.7 / 2.2 % | 26.0 % |
-| `sandbox/villages-assault`: 5 squads a side, side 0 attacks (50; a smoke check) | 16 % | 14 % | 70 % | 104 s | 20.0 % | 14.9 / 13.4 % | 9.5 % |
+| **S8** `bench/s8-leader`: S6 with an experienced Retainer in the Hird line's front rank (1000; M3 step 10) | 51.1 % | 48.7 % | 0 | 22.7 s | 25.3 % | 16.2 / 16.1 % | 12.3 % |
+| **S9** `bench/s9-battle-cry`: S8, Hrafn proud, cries 10 s in (1000; M3 step 11) | 59.8 % | 39.9 % | 0 | 24.6 s | 25.1 % | 17.2 / 16.3 % | 12.1 % |
+| **S10** `bench/s10-close-ranks`: S8, Hrafn cautious, closes ranks at the first blow (1000; step 11) | 59.8 % | 40.0 % | 0 | 23.6 s | 25.3 % | 14.4 / 17.8 % | 11.6 % |
+| **S11** `bench/s11-stand-fast`: S8, Hrafn loyal, stands to the death 15 s in (1000; step 11) | 61.0 % | 38.5 % | 0 | 24.0 s | 27.6 % | 19.1 / 18.1 % | 12.4 % |
+| `m3-veterans`: 5 experienced in mail led by an elite Retainer hold vs 12 new levies (1000; step 10) | 93.6 % | 6.4 % | 0 | 18.9 s | 15.6 % | 6.0 / 13.8 % | 18.2 % |
+| `m3-rally`: 8 new levies hold vs 5 experienced + an elite Retainer charging (1000; step 10) | 6.4 % | 93.6 % | 0 | 15.9 s | 17.2 % | 15.3 / 5.7 % | 21.6 % |
+| `sandbox/villages-assault`: 5 squads a side, side 0 attacks (50; a smoke check; step 10) | 6 % | 14 % | 80 % | 102 s | 20.1 % | 14.5 / 12.2 % | 8.0 % |
 
 Penetration (§7, axe 300, spear 200) moved the four rows where axes or spears meet armour and nothing else: spearmen
 holding against swordsmen in padded coats now win 72 % instead of 60 %; the levies' axes against mail and helm and the
@@ -633,7 +651,8 @@ Targets for a whole phase-1 battle of 15–20 a side (M6):
   `BlowStruck` event carries attacker, defender, sector, chance and whether it got through. Then he recovers; a new
   windup can start the tick the recovery ends, so a cycle is windup + recovery. **Sectors** (decided 2026-11-23),
   measured from the defender's facing to the attacker: front within 60°, flank to 120°, rear beyond (`frontArc`,
-  `rearArc`). The shield-wall bonus needs a shield, the formation's `shieldWall` flag and a frontal blow. What a blow
+  `rearArc`). The shield-wall bonus needs a shield, the formation's `shieldWall` flag and a frontal blow; a squad that
+  has closed ranks (M3 step 11, §13) takes its `frontHit` off every frontal blow at its men too, shield or not. What a blow
   that gets through does is step 4. Reach is the gap between the two bodies. Arcs are converted to angle units by
   rounding, so a boundary angle (exactly 60°) counts as inside. Men stepping back out of melee keep facing and striking
   their enemy while he is in reach. Proposed (windup + recovery), retuned by the user 2026-11-23: sword 0.7 + 1.2 s, reach
@@ -700,9 +719,12 @@ its men rout; routers rally once safe. Other numbers are proposals, tuned on the
   `lossWeight` (2) × 1000 / the squad's starting size (200 in a squad of 10); his own wound 50 light / 150 heavy; a
   squadmate's heavy wound 20; a blow at him from the flank 20, from the rear 40, and at a squadmate 5 / 10 (also when it
   felled him; not when the squadmate was already running — decided 2026-11-23: he is chased, not his squad attacked); a squadmate
-  starting to rout 30; an allied squad breaking within 20 m 150; an enemy squad breaking within 20 m gives +100.
+  starting to rout 30; an allied squad breaking within 20 m 150; an enemy squad breaking within 20 m gives +100. The
+  fall of a Retainer in the squad (leading it or not, running or not) costs `leaderFell` (1) × a fallen mate, reason
+  `LeaderFell`, instead of the mate's cost; the highest leadership among the Retainers standing in a squad cuts every loss of its men (M3 step 10,
+  §13).
 - **Recovery:** a man with no enemy (in the fight, not routing) within 10 m regains 20 a second, spread exactly over
-  the ticks, up to his start.
+  the ticks, up to his start — faster by his squad's leadership share (§13).
 - **States** (`MoraleState`, `MoraleStateChanged` event): `Steady` ≥ 600 > `Shaken` ≥ 400 > `Wavering` ≥ 200 >
   `Routing`; down at once, up only 50 above a threshold. A wavering man's blows get 40 ‰ less. A routing man drops his
   blow and target, strikes no one, is no one's lock, ignores orders and runs for his side's map edge (the edge away from the enemy:
@@ -718,12 +740,14 @@ its men rout; routers rally once safe. Other numbers are proposals, tuned on the
   aren't hashed, so this changes no golden.
   Rallied men of a broken squad stand where they stopped; when more than half are back the squad *re-forms* there
   (anchor at their centre, fitted onto the map and clear of walls like a move order's target; places to the nearest
-  men). Only squad members rally (a Retainer standing alone needs his own rule, M3 step 10).
+  men). A Retainer standing alone rallies where he stopped (M3 step 10); in a squad he runs and rallies with it.
 - **Victory** (cleanup, stage 12): once at most one side has men in the fight who aren't routing, the battle is
   decided (`BattleState.Winner`, `BattleEnded` event) — at once, even if a broken squad might re-form (decided
   2026-11-23); the sim keeps running for the view.
-- **Next:** a Retainer's leadership and rallying near him (M3 step 10, §13); trait abilities that move morale (step
-  11); standoff pressure (M5, below). **Later:** squad cohesion, fear from the sorcerer, sworn brothers and rivals
+- **Abilities (M3 step 11, §13):** a battle cry changes morale at once, reasons `BattleCry` (11, his side's men) and
+  `EnemyBattleCry` (12); while a squad stands to the death no loss reaches its men's morale — dropped, not owed —
+  though gains do (a squad whose men were already running can still break as others fall).
+- **Next:** standoff pressure (M5, below). **Later:** squad cohesion, fear from the sorcerer, sworn brothers and rivals
   (phase 2 data); fatigue only if M6 tuning asks for it.
 - **Tuning note (2026-11-23, measured 2026-11-25):** an equal head-on fight of two lines of 8 (S6) breaks one when it
   has lost 25 % (2 men), 15.7 s after the first blow on average. Since D-026 that is the reference, not a fault (§11).
@@ -746,50 +770,86 @@ its men rout; routers rally once safe. Other numbers are proposals, tuned on the
 
 ## 13. Retainers
 
-**Planned — M3 steps 10–11; the duel in M5.** Design: D-010, D-014, D-015, D-019, D-023, D-025
+**Steps 10 and 11 built (2026-11-26); the three remaining abilities and the duel (M5) planned.** Step 10, as decided by the user
+2026-11-26:
+
+- **Leadership** (`combat.json` experience `leadership`, ‰): new 0, experienced 100, professional 150, elite 200. The
+  highest of the living, non-running Retainers in a squad cuts every morale loss of its men (him too) by that share and
+  speeds their recovery by the same; a Retainer alone guards only himself (`MoraleRules.Leadership`).
+- **His fall** — any Retainer's in a squad, leading it or not — costs every man of it `leaderFell` (`morale.json`) ×
+  a mate's loss, instead of the mate's cost, reason `LeaderFell` (10). Built at 2 ("as two mates"); set to **1** by the user the same day after S8 below.
+- **Rout:** he can rout, guarded by his own leadership; in a squad he runs and rallies with it; alone he rallies where
+  he stopped, and so does one taken out of his squad while going back to his place. A routing man drops his lone
+  order. Standing alone with nowhere to go, he isn't turned by small pushes, only by a shove faster than walking.
+- **Break share:** he counts as one of his squad's men (`StartCount` ± 1 on joining or leaving alive).
+- **Commands** (§8): `AttachRetainer`, `DetachRetainer`, `MoveRetainer`, `RetainerAttack`; rejections
+  `unknown-entity`, `wrong-side`, `not-alive`, `routing`, `squad-broken`, `squad-full`, `in-squad`, `not-in-squad`,
+  `not-an-enemy`. A Retainer alone walks straight to his target and slides along walls (planned routes later).
+- **Content:** `retainers.json` `traits[]` (each with its `ability` since step 11); scenarios' `retainers[]`; script
+  entries `attach`, `detach`, `move` with `retainer`, `attack`, and (step 11) `ability`. Frames carry `retainer` and
+  `trait` per fighter, and (step 11) `AbilityUsed` events.
+- **Measured (S8 `bench/s8-leader.json`: S6 with one man of the Hird line an experienced Retainer; 2000 seeds; S6's
+  equal lines win 50.3 %):** with `leaderFell` 2 an experienced leader lost ground — 45.9 %: his fall outweighed his
+  leadership — so it is 1: 52.1 % (pinned at 51.1 % over 1000 seeds, §11). A professional leader gives 66.0 %, an
+  elite one 81.6 % (with 2) — mostly the experience ladder's hit chance (§11), not leadership. Not built: routing men
+  near a Retainer rallying sooner; his own route planning (he walks straight, sliding along walls); allies' ranks
+  opening for him.
+
+Planned beyond step 10 — design: D-010, D-014, D-015, D-019, D-023, D-025
 (`docs/design/heroes.md`). A Retainer (дружинник — the named hero) is the only fighter with a trait. In the campaign
 he also has his own AI for independent tasks; in battle the player controls him directly (D-014). He is a `Fighter`
 with a `Retainer` part (D-015 renamed this spec's `HeroData`). The player's own character, the chief (D-010), is not
 on the field in phase 1 (proposal, roadmap open question 1).
 
-- **Who (step 10):** experience experienced, professional or elite — professional and elite only for Retainers
-  (`retainerOnly`, §7) — and better kit than militia (content). One trait of six (D-025). A scenario lists them apart
+- **Who (step 10):** any experience level — the sim checks only that professional and elite are Retainers' alone
+  (`retainerOnly`, §7); content gives them experienced or better — and better kit than militia (content). One trait of six (D-025). A scenario lists them apart
   from squads, as named people: `retainers[]`: `name`, `side`, `trait`, `experience`, `kit`, `body`, and either
   `squad` (the squad he starts in) or `position` + `facing` (standing alone). Their ids come after every squad's
-  men, in `retainers[]` order. Converting today's elite squads (`m3-veterans`, `m3-rally`, `sandbox/villages`,
-  `villages-assault`) to experienced men led by Retainers changes those battles, so step 10 re-pins their step-7
-  reference on purpose and says so.
+  men, in `retainers[]` order. Today's elite squads (`m3-veterans`, `m3-rally`, `sandbox/villages`,
+  `villages-assault`) became experienced men led by an elite Retainer, which changed those battles; step 10 re-pinned
+  their reference on purpose (§11). A squad that Retainers join at spawn must fit on the map clear of walls laid out
+  for all its men. `m3/m3-retainers` scripts joining, leaving, a lone move and a lone attack for the cross-runtime
+  goldens.
 - **His place (D-019):** he joins any squad of his side in its **front rank** and can leave it to stand alone. In a
-  squad he counts as one of its men for slots, pace, the melee lock and forming up. Slots (proposal): joining — at
+  squad he counts as one of its men for slots, pace, the melee lock and forming up. Slots (`SquadMembership`): joining — at
   spawn or by `AttachRetainer` — lays the formation out for one more man (a `ranks` formation may widen); he takes
-  the front-rank slot nearest him (at spawn: nearest the anchor; ties to the lower slot index), then every other man
-  takes the nearest free slot (in id order, ties to the lower index), as on re-forming (§10); everyone's turn lag
-  resets. Leaving lays it out for one fewer, the same way. `StartCount` (which sets loss weight and the break share,
+  the front-rank slot nearest him (at spawn: nearest the anchor; ties to the lower slot index), then each other slot,
+  front first, takes the nearest man not yet placed (ties to the lower id), as on re-forming (§10); everyone's turn
+  lag resets. Later re-slotting (a formation change, a re-form) treats him as any man, so it may move him out of the
+  front rank — open (D-019 has him lead from it). Leaving lays it out for one fewer, the same way. `StartCount` (which sets loss weight and the break share,
   §12) grows by one when he joins and shrinks by one when he leaves alive, so a squad's losses are counted against the
-  men it has. Alone he takes his own orders (move, attack an enemy fighter, §8) and plans his own route
-  (`PathSystem`), and allies' ranks don't open for him yet (§10).
-- **Leadership (passive, D-023 — "a Retainer in a squad raises its morale, the more the more experienced"):** how is
-  step 10's first decision. Proposal: while he is in a squad and in the fight, its men lose less morale and recover
-  faster, by his experience level's `leadership` (§7); routing men near him rally sooner (§12); his fall costs his
-  squad morale (a reason code of its own).
-- **State (planned, hashed):** the `Retainer` part holds values only — trait id, the tick his ability is ready
-  again, the tick its effect ends — because `Fighter.Clone()` copies members and would share a mutable object between
-  a snapshot and the live state. Effects expire by comparing with `Tick`, so no stage counts them down. See §15.
-- **Ability (active, step 11, D-023, D-025):** one, from his trait; `UseAbility(retainer)`, no target; strength,
-  duration, radius and a cooldown in seconds in content (`retainers.json`, `traits[]`); usable in the standoff too;
-  an `AbilityUsed` event.
+  men it has. Alone he takes his own orders (move, attack an enemy fighter, §8) and walks straight, sliding
+  along walls — his own route planning comes later — and allies' ranks don't open for him yet (§10).
+- **Leadership (passive, D-023 — "a Retainer in a squad raises its morale, the more the more experienced"):** built
+  as above; routing men near him rallying sooner is not built.
+- **State (hashed, §15):** the `Retainer` part holds values only — his name, his trait and (step 11) the tick his
+  ability is ready again — and so does `LoneOrder`, because `Fighter.Clone()` copies members and would share a mutable
+  object between a snapshot and the live state. A lasting ability lives on the squad, `Squad.Effects`: an
+  `AbilityEffect` value per kind (the ability, the tick it ends, who used it), so it stays with the squad when he
+  leaves (decided by the user 2026-11-26). Effects expire by comparing with `Tick`, so no stage counts them down; used
+  at tick T, one lasting d ticks acts on ticks T..T+d−1. See §15.
+- **Ability (active, step 11 built 2026-11-26, D-023, D-025):** one, from his trait (`TraitDef.Ability`, an
+  `AbilityDef`); `UseAbility(retainer)`, no target (§8); a cooldown in seconds (every one 2 minutes, decided by the
+  user) and its kind's numbers in content (`retainers.json`; `TraitDef.Standard` is the code's copy, kept equal by a
+  test); usable in the standoff too (M5); an `AbilityUsed` event (Retainer, ability id, his squad). All six are
+  defined so the AI can weigh them (M4); three are built — the ones that only change numbers — and the others are
+  refused as `not-built` until each is built and tested with the AI, one by one (decided by the user 2026-11-26).
 
-  | trait | ability | in the sim |
-  |---|---|---|
-  | proud | battle cry | morale up for his own men near him, down for enemies near him |
-  | cautious | close ranks | his squad takes less from the front and marches slower, for a while |
-  | greedy | promise loot | his squad's morale and push up for a while (the bigger share after the battle is campaign) |
-  | loyal | stand to the death | his squad's morale can't fall for a few seconds |
-  | bold | front-rank rush | the front rank steps forward and strikes harder; then the squad is disordered for a while |
-  | cruel | no quarter | his squad finishes the fallen (more of them killed, not just down), and enemies near it lose morale faster |
+  | trait | ability | in the sim | numbers (decided 2026-11-26) |
+  |---|---|---|---|
+  | proud | battle cry | **built:** at once, every man in the fight within its radius (centre to centre) — his own side's, him too, gain (up to 1000), enemies lose (cut by their leadership); alone or in a squad | radius 15 m, +100 / −50 |
+  | cautious | close ranks | **built:** for a while blows from the front at his squad's men get through less (on top of a shield wall), and the squad marches slower — its anchor's march, so stepping back, withdrawing and re-forming too; not its wheels and pivots, nor men catching up to their slots or closing in | −30 ‰, pace × 0.7, 10 s |
+  | greedy | promise loot | not built: his squad's morale and push up for a while (the bigger share after the battle is campaign) | cooldown only |
+  | loyal | stand to the death | **built:** for a few seconds no morale loss reaches his squad's men (§12) | 5 s |
+  | bold | front-rank rush | not built: the front rank steps forward and strikes harder; then the squad is disordered for a while | cooldown only |
+  | cruel | no quarter | not built: his squad finishes the fallen (more of them killed, not just down), and enemies near it lose morale faster | cooldown only |
 
-  Order: the three that only change numbers (battle cry, close ranks, stand to the death) first. No quarter needs the
-  battle's result to tell killed from down; that tally is what D-017 counts in the campaign.
+  A lasting ability used again starts over. No quarter needs the battle's result to tell killed from down; that tally
+  is what D-017 counts in the campaign. **Measured** (S9–S11, S8 with one scripted use, against S8's same leader
+  without it; 2000 seeds each; S8 52.1 %): battle cry at the first blow 60.5 %, 3.5 s later 60.4 %, 8.5 s later 59.2 %;
+  close ranks just before the first blow 59.5 %, at it 60.4 %, 3.5 s later 59.4 %; stand to the death 3.5 s after the
+  first blow 59.4 %, 8.5 s after 61.7 %, 12.5 s after 59.3 %. Each shifts an equal fight by 7–10 points, never decides
+  it alone (D-026); a squad standing to the death breaks at ~31 % lost instead of 25 %, an enemy hit by a cry at ~23 %.
 - **Duel (M5; D-009, D-014, `docs/design/standoff-duel.md`):** during the standoff a Retainer may `Challenge` the
   enemy's leader or one of his Retainers (militia never duel), with terms — to first blood or to `Down` — and a
   stake (phase 1: "your side leaves the field"). The AI answers (§14): refusing a clearly weaker challenger costs
@@ -798,9 +858,8 @@ on the field in phase 1 (proposal, roadmap open question 1).
   anyone who interferes costs his side heavy morale. The end — the first wound or a man down — swings both sides'
   morale hard (the loser's side often breaks at once). One duel per standoff; a new challenge only after a new
   approach. State: the duel (both ids, terms, since which tick).
-- **Decide first:** step 10 — leadership numbers per experience level; can a Retainer rout; does his fall alone
-  break a squad; does he count in his squad's break share. Step 11 — each ability's numbers, and how "finished" is
-  decided for no quarter. M5 — the duel's morale swings.
+- **Decide first:** step 11 — each ability's numbers, and how "finished" is decided for no quarter. M5 — the duel's
+  morale swings. (Step 10's questions were decided by the user 2026-11-26, above.)
 
 ## 14. Enemy AI
 
@@ -846,8 +905,11 @@ leader's trait** shifts its decisions.
   localised to a section. Sections now: `Core` (tick, seed, id counter, scenario fingerprint), `Rng`, `Squads` (id,
   side, name, formation id, anchor, facing, order kind/target/facing, route, files, frontage, regrouping, reforming,
   withdrawing, start count, broken, velocity, spin, members), `Fighters` (id, body, experience and kit ids (M3 step 9), side, alive, position, velocity, facing, squad, slot,
-  passing through, turn lag, target, action, action ticks, wound, morale, morale state); `Core` also has the winner.
-  **Planned fields and their sections:** `Fighters` — the Retainer part: trait id, ability-ready tick, effect-end tick (steps 10–11); killed (no quarter, step 11).
+  passing through, turn lag, target, action, action ticks, wound, morale, morale state; M3 step 10: whether he is a
+  Retainer, and then his name and trait id, and his lone order — kind, target, facing, whether it has one, enemy);
+  `Core` also has the winner. M3 step 11: `Fighters` — the Retainer part's ability-ready tick; `Squads` — its effects
+  (each one's kind, end tick and who used it; the numbers are in the fingerprint through the traits). **Planned fields
+  and their sections:** `Fighters` — killed (no quarter).
   `Squads` — stance, attack target (M4 step 1); AI kind, leader trait, FSM state and its since-tick (M4 step 2).
   `Core` — battle phase and the side that struck first (M5); the duel: both ids, terms, start tick (M5); baggage
   holder and since-tick, reinforcement waves already sent (M4 step 3). Each is snapshotted by value; anything held in
@@ -930,9 +992,9 @@ leader's trait** shifts its decisions.
 - Frames file (`--frames`, written by `FrameRecorder`; this is the only copy of the spec), format `knez-frames` v1:
   ```
   { "format": "knez-frames", "version": 1, "scenario", "description", "seed" (string), "ticksPerSecond",
-    "map": { "width", "height", "walls": [[minX, minY, maxX, maxY]] },
+    "map": { "width", "height", "walls": [[minX, minY, maxX, maxY, kind]] },   // kind "house" | "obstacle" (since M3 step 11)
     "squads":   [ { "id", "name", "side", "formation" } ],
-    "fighters": [ { "id", "squad", "slot", "side", "def", "radius", "experience", "kit" } ],  // def: his body (M3 step 9; his fighter type before)
+    "fighters": [ { "id", "squad", "slot", "side", "def", "radius", "experience", "kit", "retainer"?, "trait"? } ],  // def: his body (M3 step 9; his fighter type before); retainer (his name) and trait only for Retainers (M3 step 10)
     "frames":   [ { "tick", "hash", "squads": [[id, anchorX, anchorY, facing°, ordered 1|0, targetX, targetY, targetFacing°, formation, files]],
                     "paths": [[squad, x, y, x, y, …]],   // route still ahead: next waypoint … target (step 6)
                     "fighters": [[id, x, y, facing°, alive 1|0, holdsGround 1|0, passingThrough 1|0, squad, slot]], "events": [{ "type", … }] } ],
@@ -946,15 +1008,15 @@ leader's trait** shifts its decisions.
     `side`, `reason`; `BlowStruck` (M3): `attacker`, `defender` (fighter ids), `sector` (`front`/`flank`/`rear`),
     `chance` (‰), `landed`; `Wounded` (M3): `fighter`, `by`, `blow` (how it landed), `now` (his wound after it;
     `down` = he fell); `MoraleChanged`: `fighter`, `reason`, `delta`, `now`; `MoraleStateChanged`: `fighter`,
-    `from`, `to`; `SquadBroke`: `squad`, `reformed`, `inFight`, `running` (M3 step 8); `BattleEnded`: `winner`. Fighter rows end (from M3) with morale,
+    `from`, `to`; `SquadBroke`: `squad`, `reformed`, `inFight`, `running` (M3 step 8); `BattleEnded`: `winner`; `AbilityUsed` (M3 step 11): `retainer`, `ability` (its id), `squad` (0 alone). Fighter rows end (from M3) with morale,
     morale state and wound. A test fails when a `SimEvent` subclass has no entry there.
   - If the simulation throws, the file is still closed as valid JSON: the frames up to the last finished tick plus
     `faulted` (the tick that threw and the exception); the CLI exits 1.
   - Static tables describe the battle at tick 0. **Compatibility:** adding row columns, keys or event types keeps
     version 1 — readers ignore what they don't know; a version bump is only for breaking changes. Since step 7 squad
-    rows carry the current formation id and narrowing, and fighter rows the current squad (0 once fallen) and slot; the
+    rows carry the current formation id and narrowing, and fighter rows the current squad (0 once fallen, and for a Retainer standing alone) and slot; the
     viewer shows them in the squad list and the hover panel, and falls back to the static tables for older files.
-- `tools/replay-viewer/`: static page (HTML + one script, no dependencies) that plays a frames file: map with a 1 m /
+- `tools/replay-viewer/`: static page (HTML + one script, no dependencies) that plays a frames file: map (houses timber brown, obstacles stone grey) with a 1 m /
   5 m grid, fighters as circles in squad colours with a facing tick, squad anchors with facing arrows and names, dead
   fighters greyed, events of the current tick, hover details; play/pause/step/scrub, speed ×0.25–×4, zoom/pan,
   interpolation between ticks, a red note for a faulted run. URL:

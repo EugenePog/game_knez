@@ -1,10 +1,13 @@
 {
   "id": "m3-rally",
-  "description": "M3 test on a tall map: your levies hold; raider veterans charge and stop where your line stood. Your levies break and run south; once 10 m clear of every enemy they recover (20 a second), rally at morale 350 and re-form where they stopped. The battle is already scored as lost the moment all of them ran (decided 2026-11-23).",
+  "description": "M3 test on a tall map: your levies hold; raider veterans (5 experienced men in mail and helm led by Ulfr, an elite Retainer, bold) charge and stop where your line stood. Your levies break and run south; once 10 m clear of every enemy they recover (20 a second), rally at morale 350 and re-form where they stopped. The battle is already scored as lost the moment all of them ran (decided 2026-11-23).",
   "map": {"width": 60, "height": 130},
   "squads": [
     {"name": "Levy", "side": 0, "body": "man", "men": [{ "count": 8, "experience": "new", "kit": "axe-shield" }], "formation": "line", "position": [30, 100], "facing": 90},
-    {"name": "Raider veterans", "side": 1, "body": "man", "men": [{ "count": 6, "experience": "elite", "kit": "sword-shield-mail" }], "formation": "line", "position": [30, 114], "facing": 270}
+    {"name": "Raider veterans", "side": 1, "body": "man", "men": [{ "count": 5, "experience": "experienced", "kit": "sword-shield-mail" }], "formation": "line", "position": [30, 114], "facing": 270}
+  ],
+  "retainers": [
+    { "name": "Ulfr", "side": 1, "trait": "bold", "body": "man", "experience": "elite", "kit": "sword-shield-mail", "squad": "Raider veterans" }
   ],
   "script": [
     {"tick": 10, "order": "move", "squad": "Raider veterans", "target": [30, 99], "facing": 270}

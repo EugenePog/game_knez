@@ -12,14 +12,18 @@ using EntityId = Knez.Sim.EntityId; // Unity 6 has a UnityEngine.EntityId too
 namespace Knez.Game.View
 {
     /// <summary>
-    /// Draws a <see cref="BattleRunner"/>'s battle top-down (M2 step 4): walls, fighters as discs in their squad's colour
+    /// Draws a <see cref="BattleRunner"/>'s battle top-down (M2 step 4): walls (houses in timber brown, obstacles in stone
+    /// grey), fighters as discs in their squad's colour
     /// with a tick for their facing (grey once fallen), each squad's anchor with a facing marker, and the route still
     /// ahead of a squad on the march. Reads the state only. Positions are interpolated between the last two ticks by the
     /// clock's alpha, so motion is smooth at any frame rate. The camera is fitted to the map. M3: a red dot on a wounded
     /// man (bigger = heavily), a running man in his squad's colour faded toward white, a thin line in the striker's squad
     /// colour from a man winding up a blow to his target, and when the blow falls a flash along it in the same colour
     /// plus a spark on the struck man — red if it got through, white if it was turned aside. M3 step 8: a morale bar over
-    /// every man in the fight, as long as his morale and coloured by his state (<see cref="ShowMoraleBars"/>).
+    /// every man in the fight, as long as his morale and coloured by his state (<see cref="ShowMoraleBars"/>). M3 step 10:
+    /// a gold ring round every Retainer; he takes the colour of the squad he is in, a dark side colour while he stands
+    /// alone, and a thin gold line shows where a lone Retainer is going (or whom he is going at). M3 step 11: a battle cry
+    /// shows as a gold disc as wide as its reach, fading out where he gave it.
     /// </summary>
     public sealed class BattleView : MonoBehaviour
     {
@@ -30,12 +34,18 @@ namespace Knez.Game.View
         private static readonly Color[] SideOne = { new Color(0.80f, 0.25f, 0.20f), new Color(0.85f, 0.55f, 0.15f), new Color(0.65f, 0.20f, 0.45f), new Color(0.70f, 0.40f, 0.25f) };
         private static readonly Color Fallen = new Color(0.55f, 0.55f, 0.55f, 0.6f);
         private static readonly Color Ground = new Color(0.93f, 0.89f, 0.82f);
-        private static readonly Color Wall = new Color(0.38f, 0.32f, 0.27f);
+        private static readonly Color House = new Color(0.55f, 0.36f, 0.20f); // timber
+        private static readonly Color Obstacle = new Color(0.43f, 0.45f, 0.47f); // stone
+        private static readonly Color[] Lone = { new Color(0.10f, 0.18f, 0.45f), new Color(0.45f, 0.09f, 0.08f) }; // a Retainer alone, by side
+        private static readonly Color Gold = new Color(0.83f, 0.63f, 0.09f);
 
         private readonly List<Transform> _bodies = new List<Transform>();
         private readonly List<SpriteRenderer> _bodyRenderers = new List<SpriteRenderer>();
         private readonly List<SpriteRenderer> _halos = new List<SpriteRenderer>();
         private readonly List<EntityId> _selection = new List<EntityId>();
+        private EntityId _selectedRetainer = EntityId.None;
+        private readonly List<SpriteRenderer?> _rings = new List<SpriteRenderer?>(); // a Retainer's gold ring; null for other men
+        private readonly List<LineRenderer?> _loneLines = new List<LineRenderer?>(); // where a lone Retainer is going
         private readonly List<Transform> _anchors = new List<Transform>();
         private readonly List<LineRenderer> _routes = new List<LineRenderer>();
         private readonly Dictionary<int, Color> _squadColours = new Dictionary<int, Color>(); // view-side cache keyed by id
@@ -48,6 +58,8 @@ namespace Knez.Game.View
         private const float BarHeight = 0.09f;
         private readonly List<LineRenderer> _aims = new List<LineRenderer>();
         private readonly List<Flash> _flashes = new List<Flash>();
+        private readonly List<(SpriteRenderer Disc, float Until)> _cries = new List<(SpriteRenderer, float)>();
+        private const float CrySeconds = 0.9f;
         private const float FlashSeconds = 0.35f;
         private static readonly Color Landed = new Color(0.90f, 0.05f, 0.05f);
         private static readonly Color Missed = new Color(1f, 1f, 1f);
@@ -73,6 +85,9 @@ namespace Knez.Game.View
             _selection.AddRange(squads);
         }
 
+        /// <summary>Highlights one Retainer (the player's selection), or none.</summary>
+        public void SetSelectedRetainer(EntityId retainer) => _selectedRetainer = retainer;
+
         /// <summary>Builds the scene objects for the current battle; called once the runner has loaded it.</summary>
         public void Build()
         {
@@ -90,7 +105,8 @@ namespace Knez.Game.View
             {
                 Vector2 min = wall.Min.ToVector2();
                 Vector2 max = wall.Max.ToVector2();
-                Make("Wall", ShapeSprites.Square, Wall, 0, (min + max) / 2, max - min);
+                bool house = wall.Kind == WallKind.House;
+                Make(house ? "House" : "Obstacle", ShapeSprites.Square, house ? House : Obstacle, 0, (min + max) / 2, max - min);
             }
 
             int zero = 0;
@@ -125,11 +141,27 @@ namespace Knez.Game.View
                 tick.transform.SetParent(body.transform, false);
                 tick.transform.localPosition = new Vector3(0.3f, 0, 0); // local units: the body is one unit across
                 tick.transform.localScale = new Vector3(0.45f, 0.14f, 1);
-                SpriteRenderer halo = Make("Selected", ShapeSprites.Disc, new Color(1f, 1f, 0.85f, 0.9f), 1, Vector2.zero, Vector2.one);
+                // Under the walls (0), over the ground (-10): a Retainer's ring (1) shows inside it.
+                SpriteRenderer halo = Make("Selected", ShapeSprites.Disc, new Color(1f, 1f, 0.85f, 0.9f), -1, Vector2.zero, Vector2.one);
                 halo.transform.SetParent(body.transform, false);
                 halo.transform.localPosition = Vector3.zero;
-                halo.transform.localScale = new Vector3(1.45f, 1.45f, 1);
+                halo.transform.localScale = new Vector3(fighter.IsRetainer ? 1.65f : 1.45f, fighter.IsRetainer ? 1.65f : 1.45f, 1);
                 halo.enabled = false;
+                SpriteRenderer? ring = null;
+                LineRenderer? loneLine = null;
+                if (fighter.IsRetainer)
+                {
+                    ring = Make("Retainer", ShapeSprites.Disc, Gold, 1, Vector2.zero, Vector2.one);
+                    ring.transform.SetParent(body.transform, false);
+                    ring.transform.localPosition = Vector3.zero;
+                    ring.transform.localScale = new Vector3(1.32f, 1.32f, 1);
+                    loneLine = Line("Lone " + fighter.Id.Value, 1);
+                    loneLine.startColor = loneLine.endColor = new Color(Gold.r, Gold.g, Gold.b, 0.6f);
+                    loneLine.startWidth = loneLine.endWidth = 0.08f;
+                }
+
+                _rings.Add(ring);
+                _loneLines.Add(loneLine);
                 SpriteRenderer wound = Make("Wound", ShapeSprites.Disc, new Color(0.80f, 0.08f, 0.08f), 4, Vector2.zero, Vector2.one);
                 wound.transform.SetParent(body.transform, false);
                 wound.transform.localPosition = Vector3.zero;
@@ -188,7 +220,7 @@ namespace Knez.Game.View
                     flash.Defender = d;
                     flash.Until = Time.unscaledTime + FlashSeconds;
                     Fighter striker = state.Fighters[a];
-                    flash.Colour = _squadColours.TryGetValue(striker.SquadId.Value, out Color sc) ? sc : Color.grey; // who struck
+                    flash.Colour = SquadColour(striker); // who struck
                     flash.Line.startWidth = 0.16f;
                     flash.Line.endWidth = 0.05f; // thick at the striker, thin at the struck: the direction of the blow
                     flash.Line.enabled = true;
@@ -196,6 +228,30 @@ namespace Knez.Game.View
                     flash.Spark.transform.localScale = blow.Landed ? new Vector3(0.45f, 0.45f, 1) : new Vector3(0.3f, 0.3f, 1);
                     flash.Spark.enabled = true;
                 }
+                else if (simEvent is AbilityUsed used && _index.TryGetValue(used.Retainer.Value, out int r)
+                    && state.Fighters[r].Retainer is RetainerPart part && part.Trait.Ability.Kind == AbilityKind.BattleCry)
+                {
+                    Cry(state.Fighters[r].Position.ToVector2(), part.Trait.Ability.Radius.ToFloat());
+                }
+            }
+        }
+
+        /// <summary>A battle cry's reach: a gold disc round where he cried, fading out (view-side only).</summary>
+        private void Cry(Vector2 at, float radius)
+        {
+            int free = _cries.FindIndex(c => !c.Disc.enabled);
+            SpriteRenderer disc = free >= 0 ? _cries[free].Disc : Make("Battle cry", ShapeSprites.Disc, Gold, 0, at, Vector2.one);
+            disc.transform.position = at;
+            disc.transform.localScale = new Vector3(radius * 2, radius * 2, 1);
+            disc.enabled = true;
+            var cry = (disc, Time.unscaledTime + CrySeconds);
+            if (free >= 0)
+            {
+                _cries[free] = cry;
+            }
+            else
+            {
+                _cries.Add(cry);
             }
         }
 
@@ -276,7 +332,15 @@ namespace Knez.Game.View
                 _bodies[i].position = Vector2.Lerp(_previous[i], _current[i], t);
                 _bodies[i].rotation = Quaternion.Euler(0, 0, Mathf.LerpAngle(_previousFacing[i], _currentFacing[i], t));
                 _bodyRenderers[i].color = Colour(fighter);
-                _halos[i].enabled = fighter.IsAlive && _selection.Contains(fighter.SquadId);
+                _halos[i].enabled = fighter.IsAlive && (fighter.IsRetainer && fighter.Id == _selectedRetainer
+                    || !fighter.SquadId.IsNone && _selection.Contains(fighter.SquadId));
+                SpriteRenderer? ring = _rings[i];
+                if (ring != null)
+                {
+                    ring.color = fighter.IsAlive ? Gold : Fallen;
+                }
+
+                LoneLine(state, i, fighter);
                 Bars(i, fighter);
                 bool hurt = fighter.IsAlive && (fighter.Wound == WoundLevel.Light || fighter.Wound == WoundLevel.Heavy);
                 _wounds[i].enabled = hurt;
@@ -296,7 +360,7 @@ namespace Knez.Game.View
                 aim.enabled = aiming;
                 if (aiming)
                 {
-                    Color c = _squadColours.TryGetValue(fighter.SquadId.Value, out Color sc) ? sc : Color.grey;
+                    Color c = SquadColour(fighter);
                     aim.startColor = new Color(c.r, c.g, c.b, 0.85f);
                     aim.endColor = new Color(c.r, c.g, c.b, 0.25f);
                     aim.startWidth = 0.08f;
@@ -307,6 +371,13 @@ namespace Knez.Game.View
             }
 
             float now = Time.unscaledTime;
+            foreach (var (disc, until) in _cries)
+            {
+                float left = (until - now) / CrySeconds;
+                disc.enabled = disc.enabled && left > 0;
+                disc.color = new Color(Gold.r, Gold.g, Gold.b, 0.3f * Mathf.Clamp01(left));
+            }
+
             foreach (Flash flash in _flashes)
             {
                 if (!flash.Line.enabled)
@@ -383,6 +454,28 @@ namespace Knez.Game.View
             _barFills[i].color = BattleHud.StateColour(fighter.MoraleState);
         }
 
+        /// <summary>A lone Retainer's order as a line from him: to where he is walking, or to the man he is going at.</summary>
+        private void LoneLine(BattleState state, int i, Fighter fighter)
+        {
+            LineRenderer? line = _loneLines[i];
+            if (line == null)
+            {
+                return;
+            }
+
+            LoneOrder order = fighter.LoneOrder;
+            bool shown = fighter.IsAlive && !fighter.IsRouting && fighter.SquadId.IsNone && order.Kind != LoneOrderKind.None
+                && (order.Kind != LoneOrderKind.Attack || _index.ContainsKey(order.Enemy.Value));
+            line.enabled = shown;
+            if (!shown)
+            {
+                return;
+            }
+
+            line.SetPosition(0, _bodies[i].position);
+            line.SetPosition(1, order.Kind == LoneOrderKind.Attack ? _bodies[_index[order.Enemy.Value]].position : (Vector3)order.Target.ToVector2());
+        }
+
         // A running man keeps his squad's colour, faded toward white; his bar says how far gone he is.
         private Color Colour(Fighter fighter)
         {
@@ -391,8 +484,19 @@ namespace Knez.Game.View
                 return Fallen;
             }
 
-            Color squad = _squadColours.TryGetValue(fighter.SquadId.Value, out Color c) ? c : Fallen;
+            Color squad = SquadColour(fighter);
             return fighter.IsRouting ? Color.Lerp(squad, Color.white, 0.55f) : squad;
+        }
+
+        /// <summary>The colour of the squad he is in now; a Retainer alone takes his side's dark colour.</summary>
+        private Color SquadColour(Fighter fighter)
+        {
+            if (_squadColours.TryGetValue(fighter.SquadId.Value, out Color c))
+            {
+                return c;
+            }
+
+            return fighter.IsRetainer ? Lone[fighter.SideId == 0 ? 0 : 1] : Color.grey;
         }
 
         private void FitCamera(MapDef map)

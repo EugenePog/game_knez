@@ -239,11 +239,13 @@
       for (let y = 0; y <= height + 1e-9; y += 10) ctx.fillText(`${y}`, sx(0) - 5, sy(y));
     }
 
-    // Walls: [minX, minY, maxX, maxY] in metres (absent in older files).
-    for (const [x0, y0, x1, y1] of data.map.walls || []) {
-      ctx.fillStyle = '#6b5b45';
+    // Walls: [minX, minY, maxX, maxY, kind] in metres (absent in older files; kind since M3 step 11, else an obstacle).
+    // Houses in timber brown, obstacles (rocks, fences, palisades) in stone grey.
+    for (const [x0, y0, x1, y1, kind] of data.map.walls || []) {
+      const house = kind === 'house';
+      ctx.fillStyle = house ? '#8a5a2b' : '#6f7378';
       ctx.fillRect(sx(x0), sy(y1), (x1 - x0) * view.scale, (y1 - y0) * view.scale);
-      ctx.strokeStyle = '#3f3426';
+      ctx.strokeStyle = house ? '#4e3218' : '#45484c';
       ctx.lineWidth = 1;
       ctx.strokeRect(sx(x0), sy(y1), (x1 - x0) * view.scale, (y1 - y0) * view.scale);
     }
@@ -401,7 +403,8 @@
       const wound = row.length > 11 ? row[11] : 'none';
       if (state === 'fled') continue; // he left the field
       const info = fighterInfo.get(id);
-      const squad = info && squadInfo.get(info.squad);
+      // A Retainer (M3 step 10) moves between squads: colour him by the squad he stands in now (row[7]), if any.
+      const squad = info && info.retainer ? (row.length > 8 && row[7] > 0 ? squadInfo.get(row[7]) : null) : info && squadInfo.get(info.squad);
       const routing = alive && state === 'routing';
       const color = alive ? (routing ? '#ffffff' : squad ? squad.color : '#555') : DEAD;
       const r = Math.max(2, (info ? info.radius : 0.3) * view.scale);
@@ -417,6 +420,15 @@
       ctx.lineWidth = routing ? 2.5 : 1;
       ctx.strokeStyle = routing ? (squad ? squad.color : '#555') : 'rgba(0,0,0,0.55)';
       ctx.stroke();
+      if (info && info.retainer && alive) {
+        // A Retainer: a gold ring round him.
+        ctx.beginPath();
+        ctx.arc(px, py, r + 2.5, 0, Math.PI * 2);
+        ctx.strokeStyle = '#d4a017';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
       if (alive && state === 'rallying') {
         ctx.setLineDash([3, 3]);
         ctx.beginPath();
@@ -608,7 +620,8 @@
     el.innerHTML = '';
     const lines = [
       // From M3 step 9 the fighter table names his body (def), experience and kit; older files have only def (his type).
-      info.kit ? `Fighter #${hoverId}, ${info.experience}, ${info.kit} (${info.def}), side ${info.side}`
+      info.retainer ? `Retainer ${info.retainer} (${info.trait}), #${hoverId}, ${info.experience}, ${info.kit}, side ${info.side}`
+        : info.kit ? `Fighter #${hoverId}, ${info.experience}, ${info.kit} (${info.def}), side ${info.side}`
         : `Fighter #${hoverId} (${info.def}), side ${info.side}`,
       // Rows from step 7 on carry the current squad and slot; older files only have the starting ones.
       row.length > 8

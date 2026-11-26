@@ -323,6 +323,26 @@ battle-sim.md section — the contract — and the user's yes on the numbers tha
     sandbox ones) turn them into experienced men led by Retainers, and their step-7 reference is re-pinned on purpose.
     Decide first: leadership numbers per experience level; can a Retainer rout; does his fall alone break a squad.
     Done when: a squad with a Retainer measurably holds longer (batch), and the user moves Retainers between squads.
+    ✅ Built 2026-11-26 (the user's play in Unity still to come). Decided by the user: leadership 100 / 150 / 200 ‰ for
+    experienced / professional / elite (losses cut by that share, recovery faster by the same); a Retainer can rout,
+    guarded by his leadership — in a squad he runs and rallies with it, alone he rallies where he stopped; his fall
+    costs his squad as much as a mate's (`leaderFell` 1 — built at 2, "as two mates", and lowered after S8 below); he
+    counts as one of its men for the break share. Built: `RetainerPart` (name, trait), `TraitDef` (`retainers.json`,
+    ids only), experience `leadership` and `retainerOnly`, scenario `retainers[]`, the four commands and their script
+    entries, `SquadMembership` (front-rank slot nearest him, `StartCount` ± 1), lone orders (he walks straight, sliding
+    along walls), reason `LeaderFell`, frames `retainer`/`trait`, replay viewer gold ring. Unity: gold ring, drag onto a
+    squad to join it or onto ground to leave and walk, click to select and right-click to walk / attack / join, X to
+    leave; HUD names Retainers in their squad's panel and lists those standing alone. **Measured** — bench S8
+    (`bench/s8-leader.json`: S6 with one experienced Retainer in the Hird line), 2000 seeds against S6's 50.3 %: with
+    `leaderFell` 2 the led line won 45.9 % (his fall outweighed his leadership), with 1 52.1 %; a professional leader
+    66 %, an elite one 82 % — mostly the experience ladder (open question 10), not leadership (open question 11).
+    Battles without a Retainer play identically (18 scenarios × 60 seeds); `m3-veterans` (now 5 experienced + elite
+    Hrafn, 93.6 %), `m3-rally`, the sandbox and S8 re-pinned on purpose. The sim review's fixes: a Retainer taken out of
+    his squad while rallying rallies where he stands; a lone move ends only at the exact ordered facing; small pushes
+    don't turn a Retainer standing idle; his lone attack is slowed by wounds; a side of Retainers alone counts in the
+    victory check; a squad Retainers join at spawn must fit laid out for all its men; `m3/m3-retainers` puts lone
+    orders into the cross-runtime goldens. Not built: men rallying sooner near him, his own route planning, allies'
+    ranks opening for him, keeping him in the front rank when the squad re-slots.
 11. **Trait abilities (D-023, D-025).** One active ability per Retainer from his trait; strength, duration, radius
     and a cooldown in seconds in content (`retainers.json`); a `UseAbility` command, an `AbilityUsed` event, buttons
     with cooldowns in Unity. Works in the standoff too (M5). First the three that only change numbers: **battle cry**
@@ -334,6 +354,19 @@ battle-sim.md section — the contract — and the user's yes on the numbers tha
     near the squad drops faster).
     Done when (D-026): in an equal fight each ability shifts the win rate noticeably but never decides it alone —
     measured with `battle-analyst` against step 7's reference.
+    ✅ Built 2026-11-26 (the user's play in Unity still to come), as the user scoped it: all six abilities are defined
+    (`AbilityDef` on each trait in `retainers.json`, so the AI can weigh them), and the three that only change numbers
+    are built; promise loot, front-rank rush and no quarter are refused as `not-built` and come one by one after testing
+    with the AI. The user's numbers: every cooldown 2 minutes; battle cry +100 to his side and −50 to enemies within
+    15 m, at once; close ranks −30 ‰ off frontal blows at his squad and ×0.7 pace for 10 s; stand to the death no morale
+    loss for 5 s; a lasting ability stays with the squad if he leaves. Built: `UseAbility` (refusals `not-built`,
+    `cooling-down`, `not-in-squad`), `AbilityUsed` event, reasons `BattleCry`/`EnemyBattleCry`, the Retainer's ready tick
+    and `Squad.Effects` (hashed), script order `ability`, session files, frames. Unity: Q or the HUD's button uses the
+    selected Retainer's ability; the HUD shows each Retainer's ability and cooldown and the effects on each squad; the
+    log names who used what; a battle cry shows its reach as a fading gold disc. **Measured** (benches S9–S11, S8 with
+    one scripted use; 2000 seeds; S8 without it 52.1 %): battle cry ~60 %, close ranks ~60 %, stand to the death
+    59–62 % depending on timing — each shifts an equal fight by 7–10 points and never decides it alone. Pinned in the
+    reference (1000 seeds: 59.8 / 59.8 / 61.0 %). No battle without an ability use changed (every scenario × 60 seeds).
 
 **Checkpoint:** a fight can be won by flanking, by breaking morale or by where a Retainer stands, not only by
 attrition; the reference fight still measures as pinned.
@@ -447,7 +480,14 @@ Settle each before the step that needs it; the proposal is the default if the us
     (`combat.json` `hitChance`, `experience`). Proposal: flatten it before Retainers (step 10 — professional and elite
     are theirs): measure variants with `battle-analyst` — e.g. +40 hit and +20 defence a level, morale steps of 50 —
     and pick the one where each step wins ~65–70 %, then re-pin `m3-veterans`, `m3-rally` and the sandbox. Answers
-    the recovery question too: experience needs no further buff. (M3, before step 10, or M6)
+    the recovery question too: experience needs no further buff. (M3, before step 10, or M6) — Still open: the user
+    chose to build Retainers first (2026-11-26). Step 10 shows it again: an elite Retainer's squad wins 82 % in S8
+    chiefly through his hit chance.
+11. How strong should leadership be? (found in M3 step 10, 2026-11-26) With his fall costing one mate, an experienced
+    Retainer leading a line of 8 wins 52 % against an equal line (S8 vs S6's 50 %): leadership 100 ‰ barely shows, and
+    a leader's worth comes from his experience level. Proposal: decide after question 10 — once the ladder is flatter,
+    measure leadership 100/150/200 against stronger sets (e.g. 150/250/350) on S8 with `battle-analyst`, aiming at a
+    leader worth roughly a level of experience to his squad. (M3 step 11 or M6)
 
 ## Phase 2 — public 3D skirmish
 Same sim, 3D view in the style of Expeditions: Viking; Steam page, GIFs and videos, Steam Playtest with balance

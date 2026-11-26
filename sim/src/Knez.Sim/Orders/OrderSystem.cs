@@ -8,7 +8,8 @@ namespace Knez.Sim.Orders
 {
     /// <summary>
     /// Tick stage 3: carries out squad orders (battle-sim.md §10). A move order marches the anchor along its planned route
-    /// (<see cref="Squad.Path"/>) at the walk speed of the slowest living member — at <c>reformPace</c> while re-forming —
+    /// (<see cref="Squad.Path"/>) at the walk speed of the slowest living member (× close ranks' pace, M3 step 11) — at
+    /// <c>reformPace</c> while re-forming —
     /// and waits while the route is planned or the squad regroups for a gap. Turns of up to 30° are finished about the
     /// anchor on the march; 30°–90° the squad wheels round its inner flank (from just before a corner, so it comes out on
     /// the next leg); more than a quarter turn it faces about, the rear rank becoming the front (decided 2026-11-21) —
@@ -35,6 +36,43 @@ namespace Knez.Sim.Orders
                 if (squad.Order.Kind == SquadOrderKind.Move)
                 {
                     Move(state, squad);
+                }
+            }
+
+            EndLoneOrders(state);
+        }
+
+        /// <summary>
+        /// A Retainer standing alone (battle-sim.md §13, M3 step 10) is done with a move once he stands at its point
+        /// (within 1 cm) facing its way exactly (movement turns him onto it, stage 6), and with an attack once that enemy
+        /// is down or gone. A man out of the fight has no order.
+        /// </summary>
+        private static void EndLoneOrders(BattleState state)
+        {
+            List<Fighter> fighters = state.FighterList;
+            for (int i = 0; i < fighters.Count; i++)
+            {
+                Fighter man = fighters[i];
+                LoneOrder order = man.LoneOrder;
+                if (order.Kind != LoneOrderKind.None && !man.IsAlive)
+                {
+                    man.LoneOrder = LoneOrder.None;
+                }
+                else if (order.Kind == LoneOrderKind.Move)
+                {
+                    bool facing = !order.HasFacing || man.Facing == order.Facing;
+                    if ((order.Target - man.Position).Length <= MovementRules.ArriveDistance && facing)
+                    {
+                        man.LoneOrder = LoneOrder.None;
+                    }
+                }
+                else if (order.Kind == LoneOrderKind.Attack)
+                {
+                    Fighter? enemy = state.FindFighter(order.Enemy);
+                    if (enemy == null || !enemy.IsAlive)
+                    {
+                        man.LoneOrder = LoneOrder.None;
+                    }
                 }
             }
         }
@@ -545,7 +583,8 @@ namespace Knez.Sim.Orders
             return slowest;
         }
 
-        /// <summary>Walk speed per tick of the slowest living member, or zero when none lives.</summary>
+        /// <summary>Walk speed per tick of the slowest living member, times close ranks' pace while the squad has closed
+        /// ranks (M3 step 11), or zero when none lives.</summary>
         private static Fix SlowestWalk(BattleState state, Squad squad)
         {
             Fix slowest = Fix.Zero;
@@ -566,6 +605,8 @@ namespace Knez.Sim.Orders
                     any = true;
                 }
             }
+
+            slowest = any ? slowest * Abilities.AbilityRules.Pace(state, squad) : slowest; // closed ranks march slower (M3 step 11)
 
             // At least one raw unit while anyone lives: zero means "nobody left" to the caller.
             return any && slowest <= Fix.Zero ? Fix.FromRaw(1) : slowest;

@@ -26,6 +26,27 @@ namespace Knez.Sim.Commands
         /// <summary>The squad is broken: its men are running and take no orders until it re-forms.</summary>
         public static readonly RejectReason SquadBroken = new RejectReason("squad-broken");
 
+        /// <summary>The man is running and takes no orders until he rallies (M3 step 10).</summary>
+        public static readonly RejectReason Routing = new RejectReason("routing");
+
+        /// <summary>The squad already has as many men as a squad may (M3 step 10).</summary>
+        public static readonly RejectReason SquadFull = new RejectReason("squad-full");
+
+        /// <summary>The Retainer stands in a squad: the order is for a man standing alone, or he is already in that squad.</summary>
+        public static readonly RejectReason InSquad = new RejectReason("in-squad");
+
+        /// <summary>The Retainer stands alone: the order is for a man in a squad.</summary>
+        public static readonly RejectReason NotInSquad = new RejectReason("not-in-squad");
+
+        /// <summary>The target is not an enemy.</summary>
+        public static readonly RejectReason NotAnEnemy = new RejectReason("not-an-enemy");
+
+        /// <summary>The Retainer's ability is still cooling down (M3 step 11).</summary>
+        public static readonly RejectReason CoolingDown = new RejectReason("cooling-down");
+
+        /// <summary>The Retainer's ability is defined but not built yet (M3 step 11: promise loot, front-rank rush, no quarter).</summary>
+        public static readonly RejectReason NotBuilt = new RejectReason("not-built");
+
         private RejectReason(string code)
         {
             Code = code;

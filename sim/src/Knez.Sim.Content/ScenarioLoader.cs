@@ -11,7 +11,7 @@ namespace Knez.Sim.Content
     /// against a <see cref="DefLibrary"/>. Format (battle-sim.md §7):
     /// <code>
     /// { "id": "formations", "description": "…",
-    ///   "map": { "width": 60, "height": 40, "walls": [ { "from": [0, 20], "to": [28, 21] } ] },
+    ///   "map": { "width": 60, "height": 40, "walls": [ { "from": [0, 20], "to": [28, 21], "kind": "house" } ] },
     ///   "squads": [ { "name": "Line", "side": 0, "body": "man",
     ///                 "men": [ { "count": 8, "experience": "experienced", "kit": "sword-shield-padded" } ],
     ///                 "formation": "line", "position": [20, 12], "facing": 90 } ],
@@ -24,10 +24,11 @@ namespace Knez.Sim.Content
     /// </summary>
     public static class ScenarioLoader
     {
-        private const string ScenarioMembers = "id, description, map, squads, script";
+        private const string ScenarioMembers = "id, description, map, squads, retainers, script";
+        private const string RetainerMembers = "name, side, trait, body, experience, kit, squad, position, facing";
         private const string ScriptMembers = "tick, order, squad, target, facing, formation";
         private const string MapMembers = "width, height, walls";
-        private const string WallMembers = "from, to";
+        private const string WallMembers = "from, to, kind";
         private const string SquadMembers = "name, side, body, men, formation, position, facing";
         private const string MenMembers = "count, experience, kit";
 
@@ -49,8 +50,9 @@ namespace Knez.Sim.Content
                 var wall = JsonObjectReader.Of(wallItems[i], $"map.walls[{i}]", source.Name);
                 FixVec2 from = wall.RequireVec2("from");
                 FixVec2 to = wall.RequireVec2("to");
+                WallKind kind = WallKindOf(wall);
                 wall.RejectUnknownMembers(WallMembers);
-                walls.Add(Build(wall, wallItems[i], () => new WallDef(from, to)));
+                walls.Add(Build(wall, wallItems[i], () => new WallDef(from, to, kind)));
             }
 
             mapReader.RejectUnknownMembers(MapMembers);
@@ -64,6 +66,13 @@ namespace Knez.Sim.Content
                 squads.Add(ReadSquad(squadItems[i], $"squads[{i}]", source.Name, defs));
             }
 
+            IReadOnlyList<JsonValue> retainerItems = root.OptionalArray("retainers");
+            var retainers = new List<RetainerSpawnDef>(retainerItems.Count);
+            for (int i = 0; i < retainerItems.Count; i++)
+            {
+                retainers.Add(ReadRetainer(retainerItems[i], $"retainers[{i}]", source.Name, defs));
+            }
+
             IReadOnlyList<JsonValue> scriptItems = root.OptionalArray("script");
             var script = new List<ScriptedOrderDef>(scriptItems.Count);
             for (int i = 0; i < scriptItems.Count; i++)
@@ -75,7 +84,7 @@ namespace Knez.Sim.Content
 
             // Whole-scenario checks (unique names, slots on the map, script order and squads) name the entry themselves.
             return Build(root, rootValue.Get("squads")!, () => new ScenarioDef(id, description, map, squads, script, defs.Movement, defs.Formations,
-                defs.Combat, defs.Morale));
+                defs.Combat, defs.Morale, retainers));
         }
 
         private static ScriptedOrderDef ReadScriptedOrder(JsonValue value, string path, string sourceName)
@@ -83,24 +92,125 @@ namespace Knez.Sim.Content
             var item = JsonObjectReader.Of(value, path, sourceName);
             int tick = item.RequireInt("tick");
             string order = item.RequireString("order");
-            string squad = item.RequireString("squad");
-            if (order == "formation")
+            switch (order)
             {
-                string formation = item.RequireString("formation");
-                item.RejectUnknownMembers("tick, order, squad, formation");
-                return Build(item, value, () => ScriptedOrderDef.Formation(tick, squad, formation));
+                case "formation":
+                {
+                    string squad = item.RequireString("squad");
+                    string formation = item.RequireString("formation");
+                    item.RejectUnknownMembers("tick, order, squad, formation");
+                    return Build(item, value, () => ScriptedOrderDef.Formation(tick, squad, formation));
+                }
+
+                case "move" when item.Member("retainer") != null:
+                {
+                    string retainer = item.RequireString("retainer");
+                    FixVec2 target = item.RequireVec2("target");
+                    Angle? facing = Facing(item.OptionalFix("facing"));
+                    item.RejectUnknownMembers("tick, order, retainer, target, facing");
+                    return Build(item, value, () => ScriptedOrderDef.MoveRetainer(tick, retainer, target, facing));
+                }
+
+                case "move":
+                {
+                    string squad = item.RequireString("squad");
+                    FixVec2 target = item.RequireVec2("target");
+                    Angle? facing = Facing(item.OptionalFix("facing"));
+                    item.RejectUnknownMembers(ScriptMembers);
+                    return Build(item, value, () => new ScriptedOrderDef(tick, squad, target, facing));
+                }
+
+                case "attach":
+                {
+                    string retainer = item.RequireString("retainer");
+                    string squad = item.RequireString("squad");
+                    item.RejectUnknownMembers("tick, order, retainer, squad");
+                    return Build(item, value, () => ScriptedOrderDef.Attach(tick, retainer, squad));
+                }
+
+                case "ability":
+                {
+                    string retainer = item.RequireString("retainer");
+                    item.RejectUnknownMembers("tick, order, retainer");
+                    return Build(item, value, () => ScriptedOrderDef.Ability(tick, retainer));
+                }
+
+                case "detach":
+                {
+                    string retainer = item.RequireString("retainer");
+                    item.RejectUnknownMembers("tick, order, retainer");
+                    return Build(item, value, () => ScriptedOrderDef.Detach(tick, retainer));
+                }
+
+                case "attack":
+                {
+                    string retainer = item.RequireString("retainer");
+                    int enemy = item.RequireInt("enemy");
+                    item.RejectUnknownMembers("tick, order, retainer, enemy");
+                    return Build(item, value, () => ScriptedOrderDef.Attack(tick, retainer, new EntityId(enemy)));
+                }
+
+                default:
+                    throw item.Error(value.Get("order")!, item.MemberPath("order"),
+                        $"unknown order '{order}' (known: move, formation, attach, detach, attack, ability)");
+            }
+        }
+
+        private static Angle? Facing(Fix? degrees) => degrees.HasValue ? Angle.FromDegrees(degrees.Value) : (Angle?)null;
+
+        private static RetainerSpawnDef ReadRetainer(JsonValue value, string path, string sourceName, DefLibrary defs)
+        {
+            var item = JsonObjectReader.Of(value, path, sourceName);
+            string name = item.RequireString("name");
+            int side = item.RequireInt("side");
+            string traitId = item.RequireString("trait");
+            string bodyId = item.RequireString("body");
+            string experienceId = item.RequireString("experience");
+            string kitId = item.RequireString("kit");
+            string? squad = item.OptionalString("squad");
+            bool alone = item.Member("position") != null || item.Member("facing") != null;
+            FixVec2 position = alone ? item.RequireVec2("position") : FixVec2.Zero;
+            Fix facing = alone ? item.RequireFix("facing") : Fix.Zero;
+            item.RejectUnknownMembers(RetainerMembers);
+            if (squad != null && alone)
+            {
+                throw item.Error("give either 'squad' (he starts in it) or 'position' and 'facing' (he starts alone), not both");
             }
 
-            FixVec2 target = item.RequireVec2("target");
-            Fix? facingDegrees = item.OptionalFix("facing");
-            item.RejectUnknownMembers(ScriptMembers);
-            if (order != "move")
+            if (squad == null && !alone)
             {
-                throw item.Error(value.Get("order")!, item.MemberPath("order"), $"unknown order '{order}' (known: move, formation)");
+                throw item.Error("give 'squad' (he starts in it) or 'position' and 'facing' (he starts alone)");
             }
 
-            Angle? facing = facingDegrees.HasValue ? Angle.FromDegrees(facingDegrees.Value) : (Angle?)null;
-            return Build(item, value, () => new ScriptedOrderDef(tick, squad, target, facing));
+            TraitDef? trait = defs.FindTrait(traitId);
+            if (trait == null)
+            {
+                throw item.Error(value.Get("trait")!, item.MemberPath("trait"), $"unknown trait '{traitId}' (known: {defs.TraitIds()})");
+            }
+
+            BodyDef? body = defs.FindBody(bodyId);
+            if (body == null)
+            {
+                throw item.Error(value.Get("body")!, item.MemberPath("body"), $"unknown body '{bodyId}' (known: {defs.BodyIds()})");
+            }
+
+            CombatDef rules = defs.Rules;
+            ExperienceDef? experience = rules.FindExperience(experienceId);
+            if (experience == null)
+            {
+                throw item.Error(value.Get("experience")!, item.MemberPath("experience"),
+                    $"unknown experience level '{experienceId}' (known: {Ids(rules.ExperienceLevels, e => e.Id)})");
+            }
+
+            KitDef? kit = rules.FindKit(kitId);
+            if (kit == null)
+            {
+                throw item.Error(value.Get("kit")!, item.MemberPath("kit"), $"unknown kit '{kitId}' (known: {Ids(rules.Kits, k => k.Id)})");
+            }
+
+            return squad != null
+                ? Build(item, value, () => RetainerSpawnDef.InSquad(name, side, trait, body, experience, kit, squad))
+                : Build(item, value, () => RetainerSpawnDef.Alone(name, side, trait, body, experience, kit, position, Angle.FromDegrees(facing)));
         }
 
         private static SquadSpawnDef ReadSquad(JsonValue value, string path, string sourceName, DefLibrary defs)
@@ -163,6 +273,12 @@ namespace Knez.Sim.Content
                     $"unknown experience level '{experienceId}' (known: {Ids(rules.ExperienceLevels, e => e.Id)})");
             }
 
+            if (experience.RetainerOnly)
+            {
+                throw item.Error(value.Get("experience")!, item.MemberPath("experience"),
+                    $"'{experienceId}' is for Retainers only (D-019): list him in 'retainers'");
+            }
+
             KitDef? kit = rules.FindKit(kitId);
             if (kit == null)
             {
@@ -184,6 +300,22 @@ namespace Knez.Sim.Content
         }
 
         /// <summary>Runs a def constructor and turns its <see cref="ArgumentException"/> into a located content error.</summary>
+        /// <summary>A wall's optional <c>kind</c>: "house" or "obstacle" (the default).</summary>
+        private static WallKind WallKindOf(JsonObjectReader wall)
+        {
+            string? kind = wall.OptionalString("kind");
+            switch (kind)
+            {
+                case null:
+                case "obstacle":
+                    return WallKind.Obstacle;
+                case "house":
+                    return WallKind.House;
+                default:
+                    throw wall.Error(wall.Member("kind")!, wall.MemberPath("kind"), $"unknown wall kind '{kind}' (known: obstacle, house)");
+            }
+        }
+
         private static T Build<T>(JsonObjectReader reader, JsonValue at, Func<T> create)
         {
             try

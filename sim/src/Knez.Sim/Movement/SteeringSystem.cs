@@ -187,7 +187,10 @@ namespace Knez.Sim.Movement
 
         /// <summary>A step at walking pace toward <paramref name="foe"/>, stopping half the man's reach short of touching;
         /// zero when he is already that close (or there is no foe).</summary>
-        private static FixVec2 StepIn(BattleState state, Fighter fighter, Fighter? foe)
+        private static FixVec2 StepIn(BattleState state, Fighter fighter, Fighter? foe) => StepIn(fighter, foe, fighter.Body.WalkPerTick);
+
+        /// <summary>A step of at most <paramref name="pace"/> toward <paramref name="foe"/>, stopping half a reach short of touching.</summary>
+        private static FixVec2 StepIn(Fighter fighter, Fighter? foe, Fix pace)
         {
             if (foe == null || !foe.IsAlive)
             {
@@ -196,7 +199,7 @@ namespace Knez.Sim.Movement
 
             FixVec2 toward = foe.Position - fighter.Position;
             Fix gap = toward.Length - fighter.Radius - foe.Radius;
-            Fix step = FixMath.Min(fighter.Body.WalkPerTick, gap - (fighter.Kit.Weapon.Reach / 2));
+            Fix step = FixMath.Min(pace, gap - (fighter.Kit.Weapon.Reach / 2));
             return step <= Fix.Zero || toward == FixVec2.Zero ? FixVec2.Zero : toward.WithLength(step);
         }
 
@@ -234,6 +237,44 @@ namespace Knez.Sim.Movement
         }
 
         /// <summary>
+        /// A Retainer standing alone (battle-sim.md §13, M3 step 10) follows his own order at walking pace (slowed by his
+        /// wounds), straight, sliding along walls (routes for a man alone come later): to a point, or at an enemy until
+        /// half his reach short of touching. In melee he holds his ground like any man in reach of an enemy, except that a
+        /// move to a point more than a quarter turn behind his front steps back toward it at step-back pace, facing the
+        /// enemy (as a squad withdraws, §11). Zero for anyone else without a squad.
+        /// </summary>
+        private static FixVec2 Alone(BattleState state, Fighter fighter)
+        {
+            Orders.LoneOrder order = fighter.LoneOrder;
+            if (!fighter.IsRetainer || order.Kind == Orders.LoneOrderKind.None)
+            {
+                return FixVec2.Zero;
+            }
+
+            Fix walk = fighter.Body.WalkPerTick * Combat.Wounds.Pace(state.Scenario.Combat, fighter.Wound);
+            if (fighter.IsEngaged)
+            {
+                Fighter? enemy = state.FindFighter(fighter.Target);
+                FixVec2 back = order.Target - fighter.Position;
+                if (order.Kind != Orders.LoneOrderKind.Move || enemy == null || back.Length <= MovementRules.ArriveDistance
+                    || FixVec2.Dot(enemy.Position - fighter.Position, back) >= Fix.Zero)
+                {
+                    return FixVec2.Zero; // the melee lock: he holds his ground
+                }
+
+                return back.WithLength(FixMath.Min(back.Length, walk * state.Scenario.Movement.StepBackPace));
+            }
+
+            if (order.Kind == Orders.LoneOrderKind.Attack)
+            {
+                return StepIn(fighter, state.FindFighter(order.Enemy), walk); // slowed by his wounds, as a move is
+            }
+
+            FixVec2 to = order.Target - fighter.Position;
+            return to.Length <= walk ? to : to.WithLength(walk);
+        }
+
+        /// <summary>
         /// Velocity toward the formation slot, plus <paramref name="separation"/> — or, in a squad standing in melee whose
         /// formation doesn't keep its ranks, a step toward an enemy (closing in, or settling well inside reach).
         /// </summary>
@@ -249,7 +290,7 @@ namespace Knez.Sim.Movement
             Squad? squad = fighter.SquadId.IsNone ? null : state.FindSquad(fighter.SquadId);
             if (squad == null || fighter.SlotIndex < 0)
             {
-                return separation; // individual orders (Retainers standing alone) come later
+                return Alone(state, fighter) + separation;
             }
 
             if (squad.Broken)

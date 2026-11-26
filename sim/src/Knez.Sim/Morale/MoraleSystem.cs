@@ -84,7 +84,12 @@ namespace Knez.Sim.Morale
             if (wounded.Now == WoundLevel.Down)
             {
                 Squad? squad = man.SquadId.IsNone ? null : state.FindSquad(man.SquadId);
-                if (squad != null)
+                if (squad != null && man.IsRetainer)
+                {
+                    // The man leading them fell: it costs as much as LeaderFell mates (decided 2026-11-26: one), instead.
+                    ToSquad(state, squad, man, -MoraleRules.LeaderCost(rules, squad.StartCount), MoraleReason.LeaderFell);
+                }
+                else if (squad != null)
                 {
                     ToSquad(state, squad, man, -MoraleRules.LossCost(rules, squad.StartCount), MoraleReason.SquadmateFell);
                 }
@@ -141,22 +146,21 @@ namespace Knez.Sim.Morale
                 return;
             }
 
-            int gain = (rules.RecoveryPerSecond * tick / BattleState.TicksPerSecond)
-                - (rules.RecoveryPerSecond * (tick - 1) / BattleState.TicksPerSecond);
-            if (gain == 0)
-            {
-                return;
-            }
-
             List<Fighter> fighters = state.FighterList;
             for (int i = 0; i < fighters.Count; i++)
             {
                 Fighter man = fighters[i];
                 int start = man.Experience.Morale;
-                if (man.IsAlive && man.Morale < start && safe[i])
+                if (!man.IsAlive || man.Morale >= start || !safe[i])
                 {
-                    man.Morale = man.Morale + gain > start ? start : man.Morale + gain;
+                    continue;
                 }
+
+                // Leadership speeds it by the same share it cuts losses by (battle-sim.md §13).
+                int leadership = MoraleRules.Leadership(state, man);
+                int rate = leadership == 0 ? rules.RecoveryPerSecond : rules.RecoveryPerSecond * (DefChecks.Whole + leadership) / DefChecks.Whole;
+                int gain = (int)(((long)rate * tick / BattleState.TicksPerSecond) - ((long)rate * (tick - 1) / BattleState.TicksPerSecond));
+                man.Morale = man.Morale + gain > start ? start : man.Morale + gain;
             }
         }
 
@@ -181,6 +185,10 @@ namespace Knez.Sim.Morale
                 {
                     to = MoraleState.Rallying;
                 }
+                else if (squad == null && man.IsRetainer && man.Morale >= rules.RallyAt && safe)
+                {
+                    to = MoraleRules.Next(rules, MoraleState.Wavering, man.Morale); // a Retainer alone rallies where he stopped
+                }
             }
             else if (from == MoraleState.Rallying)
             {
@@ -192,6 +200,12 @@ namespace Knez.Sim.Morale
                     && Movement.Crowding.DistanceToSlot(state, squad, man) <= state.Scenario.Movement.HoldingReach)
                 {
                     to = MoraleRules.Next(rules, MoraleState.Wavering, man.Morale); // back in his place
+                }
+                else if (squad == null)
+                {
+                    // A Retainer taken out of his squad while going back to it: no place to reach, so he rallies where he
+                    // is, as a Retainer alone does (M3 step 10).
+                    to = MoraleRules.Next(rules, MoraleState.Wavering, man.Morale);
                 }
             }
             else
@@ -340,6 +354,7 @@ namespace Knez.Sim.Morale
                 man.Action = FighterAction.Idle; // a running man strikes no one
                 man.ActionTicks = 0;
                 man.Target = EntityId.None;
+                man.LoneOrder = Orders.LoneOrder.None; // nor keeps a Retainer's own order
             }
 
             state.AddEvent(new MoraleStateChanged(state.Tick, man.Id, from, to));
@@ -365,8 +380,24 @@ namespace Knez.Sim.Morale
             }
         }
 
-        private static void Change(BattleState state, Fighter man, int delta, MoraleReason reason)
+        /// <summary>Changes <paramref name="man"/>'s morale by <paramref name="delta"/> (within 0..1000) and raises a
+        /// <see cref="MoraleChanged"/> with <paramref name="reason"/>. A loss is cut by his leadership, and dropped while
+        /// his squad stands to the death (M3 step 11).</summary>
+        internal static void Change(BattleState state, Fighter man, int delta, MoraleReason reason)
         {
+            if (delta < 0 && Abilities.AbilityRules.StandsFast(state, man))
+            {
+                return; // stand to the death: no loss now, and none owed later
+            }
+
+            if (delta < 0)
+            {
+                // Leadership (battle-sim.md §13, M3 step 10): a Retainer standing in the squad cuts every loss by his
+                // share (‰), toward zero.
+                int leadership = MoraleRules.Leadership(state, man);
+                delta = leadership == 0 ? delta : delta * (DefChecks.Whole - leadership) / DefChecks.Whole;
+            }
+
             int now = man.Morale + delta;
             now = now < 0 ? 0 : now > 1000 ? 1000 : now;
             int applied = now - man.Morale;

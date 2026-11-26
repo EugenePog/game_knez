@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Knez.Sim.Defs;
 using Knez.Sim.Numerics;
 using Knez.Sim.Units;
@@ -32,6 +33,43 @@ namespace Knez.Sim.Morale
         /// <summary>What a fallen squadmate costs each man of a squad that started with <paramref name="startCount"/> men.</summary>
         public static int LossCost(MoraleDef rules, int startCount) =>
             startCount <= 0 ? 0 : (int)((rules.LossWeight.Raw * Whole / startCount) >> Fix.FractionBits);
+
+        /// <summary>What the fall of the Retainer leading it costs each man of such a squad: <see cref="MoraleDef.LeaderFell"/>
+        /// times <see cref="LossCost"/> (battle-sim.md §13; decided 2026-11-26: as one mate).</summary>
+        public static int LeaderCost(MoraleDef rules, int startCount) =>
+            (int)(((long)LossCost(rules, startCount) * rules.LeaderFell.Raw) >> Fix.FractionBits);
+
+        /// <summary>
+        /// The leadership (‰) that guards <paramref name="man"/>'s morale now (battle-sim.md §13, M3 step 10, D-023): the
+        /// highest of the Retainers standing in his squad (alive, not running) — his own when he is one — or, for a Retainer
+        /// standing alone and not running, his own. Zero otherwise.
+        /// </summary>
+        public static int Leadership(BattleState state, Fighter man)
+        {
+            if (man.SquadId.IsNone)
+            {
+                return man.IsRetainer && man.IsAlive && !man.IsRouting ? man.Experience.Leadership : 0;
+            }
+
+            Squad? squad = state.FindSquad(man.SquadId);
+            if (squad == null)
+            {
+                return 0;
+            }
+
+            int best = 0;
+            List<EntityId> members = squad.MemberList;
+            for (int m = 0; m < members.Count; m++)
+            {
+                Fighter? leader = state.FindFighter(members[m]);
+                if (leader != null && leader.IsRetainer && leader.IsAlive && !leader.IsRouting && leader.Experience.Leadership > best)
+                {
+                    best = leader.Experience.Leadership;
+                }
+            }
+
+            return best;
+        }
 
         /// <summary>True when no living, non-routing enemy is within <see cref="MoraleDef.SafeDistance"/> of
         /// <paramref name="fighter"/> (edge to edge).</summary>

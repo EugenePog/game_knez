@@ -32,5 +32,14 @@ namespace Knez.Sim.Morale
 
         /// <summary>An enemy squad nearby broke.</summary>
         EnemySquadBroke = 9,
+
+        /// <summary>The Retainer leading his squad fell (M3 step 10).</summary>
+        LeaderFell = 10,
+
+        /// <summary>A Retainer of his side gave a battle cry near him (M3 step 11).</summary>
+        BattleCry = 11,
+
+        /// <summary>An enemy Retainer gave a battle cry near him (M3 step 11).</summary>
+        EnemyBattleCry = 12,
     }
 }

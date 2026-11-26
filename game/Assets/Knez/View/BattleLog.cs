@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Knez.Sim;
 using Knez.Sim.Combat;
+using Knez.Sim.Defs;
 using Knez.Sim.Events;
 using Knez.Sim.Morale;
 using Knez.Sim.Units;
@@ -103,6 +104,9 @@ namespace Knez.Game.View
                 case BattleEnded ended:
                     Add(ended.Tick, LogKind.Ended, ended.Winner, ended.Winner < 0 ? "Nobody holds the field." : $"Side {ended.Winner} holds the field.");
                     break;
+                case AbilityUsed used:
+                    Add(used.Tick, LogKind.Ability, SideOf(state, used.Retainer), Used(state, used));
+                    break;
             }
         }
 
@@ -129,7 +133,8 @@ namespace Knez.Game.View
             }
         }
 
-        /// <summary>"#5 (Hird line)", by the squad he started in (the fallen leave their squad in the sim).</summary>
+        /// <summary>"#5 (Hird line)", by the squad he started in (the fallen leave their squad in the sim); a Retainer by
+        /// name and the squad he counts for: "Hrafn (Veterans)", "Vesti" (M3 step 10).</summary>
         public string Name(BattleState state, EntityId fighter)
         {
             if (fighter.IsNone)
@@ -137,8 +142,30 @@ namespace Knez.Game.View
                 return "no one";
             }
 
-            Squad? squad = state.FindSquad(_tally.HomeOf(fighter));
+            Fighter? man = state.FindFighter(fighter);
+            Squad? squad = state.FindSquad(man != null ? _tally.HomeOf(man) : _tally.HomeOf(fighter));
+            if (man != null)
+            {
+                return HudText.Name(man, squad);
+            }
+
             return squad != null ? $"#{fighter.Value} ({squad.Name})" : $"#{fighter.Value}";
+        }
+
+        /// <summary>"Hrafn gives a battle cry", "Veterans stand to the death for 5.0 s at Hrafn's word" (M3 step 11).</summary>
+        private string Used(BattleState state, AbilityUsed used)
+        {
+            Fighter? retainer = state.FindFighter(used.Retainer);
+            string name = retainer?.Retainer is RetainerPart part ? part.Name : Name(state, used.Retainer);
+            AbilityDef? ability = retainer?.Retainer is RetainerPart his ? his.Trait.Ability : null;
+            Squad? squad = used.Squad.IsNone ? null : state.FindSquad(used.Squad);
+            if (ability == null || ability.Kind == AbilityKind.BattleCry || squad == null)
+            {
+                return $"{name} gives a {(ability != null ? HudText.AbilityName(ability) : used.Ability)}";
+            }
+
+            string what = ability.Kind == AbilityKind.CloseRanks ? "close ranks" : HudText.AbilityName(ability);
+            return $"{squad.Name} {what} for {HudText.Seconds(ability.DurationTicks)} at {name}'s word";
         }
 
         private static int SideOf(BattleState state, EntityId fighter)

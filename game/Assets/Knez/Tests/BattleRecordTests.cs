@@ -159,10 +159,55 @@ namespace Knez.Game.Tests
             record.Begin(sim.State);
             var veterans = sim.State.Squads.First(s => s.SideId == 0);
             var groups = record.Tally.Composition(sim.State, veterans);
-            Assert.That(groups.Count, Is.EqualTo(1));
+            Assert.That(groups.Count, Is.EqualTo(1), "Hrafn, the Retainer leading them, is named apart");
             Assert.That(HudText.Group(groups[0].Sample, groups[0].Count, groups[0].InFight),
-                Is.EqualTo("6 elite: sword · round shield · mail · helm"));
-            Assert.That(HudText.Group(groups[0].Sample, 6, 4), Does.StartWith("6 elite (4 left): "));
+                Is.EqualTo("5 experienced: sword · round shield · mail · helm"));
+            Assert.That(HudText.Group(groups[0].Sample, 5, 3), Does.StartWith("5 experienced (3 left): "));
+            var retainers = record.Tally.RetainersOf(sim.State, veterans.Id);
+            Assert.That(retainers.Select(HudText.Retainer).ToArray(), Is.EqualTo(new[] { "Hrafn (loyal, elite)" }));
+        }
+
+        [Test]
+        public void AbilityUsed_TheLogSaysWhoAndWhat()
+        {
+            // M3 step 11.
+            var sim = Load("scenarios/m3/m3-veterans.json");
+            var record = new BattleRecord();
+            record.Begin(sim.State);
+            var hrafn = sim.State.Fighters.Single(f => f.IsRetainer);
+            sim.Enqueue(new Knez.Sim.Commands.UseAbilityCommand(0, hrafn.Id));
+            sim.Step();
+            record.Observe(sim.State);
+            LogLine line = record.Log.Lines.Single(l => l.Kind == LogKind.Ability);
+            Assert.That(line.Text, Is.EqualTo("Veterans stand to the death for 5.0 s at Hrafn's word"));
+            Assert.That(line.Side, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void Retainer_CountsForTheSquadHeIsIn_StandingAloneForNone()
+        {
+            // M3 step 10: he leaves Veterans and stands alone, then joins them again; the tally follows him.
+            var sim = Load("scenarios/m3/m3-veterans.json");
+            var record = new BattleRecord();
+            record.Begin(sim.State);
+            var veterans = sim.State.Squads.First(s => s.SideId == 0);
+            var hrafn = sim.State.Fighters.Single(f => f.IsRetainer);
+            Assert.That(record.Tally.Of(sim.State, veterans).InFight, Is.EqualTo(6), "5 men and Hrafn");
+            Assert.That(record.Log.Name(sim.State, hrafn.Id), Is.EqualTo("Hrafn (Veterans)"));
+
+            sim.Enqueue(new Knez.Sim.Commands.DetachRetainerCommand(0, hrafn.Id));
+            sim.Step();
+            record.Observe(sim.State);
+            Assert.That(record.Tally.HomeOf(hrafn), Is.EqualTo(EntityId.None));
+            Assert.That(record.Tally.RetainersOf(sim.State, EntityId.None), Is.EqualTo(new[] { hrafn }));
+            Assert.That(record.Tally.Of(sim.State, veterans).InFight, Is.EqualTo(5));
+            Assert.That(record.Log.Name(sim.State, hrafn.Id), Is.EqualTo("Hrafn"));
+
+            sim.Enqueue(new Knez.Sim.Commands.AttachRetainerCommand(0, hrafn.Id, veterans.Id));
+            sim.Step();
+            record.Observe(sim.State);
+            Assert.That(record.Tally.RetainersOf(sim.State, veterans.Id), Is.EqualTo(new[] { hrafn }));
+            Assert.That(record.Tally.Of(sim.State, veterans).InFight, Is.EqualTo(6));
         }
 
         [Test]

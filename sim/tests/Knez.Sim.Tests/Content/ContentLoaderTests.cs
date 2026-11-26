@@ -83,7 +83,7 @@ public class ContentLoaderTests
     [TestCase("""{ "bodies": [ { "id": "w", "radius": 0.3, "walkSpeed": 1 } ] }""",
         "f.json:1:15: bodies[0]: missing member 'runSpeed'")]
     [TestCase("""{ "fighter": [] }""",
-        "f.json:1:14: fighter: unknown member 'fighter' (allowed: description, bodies, formations, movement, combat, morale)")]
+        "f.json:1:14: fighter: unknown member 'fighter' (allowed: description, bodies, formations, movement, combat, morale, traits)")]
     [TestCase("""{ "fighters": [] }""",
         "f.json:1:15: fighters: fighter types are gone (M3 step 9, ADR-0005): bodies go in 'bodies', kits in combat 'kits', and a scenario's squads name experience and kit per group of men")]
     [TestCase("""[]""",
@@ -159,12 +159,29 @@ public class ContentLoaderTests
             Assert.That(walls, Has.Count.EqualTo(1));
             Assert.That(walls[0].Min, Is.EqualTo(new FixVec2(Fix.FromInt(35), Fix.Ratio(41, 2))));
             Assert.That(walls[0].Max, Is.EqualTo(FixVec2.FromInts(40, 22)));
+            Assert.That(walls[0].Kind, Is.EqualTo(WallKind.Obstacle), "no kind: an obstacle");
+        });
+    }
+
+    [Test]
+    public void ScenarioLoader_Parse_WallKinds_HouseOrObstacle_DrawnOnly_NotInTheFingerprint()
+    {
+        string With(string kinds) => Scenario(GoodSquad).Replace("\"map\": { \"width\": 60, \"height\": 40 }",
+            "\"map\": { \"width\": 60, \"height\": 40, \"walls\": [ { \"from\": [40, 20], \"to\": [45, 22]" + kinds + " } ] }");
+        var house = ScenarioLoader.Parse(new SourceText("s.json", With(", \"kind\": \"house\"")), Defs());
+        var obstacle = ScenarioLoader.Parse(new SourceText("s.json", With(", \"kind\": \"obstacle\"")), Defs());
+        Assert.Multiple(() =>
+        {
+            Assert.That(house.Map.Walls[0].Kind, Is.EqualTo(WallKind.House));
+            Assert.That(obstacle.Map.Walls[0].Kind, Is.EqualTo(WallKind.Obstacle));
+            Assert.That(house.Fingerprint, Is.EqualTo(obstacle.Fingerprint), "no rule reads the kind yet: it doesn't move the hash");
         });
     }
 
     [TestCase("{ \"from\": [40, 20], \"to\": [35, 20.05] }", "map.walls[0]: a wall must be at least 0.1 m thick")]
     [TestCase("{ \"from\": [40, 20], \"to\": [65, 22] }", "reaches past the")]
-    [TestCase("{ \"from\": [40, 20], \"to\": [45, 22], \"height\": 3 }", "map.walls[0].height: unknown member 'height' (allowed: from, to)")]
+    [TestCase("{ \"from\": [40, 20], \"to\": [45, 22], \"height\": 3 }", "map.walls[0].height: unknown member 'height' (allowed: from, to, kind)")]
+    [TestCase("{ \"from\": [40, 20], \"to\": [45, 22], \"kind\": \"tree\" }", "map.walls[0].kind: unknown wall kind 'tree' (known: obstacle, house)")]
     [TestCase("{ \"from\": [5, 8], \"to\": [35, 10] }", "squads[0] 'A': slot 4 at")]
     public void ScenarioLoader_Parse_BadWall_LocatedError(string wall, string expected)
     {
@@ -196,7 +213,7 @@ public class ContentLoaderTests
         });
     }
 
-    [TestCase("""{ "tick": 5, "order": "charge", "squad": "A", "target": [30, 20] }""", "script[0].order: unknown order 'charge' (known: move, formation)")]
+    [TestCase("""{ "tick": 5, "order": "charge", "squad": "A", "target": [30, 20] }""", "script[0].order: unknown order 'charge' (known: move, formation, attach, detach, attack, ability)")]
     [TestCase("""{ "tick": 5, "order": "move", "squad": "Nobody", "target": [30, 20] }""", "script[0]: no squad is named 'Nobody'.")]
     [TestCase("""{ "tick": 0, "order": "move", "squad": "A", "target": [30, 20] }""", "script[0]: tick must be 1..2147483647 (got 0).")]
     [TestCase("""{ "tick": 5, "order": "move", "squad": "A", "target": [99, 20] }""", "script[0]: target (99.00000, 20.00000) is off the")]
@@ -258,6 +275,107 @@ public class ContentLoaderTests
         string squad = GoodSquad.Replace(from, to);
         var ex = Assert.Throws<ContentException>(() => ScenarioLoader.Parse(new SourceText("s.json", Scenario(squad)), Defs()));
         Assert.That(ex!.Message, Is.EqualTo(expected));
+    }
+
+    private const string Traits = """{ "traits": [ { "id": "loyal", "ability": { "id": "stand-to-the-death", "cooldown": 120, "duration": 5 } }, { "id": "bold", "ability": { "id": "front-rank-rush", "cooldown": 120 } } ] }""";
+
+    private static DefLibrary DefsWithTraits() =>
+        DefLibrary.Parse([new SourceText("formations.json", Formations), new SourceText("bodies.json", Bodies), new SourceText("retainers.json", Traits)]);
+
+    private static string WithRetainers(string retainers, string script = "") => Scenario(GoodSquad).Replace("\n  ]\n}",
+        "\n  ],\n  \"retainers\": [ " + retainers + " ]" + (script.Length > 0 ? ",\n  \"script\": [ " + script + " ]" : string.Empty) + "\n}");
+
+    private const string Hrafn = """{ "name": "Hrafn", "side": 0, "trait": "loyal", "body": "man", "experience": "elite", "kit": "sword-shield-mail", "squad": "A" }""";
+
+    private const string Ulfr = """{ "name": "Ulfr", "side": 0, "trait": "bold", "body": "man", "experience": "professional", "kit": "axe-shield-mail", "position": [30, 30], "facing": 180 }""";
+
+    [Test]
+    public void ScenarioLoader_Parse_Retainers_InASquadOrAlone()
+    {
+        var scenario = ScenarioLoader.Parse(new SourceText("s.json", WithRetainers(Hrafn + ", " + Ulfr)), DefsWithTraits());
+        var hrafn = scenario.Retainers[0];
+        var ulfr = scenario.Retainers[1];
+        Assert.Multiple(() =>
+        {
+            Assert.That(DefsWithTraits().Traits.Select(t => t.Id), Is.EqualTo(new[] { "bold", "loyal" }));
+            Assert.That((hrafn.Name, hrafn.Trait.Id, hrafn.Experience.Id, hrafn.Kit.Id, hrafn.SquadName), Is.EqualTo(("Hrafn", "loyal", "elite", "sword-shield-mail", "A")));
+            Assert.That(hrafn.Experience, Is.SameAs(CombatDef.Standard.FindExperience("elite")));
+            Assert.That((ulfr.SquadName, ulfr.Position, ulfr.Facing), Is.EqualTo(((string?)null, FixVec2.FromInts(30, 30), Angle.FromDegrees(180))));
+        });
+    }
+
+    [Test]
+    public void DefLibrary_Parse_TraitAbilities_BuiltWithTheirNumbers_OthersOnlyACooldown()
+    {
+        var defs = DefsWithTraits();
+        var loyal = defs.FindTrait("loyal")!.Ability;
+        var bold = defs.FindTrait("bold")!.Ability;
+        Assert.Multiple(() =>
+        {
+            Assert.That((loyal.Kind, loyal.Built, loyal.OnSquad, loyal.CooldownTicks, loyal.DurationTicks),
+                Is.EqualTo((AbilityKind.StandToTheDeath, true, true, 2400, 100)));
+            Assert.That((bold.Kind, bold.Built, bold.CooldownTicks), Is.EqualTo((AbilityKind.FrontRankRush, false, 2400)));
+        });
+    }
+
+    [TestCase("\"id\": \"front-rank-rush\"", "\"id\": \"shield-bash\"",
+        "traits[1].ability.id: unknown ability 'shield-bash' (known: battle-cry, close-ranks, promise-loot, stand-to-the-death, front-rank-rush, no-quarter)")]
+    [TestCase("\"cooldown\": 120 }", "\"cooldown\": 120, \"duration\": 3 }", "traits[1].ability.duration: unknown member 'duration'")]
+    [TestCase("\"cooldown\": 120, \"duration\": 5", "\"cooldown\": 120", "traits[0].ability: missing member 'duration'")]
+    [TestCase("\"duration\": 5", "\"duration\": 500", "traits[0].ability: duration must be 0.05..120 s")]
+    [TestCase(", \"ability\": { \"id\": \"front-rank-rush\", \"cooldown\": 120 }", "", "traits[1]: missing member 'ability'")]
+    public void DefLibrary_Parse_BadAbility_LocatedError(string from, string to, string expected)
+    {
+        var ex = Assert.Throws<ContentException>(() => DefLibrary.Parse([new SourceText("formations.json", Formations),
+            new SourceText("bodies.json", Bodies), new SourceText("retainers.json", Traits.Replace(from, to))]));
+        Assert.That(ex!.Message, Does.Contain(expected));
+    }
+
+    [TestCase("\"trait\": \"loyal\"", "\"trait\": \"brave\"", "retainers[0].trait: unknown trait 'brave' (known: bold, loyal)")]
+    [TestCase("\"squad\": \"A\" }", "\"squad\": \"A\", \"position\": [30, 30], \"facing\": 90 }", "retainers[0]: give either 'squad' (he starts in it) or 'position' and 'facing' (he starts alone), not both")]
+    [TestCase(", \"squad\": \"A\" }", " }", "retainers[0]: give 'squad' (he starts in it) or 'position' and 'facing' (he starts alone)")]
+    [TestCase("\"kit\": \"sword-shield-mail\"", "\"kit\": \"sword-mail\"", "retainers[0].kit: unknown kit 'sword-mail'")]
+    [TestCase("\"squad\": \"A\"", "\"squad\": \"Z\"", "retainers[0] 'Hrafn': no squad is named 'Z'")]
+    [TestCase("\"name\": \"Hrafn\"", "\"name\": \"Hrafn\", \"hp\": 10", "retainers[0].hp: unknown member 'hp'")]
+    public void ScenarioLoader_Parse_BadRetainer_LocatedError(string from, string to, string expected)
+    {
+        var ex = Assert.Throws<ContentException>(() =>
+            ScenarioLoader.Parse(new SourceText("s.json", WithRetainers(Hrafn.Replace(from, to))), DefsWithTraits()));
+        Assert.That(ex!.Message, Does.Contain(expected));
+    }
+
+    [Test]
+    public void ScenarioLoader_Parse_SquadManOfARetainerOnlyLevel_LocatedError()
+    {
+        string squad = GoodSquad.Replace("\"experience\": \"experienced\"", "\"experience\": \"elite\"");
+        var ex = Assert.Throws<ContentException>(() => ScenarioLoader.Parse(new SourceText("s.json", Scenario(squad)), Defs()));
+        Assert.That(ex!.Message, Is.EqualTo("s.json:5:82: squads[0].men[0].experience: 'elite' is for Retainers only (D-019): list him in 'retainers'"));
+    }
+
+    [Test]
+    public void ScenarioLoader_Parse_RetainerScriptOrders()
+    {
+        string script = """
+            { "tick": 2, "order": "detach", "retainer": "Hrafn" },
+            { "tick": 3, "order": "move", "retainer": "Hrafn", "target": [25, 20], "facing": 0 },
+            { "tick": 4, "order": "attack", "retainer": "Hrafn", "enemy": 7 },
+            { "tick": 5, "order": "attach", "retainer": "Hrafn", "squad": "A" }
+            """;
+        var entries = ScenarioLoader.Parse(new SourceText("s.json", WithRetainers(Hrafn, script)), DefsWithTraits()).Script;
+        Assert.Multiple(() =>
+        {
+            Assert.That(entries.Select(e => e.Kind), Is.EqualTo(new[]
+            {
+                ScriptedOrderKind.DetachRetainer, ScriptedOrderKind.MoveRetainer, ScriptedOrderKind.RetainerAttack, ScriptedOrderKind.AttachRetainer,
+            }));
+            Assert.That(entries.Select(e => e.RetainerName), Has.All.EqualTo("Hrafn"));
+            Assert.That(entries[1].Target, Is.EqualTo(FixVec2.FromInts(25, 20)));
+            Assert.That(entries[2].Enemy.Value, Is.EqualTo(7));
+            Assert.That(entries[3].SquadName, Is.EqualTo("A"));
+        });
+        var ex = Assert.Throws<ContentException>(() => ScenarioLoader.Parse(new SourceText("s.json",
+            WithRetainers(Hrafn, """{ "tick": 2, "order": "detach", "retainer": "Odd" }""")), DefsWithTraits()));
+        Assert.That(ex!.Message, Does.Contain("script[0]: no Retainer is named 'Odd'"));
     }
 
     private const string Movement = """

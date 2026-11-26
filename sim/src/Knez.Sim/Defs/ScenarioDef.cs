@@ -19,7 +19,8 @@ namespace Knez.Sim.Defs
         /// </summary>
         public ScenarioDef(string id, string description, MapDef map, IReadOnlyList<SquadSpawnDef> squads,
             IReadOnlyList<ScriptedOrderDef>? script = null, MovementDef? movement = null,
-            IReadOnlyList<FormationDef>? formations = null, CombatDef? combat = null, MoraleDef? morale = null)
+            IReadOnlyList<FormationDef>? formations = null, CombatDef? combat = null, MoraleDef? morale = null,
+            IReadOnlyList<RetainerSpawnDef>? retainers = null)
         {
             Morale = morale ?? MoraleDef.Standard;
             Id = DefChecks.Id(id, nameof(id));
@@ -64,6 +65,12 @@ namespace Knez.Sim.Defs
                             $"squads[{i}] '{squad.Name}' men[{g}]: experience '{men.Experience.Id}' starts at morale {men.Experience.Morale}, below the routing threshold {Morale.Routing}: they would run at once.");
                     }
 
+                    if (men.Experience.RetainerOnly)
+                    {
+                        throw new ArgumentException(
+                            $"squads[{i}] '{squad.Name}' men[{g}]: experience '{men.Experience.Id}' is for Retainers only (D-019); list him in retainers.");
+                    }
+
                     if (!Combat.Contains(men.Experience))
                     {
                         throw new ArgumentException(
@@ -83,8 +90,9 @@ namespace Knez.Sim.Defs
             }
 
             Squads = new ReadOnlyCollection<SquadSpawnDef>(copy);
+            Retainers = new ReadOnlyCollection<RetainerSpawnDef>(CheckRetainers(retainers ?? Array.Empty<RetainerSpawnDef>(), copy, map));
             Formations = new ReadOnlyCollection<FormationDef>(Catalogue(formations, copy));
-            Script = new ReadOnlyCollection<ScriptedOrderDef>(CheckScript(script ?? Array.Empty<ScriptedOrderDef>(), copy, map, Formations));
+            Script = new ReadOnlyCollection<ScriptedOrderDef>(CheckScript(script ?? Array.Empty<ScriptedOrderDef>(), copy, Retainers, map, Formations));
             Fingerprint = ComputeFingerprint();
         }
 
@@ -137,6 +145,9 @@ namespace Knez.Sim.Defs
         /// <summary>Orders the scenario gives by itself, sorted by tick (file order within a tick).</summary>
         public IReadOnlyList<ScriptedOrderDef> Script { get; }
 
+        /// <summary>Retainers as named people (battle-sim.md §13, M3 step 10), in id order: after every squad's men.</summary>
+        public IReadOnlyList<RetainerSpawnDef> Retainers { get; }
+
         /// <summary>
         /// FNV-1a hash of everything that affects the battle (map, movement and combat rules, the formation catalogue, squads and the
         /// defs they use, script), in a canonical order.
@@ -160,21 +171,25 @@ namespace Knez.Sim.Defs
             }
         }
 
-        private static void CheckOnMap(MapDef map, SquadSpawnDef squad, int index)
+        private static void CheckOnMap(MapDef map, SquadSpawnDef squad, int index) => CheckOnMap(map, squad, index, squad.Count, string.Empty);
+
+        /// <summary>Every slot of <paramref name="squad"/> laid out for <paramref name="count"/> men is on the map and clear
+        /// of walls (<paramref name="with"/>: what the count includes, for the message).</summary>
+        private static void CheckOnMap(MapDef map, SquadSpawnDef squad, int index, int count, string with)
         {
-            for (int slot = 0; slot < squad.Count; slot++)
+            for (int slot = 0; slot < count; slot++)
             {
-                FixVec2 position = FormationLayout.SlotPosition(squad.Formation, squad.Count, slot, squad.Position, squad.Facing);
+                FixVec2 position = FormationLayout.SlotPosition(squad.Formation, count, slot, squad.Position, squad.Facing);
                 if (!map.Contains(position))
                 {
                     throw new ArgumentException(
-                        $"squads[{index}] '{squad.Name}': slot {slot} at {position} is off the {map} map; move the squad inward.");
+                        $"squads[{index}] '{squad.Name}'{with}: slot {slot} at {position} is off the {map} map; move the squad inward.");
                 }
 
                 if (Knez.Sim.Movement.Terrain.WallDepth(map, position, squad.Body.Radius) > Fix.Zero)
                 {
                     throw new ArgumentException(
-                        $"squads[{index}] '{squad.Name}': slot {slot} at {position} is in or against a wall; move the squad clear of it.");
+                        $"squads[{index}] '{squad.Name}'{with}: slot {slot} at {position} is in or against a wall; move the squad clear of it.");
                 }
             }
         }
@@ -234,8 +249,105 @@ namespace Knez.Sim.Defs
             return list.ToArray();
         }
 
-        private static ScriptedOrderDef[] CheckScript(IReadOnlyList<ScriptedOrderDef> script, SquadSpawnDef[] squads, MapDef map,
-            IReadOnlyList<FormationDef> formations)
+        /// <summary>
+        /// Retainers: unique names; experience and kit from these combat rules, starting morale above routing; a squad to
+        /// start in that exists, is of his side and has room (64 with every Retainer in it), or a place on the map clear of
+        /// walls. Messages name the entry as <c>retainers[i]</c>.
+        /// </summary>
+        private RetainerSpawnDef[] CheckRetainers(IReadOnlyList<RetainerSpawnDef> retainers, SquadSpawnDef[] squads, MapDef map)
+        {
+            var copy = new RetainerSpawnDef[retainers.Count];
+            for (int i = 0; i < copy.Length; i++)
+            {
+                RetainerSpawnDef r = retainers[i] ?? throw new ArgumentNullException(nameof(retainers), $"retainers[{i}] is null.");
+                for (int j = 0; j < i; j++)
+                {
+                    if (string.Equals(copy[j].Name, r.Name, StringComparison.Ordinal))
+                    {
+                        throw new ArgumentException($"retainers[{i}]: name '{r.Name}' is already used by retainers[{j}].");
+                    }
+                }
+
+                if (!Combat.Contains(r.Experience))
+                {
+                    throw new ArgumentException($"retainers[{i}] '{r.Name}': experience level '{r.Experience.Id}' is not the combat rules' def of that id.");
+                }
+
+                if (!Combat.Contains(r.Kit))
+                {
+                    throw new ArgumentException($"retainers[{i}] '{r.Name}': kit '{r.Kit.Id}' is not the combat rules' def of that id.");
+                }
+
+                if (r.Experience.Morale < Morale.Routing)
+                {
+                    throw new ArgumentException($"retainers[{i}] '{r.Name}': experience '{r.Experience.Id}' starts at morale {r.Experience.Morale}, below the routing threshold {Morale.Routing}: he would run at once.");
+                }
+
+                if (r.SquadName != null)
+                {
+                    SquadSpawnDef? squad = null;
+                    for (int s = 0; s < squads.Length && squad == null; s++)
+                    {
+                        squad = string.Equals(squads[s].Name, r.SquadName, StringComparison.Ordinal) ? squads[s] : null;
+                    }
+
+                    if (squad == null)
+                    {
+                        throw new ArgumentException($"retainers[{i}] '{r.Name}': no squad is named '{r.SquadName}'.");
+                    }
+
+                    if (squad.SideId != r.SideId)
+                    {
+                        throw new ArgumentException($"retainers[{i}] '{r.Name}': squad '{r.SquadName}' is side {squad.SideId}, he is side {r.SideId}.");
+                    }
+
+                    int joining = 0;
+                    for (int j = 0; j <= i && j < retainers.Count; j++)
+                    {
+                        joining += string.Equals(retainers[j]?.SquadName, r.SquadName, StringComparison.Ordinal) ? 1 : 0;
+                    }
+
+                    if (squad.Count + joining > SquadSpawnDef.MaxCount)
+                    {
+                        throw new ArgumentException($"retainers[{i}] '{r.Name}': squad '{r.SquadName}' would have more than {SquadSpawnDef.MaxCount} men.");
+                    }
+                }
+                else
+                {
+                    if (!map.Contains(r.Position))
+                    {
+                        throw new ArgumentException($"retainers[{i}] '{r.Name}': position {r.Position} is off the {map} map.");
+                    }
+
+                    if (Knez.Sim.Movement.Terrain.WallDepth(map, r.Position, r.Body.Radius) > Fix.Zero)
+                    {
+                        throw new ArgumentException($"retainers[{i}] '{r.Name}': position {r.Position} is in or against a wall.");
+                    }
+                }
+
+                copy[i] = r;
+            }
+
+            // A squad that Retainers join at spawn is laid out for all its men (§13): check that layout as its own.
+            for (int s = 0; s < squads.Length; s++)
+            {
+                int joining = 0;
+                for (int i = 0; i < copy.Length; i++)
+                {
+                    joining += string.Equals(copy[i].SquadName, squads[s].Name, StringComparison.Ordinal) ? 1 : 0;
+                }
+
+                if (joining > 0)
+                {
+                    CheckOnMap(map, squads[s], s, squads[s].Count + joining, $" with its {joining} Retainer(s)");
+                }
+            }
+
+            return copy;
+        }
+
+        private static ScriptedOrderDef[] CheckScript(IReadOnlyList<ScriptedOrderDef> script, SquadSpawnDef[] squads,
+            IReadOnlyList<RetainerSpawnDef> retainers, MapDef map, IReadOnlyList<FormationDef> formations)
         {
             var copy = new ScriptedOrderDef[script.Count];
             for (int i = 0; i < copy.Length; i++)
@@ -246,18 +358,40 @@ namespace Knez.Sim.Defs
                     throw new ArgumentException($"script[{i}]: tick {entry.Tick} comes before the previous entry's tick {copy[i - 1].Tick}; keep the script in tick order.");
                 }
 
-                bool known = false;
-                for (int s = 0; s < squads.Length && !known; s++)
+                if (entry.SquadName != null)
                 {
-                    known = string.Equals(squads[s].Name, entry.SquadName, StringComparison.Ordinal);
+                    bool known = false;
+                    for (int s = 0; s < squads.Length && !known; s++)
+                    {
+                        known = string.Equals(squads[s].Name, entry.SquadName, StringComparison.Ordinal);
+                    }
+
+                    if (!known)
+                    {
+                        throw new ArgumentException($"script[{i}]: no squad is named '{entry.SquadName}'.");
+                    }
                 }
 
-                if (!known)
+                if (entry.RetainerName != null)
                 {
-                    throw new ArgumentException($"script[{i}]: no squad is named '{entry.SquadName}'.");
+                    bool known = false;
+                    for (int r = 0; r < retainers.Count && !known; r++)
+                    {
+                        known = string.Equals(retainers[r].Name, entry.RetainerName, StringComparison.Ordinal);
+                    }
+
+                    if (!known)
+                    {
+                        throw new ArgumentException($"script[{i}]: no Retainer is named '{entry.RetainerName}'.");
+                    }
                 }
 
-                if (entry.FormationId != null)
+                if (entry.Kind == ScriptedOrderKind.DetachRetainer || entry.Kind == ScriptedOrderKind.RetainerAttack
+                    || entry.Kind == ScriptedOrderKind.AttachRetainer || entry.Kind == ScriptedOrderKind.UseAbility)
+                {
+                    // Nothing on the map to check: who may join whom, and which enemy, is checked when the order runs.
+                }
+                else if (entry.FormationId != null)
                 {
                     bool exists = false;
                     for (int f = 0; f < formations.Count && !exists; f++)
@@ -305,6 +439,12 @@ namespace Knez.Sim.Defs
             for (int i = 0; i < Script.Count; i++)
             {
                 Script[i].AddTo(ref hash);
+            }
+
+            hash.Add(Retainers.Count);
+            for (int i = 0; i < Retainers.Count; i++)
+            {
+                Retainers[i].AddTo(ref hash);
             }
 
             return hash.Value;

@@ -22,7 +22,7 @@ Read these before proposing — a design the sim can't express is a sim feature 
   morale), the seven named `kits` (each with a round shield), hit chances, position (front/flank/rear).
 - `content/defs/morale.json`, `content/defs/formations.json`.
 - `docs/battle-sim.md` §11 combat (no hit points: a blow that gets through wounds — Light / Heavy / Down),
-  §12 morale (and the planned standoff), §13 Retainers (planned, incl. the duel), §14 enemy AI (planned).
+  §12 morale (and the planned standoff), §13 Retainers (built in M3 step 10: leadership, joining and leaving squads, lone orders; abilities and the duel planned), §14 enemy AI (planned).
 
 Each def file's `description` says which numbers are agreed and which are placeholders.
 

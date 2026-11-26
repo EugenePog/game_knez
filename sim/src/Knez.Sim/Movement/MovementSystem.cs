@@ -38,13 +38,17 @@ namespace Knez.Sim.Movement
                 {
                     look = FixMath.Atan2(toEnemy.Y, toEnemy.X); // in melee he faces his enemy (decided 2026-11-23)
                 }
-                else if (relative.Length > fighter.Body.WalkPerTick || (squad == null && velocity != FixVec2.Zero))
+                else if (relative.Length > fighter.Body.WalkPerTick || (squad == null && velocity != FixVec2.Zero && !StandsAlone(fighter)))
                 {
                     look = FixMath.Atan2(velocity.Y, velocity.X);
                 }
                 else if (squad != null)
                 {
                     look = squad.Facing;
+                }
+                else if (fighter.LoneOrder.Kind == Orders.LoneOrderKind.Move && fighter.LoneOrder.HasFacing)
+                {
+                    look = fighter.LoneOrder.Facing; // a Retainer alone, arrived: he turns to the ordered facing
                 }
                 else
                 {
@@ -58,6 +62,23 @@ namespace Knez.Sim.Movement
             List<CrowdRole> roles = context.FighterRoles;
             Crowding.Fill(state, weights, roles);
             Crowding.Resolve(state, weights, roles);
+        }
+
+        /// <summary>
+        /// A Retainer standing alone with nowhere to go (battle-sim.md §13): no order, or at his move's point. Small pushes
+        /// from separation don't turn him — he keeps his facing, or turns to the ordered one — only a real shove (faster
+        /// than walking) does.
+        /// </summary>
+        private static bool StandsAlone(Fighter fighter)
+        {
+            if (!fighter.IsRetainer || !fighter.SquadId.IsNone || fighter.IsRouting)
+            {
+                return false;
+            }
+
+            Orders.LoneOrder order = fighter.LoneOrder;
+            return order.Kind == Orders.LoneOrderKind.None
+                || (order.Kind == Orders.LoneOrderKind.Move && (order.Target - fighter.Position).Length <= MovementRules.ArriveDistance);
         }
 
         /// <summary>The fighter's slot motion this tick: outer slots of a turning squad move faster than its anchor (his

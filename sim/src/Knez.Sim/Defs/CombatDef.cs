@@ -378,8 +378,9 @@ namespace Knez.Sim.Defs
             var head = new[] { new ProtectionDef("none", 0), new ProtectionDef("cap", 30), new ProtectionDef("helm", 60) };
             var levels = new[]
             {
-                new ExperienceDef("new", 0, 600), new ExperienceDef("experienced", 40, 750),
-                new ExperienceDef("professional", 80, 850), new ExperienceDef("elite", 120, 950),
+                new ExperienceDef("new", 0, 600, leadership: 0), new ExperienceDef("experienced", 40, 750, leadership: 100),
+                new ExperienceDef("professional", 80, 850, leadership: 150, retainerOnly: true),
+                new ExperienceDef("elite", 120, 950, leadership: 200, retainerOnly: true),
             };
             var hitChance = new IReadOnlyList<int>[]
             {

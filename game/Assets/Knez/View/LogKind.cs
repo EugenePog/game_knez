@@ -32,5 +32,8 @@ namespace Knez.Game.View
 
         /// <summary>The battle was decided.</summary>
         Ended,
+
+        /// <summary>A Retainer used his ability (M3 step 11).</summary>
+        Ability,
     }
 }

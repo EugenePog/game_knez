@@ -1,0 +1,11 @@
+{
+  "description": "Retainers' traits (D-025, battle-sim.md §13) and each one's active ability (D-023, M3 step 11). Every ability has an id and a cooldown (s; decided by the user 2026-11-26: 2 minutes each). Built in step 11, with the user's numbers: battle cry (proud) — own-side men within radius (m, centre to centre) gain ownMorale (up to 1000), enemies within it lose enemyMorale, at once; close ranks (cautious) — for duration (s) blows from the front at his squad's men get frontHit (permille) less often through and the squad marches at pace (a fraction); stand to the death (loyal) — for duration (s) his squad's men lose no morale. Defined but not built yet, so the AI can weigh them and each can be built after testing with the AI: promise loot (greedy), front-rank rush (bold), no quarter (cruel) — using one is refused as not-built. A lasting ability stays with the squad if he leaves it.",
+  "traits": [
+    { "id": "proud", "ability": { "id": "battle-cry", "cooldown": 120, "radius": 15, "ownMorale": 100, "enemyMorale": 50 } },
+    { "id": "cautious", "ability": { "id": "close-ranks", "cooldown": 120, "duration": 10, "frontHit": 30, "pace": 0.7 } },
+    { "id": "greedy", "ability": { "id": "promise-loot", "cooldown": 120 } },
+    { "id": "loyal", "ability": { "id": "stand-to-the-death", "cooldown": 120, "duration": 5 } },
+    { "id": "bold", "ability": { "id": "front-rank-rush", "cooldown": 120 } },
+    { "id": "cruel", "ability": { "id": "no-quarter", "cooldown": 120 } }
+  ]
+}

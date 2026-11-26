@@ -105,9 +105,10 @@ namespace Knez.Sim.Formations
         /// <summary>
         /// Gives every member of <paramref name="squad"/> a slot of its current layout (formation, frontage, narrowing,
         /// anchor and facing): front slots first, each to the nearest man not yet placed. Used when the squad changes
-        /// formation or faces about.
+        /// formation or faces about. With <paramref name="pinned"/> (a Retainer joining, battle-sim.md §13), that man has
+        /// <paramref name="pinnedSlot"/> and the others share the rest.
         /// </summary>
-        public static void Nearest(BattleState state, Squad squad)
+        public static void Nearest(BattleState state, Squad squad, Fighter? pinned = null, int pinnedSlot = Fighter.NoSlot)
         {
             List<EntityId> members = squad.MemberList;
             int count = members.Count;
@@ -118,9 +119,19 @@ namespace Knez.Sim.Formations
                 man.TurnLag = FixVec2.Zero; // the new place is picked from where he stands, so no lag carries over
             }
 
+            if (pinned != null)
+            {
+                pinned.SlotIndex = pinnedSlot;
+            }
+
             int width = FormationLayout.Width(squad.Formation, squad.Frontage, count);
             for (int slot = 0; slot < count; slot++)
             {
+                if (pinned != null && slot == pinnedSlot)
+                {
+                    continue;
+                }
+
                 FixVec2 at = FormationLayout.ToWorld(squad.Anchor, squad.Facing,
                     FormationLayout.SlotOffsetAt(squad.Formation, width, count, slot, squad.Files));
                 Fighter? best = null;

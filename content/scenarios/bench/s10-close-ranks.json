@@ -1,0 +1,17 @@
+{
+  "id": "s10-close-ranks",
+  "description": "Bench S10, close ranks (M3 step 11, battle-sim.md §13): S8 with Hrafn cautious; at the first blow (6.5 s) his line closes ranks for 10 s — blows from the front 30 permille less likely through, marching at 0.7 of its pace. Batch it against S8 (the same leader, no ability) to see what it is worth; BalanceReferenceTests pins it. Don't edit it to play.",
+  "map": {"width": 60, "height": 40},
+  "squads": [
+    {"name": "Hird line", "side": 0, "body": "man", "men": [{ "count": 7, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line", "position": [30, 12], "facing": 90},
+    {"name": "Raider line", "side": 1, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line", "position": [30, 28], "facing": 270}
+  ],
+  "retainers": [
+    { "name": "Hrafn", "side": 0, "trait": "cautious", "body": "man", "experience": "experienced", "kit": "sword-shield-padded", "squad": "Hird line" }
+  ],
+  "script": [
+    {"tick": 10, "order": "move", "squad": "Hird line", "target": [30, 30], "facing": 90},
+    {"tick": 10, "order": "move", "squad": "Raider line", "target": [30, 10], "facing": 270},
+    {"tick": 130, "order": "ability", "retainer": "Hrafn"}
+  ]
+}

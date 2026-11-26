@@ -23,14 +23,19 @@ public class BlowTests
     /// <summary>An elite man in mail and helm with sword and round shield.</summary>
     private static SquadMenDef Armoured { get; } = TestDefs.Men(1, TestDefs.Level("elite"), TestDefs.KitOf("sword-shield-mail"))[0];
 
-    /// <summary>Lone men (squads of one) at points in centimetres, each facing the given way.</summary>
+    /// <summary>Lone men (squads of one) at points in centimetres, each facing the given way. A man of a Retainer-only
+    /// level (elite, M3 step 10) stands as a Retainer alone instead; list him last, since Retainers' ids come after squads'.</summary>
     private static BattleSimulation Men(params (int side, int xCm, int yCm, int facing, SquadMenDef? def, FormationDef? formation)[] men)
     {
-        var squads = men.Select((m, i) => new SquadSpawnDef($"m{i}", m.side, TestDefs.Man, [m.def ?? TestDefs.Men(1)[0]],
-            m.formation ?? TestDefs.Line, new FixVec2(Fix.Ratio(m.xCm, 100), Fix.Ratio(m.yCm, 100)),
+        var squads = men.Where(m => m.def == null || !m.def.Experience.RetainerOnly).Select((m, i) => new SquadSpawnDef($"m{i}", m.side,
+            TestDefs.Man, [m.def ?? TestDefs.Men(1)[0]], m.formation ?? TestDefs.Line,
+            new FixVec2(Fix.Ratio(m.xCm, 100), Fix.Ratio(m.yCm, 100)), Angle.FromDegrees(m.facing))).ToArray();
+        var retainers = men.Where(m => m.def != null && m.def.Experience.RetainerOnly).Select((m, i) => RetainerSpawnDef.Alone($"r{i}",
+            m.side, TraitDef.StandardOf("loyal"), TestDefs.Man, m.def!.Experience, m.def.Kit, new FixVec2(Fix.Ratio(m.xCm, 100), Fix.Ratio(m.yCm, 100)),
             Angle.FromDegrees(m.facing))).ToArray();
         var formations = men.Select(m => m.formation ?? TestDefs.Line).Distinct().ToArray();
-        return new BattleSimulation(BattleSetup.Create(new ScenarioDef("test-men", "test", TestDefs.Map, squads, formations: formations), seed: 1));
+        return new BattleSimulation(BattleSetup.Create(new ScenarioDef("test-men", "test", TestDefs.Map, squads, formations: formations,
+            retainers: retainers), seed: 1));
     }
 
     private static Fighter Man(BattleSimulation sim, int index) => sim.State.FighterList[index];

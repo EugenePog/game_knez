@@ -59,7 +59,8 @@ namespace Knez.Sim.Combat
         /// <summary>
         /// The chance (‰) a blow by <paramref name="attacker"/> at <paramref name="defender"/> gets through: the matrix
         /// (attacker's weapon × experience), minus the defender's shield (all of it from the front, a share from flank and
-        /// rear), a shield wall's bonus from the front (with a shield), his body armour and head cover less the share the
+        /// rear), a shield wall's bonus from the front (with a shield), his squad's closed ranks from the front (M3 step 11),
+        /// his body armour and head cover less the share the
         /// attacker's weapon penetrates (truncated; M3 step 9), his experience's defence and his own weapon's defence (the
         /// spear's); plus the flank or rear bonus; minus the attacker's own wound penalty and, wavering, his morale
         /// penalty; within the limits.
@@ -79,6 +80,8 @@ namespace Knez.Sim.Combat
                     {
                         chance -= rules.ShieldWallBonus;
                     }
+
+                    chance -= Abilities.AbilityRules.FrontHitCut(state, defender); // close ranks (M3 step 11)
 
                     break;
                 case BlowSector.Flank:
