@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Knez.Sim.Content.Json;
 using Knez.Sim.Defs;
 using Knez.Sim.Numerics;
+using Knez.Sim.Orders;
 
 namespace Knez.Sim.Content
 {
@@ -24,12 +25,12 @@ namespace Knez.Sim.Content
     /// </summary>
     public static class ScenarioLoader
     {
-        private const string ScenarioMembers = "id, description, map, squads, retainers, script";
+        private const string ScenarioMembers = "id, description, ai, map, squads, retainers, script";
         private const string RetainerMembers = "name, side, trait, body, experience, kit, squad, position, facing";
         private const string ScriptMembers = "tick, order, squad, target, facing, formation";
         private const string MapMembers = "width, height, walls";
         private const string WallMembers = "from, to, kind";
-        private const string SquadMembers = "name, side, body, men, formation, position, facing";
+        private const string SquadMembers = "name, side, body, men, formation, position, facing, stance";
         private const string MenMembers = "count, experience, kit";
 
         /// <summary>Parses a scenario; throws <see cref="ContentException"/> on the first problem.</summary>
@@ -80,11 +81,18 @@ namespace Knez.Sim.Content
                 script.Add(ReadScriptedOrder(scriptItems[i], $"script[{i}]", source.Name));
             }
 
+            IReadOnlyList<JsonValue> aiItems = root.OptionalArray("ai");
+            var aiSides = new List<int>(aiItems.Count);
+            for (int i = 0; i < aiItems.Count; i++)
+            {
+                aiSides.Add(root.ToInt(aiItems[i], $"ai[{i}]"));
+            }
+
             root.RejectUnknownMembers(ScenarioMembers);
 
             // Whole-scenario checks (unique names, slots on the map, script order and squads) name the entry themselves.
             return Build(root, rootValue.Get("squads")!, () => new ScenarioDef(id, description, map, squads, script, defs.Movement, defs.Formations,
-                defs.Combat, defs.Morale, retainers));
+                defs.Combat, defs.Morale, retainers, defs.Ai, aiSides));
         }
 
         private static ScriptedOrderDef ReadScriptedOrder(JsonValue value, string path, string sourceName)
@@ -128,6 +136,22 @@ namespace Knez.Sim.Content
                     return Build(item, value, () => ScriptedOrderDef.Attach(tick, retainer, squad));
                 }
 
+                case "attack" when item.Member("squad") != null:
+                {
+                    string squad = item.RequireString("squad");
+                    string enemy = item.RequireString("enemy");
+                    item.RejectUnknownMembers("tick, order, squad, enemy");
+                    return Build(item, value, () => ScriptedOrderDef.AttackSquad(tick, squad, enemy));
+                }
+
+                case "stance":
+                {
+                    string squad = item.RequireString("squad");
+                    SquadStance stance = StanceOf(item, "stance");
+                    item.RejectUnknownMembers("tick, order, squad, stance");
+                    return Build(item, value, () => ScriptedOrderDef.SetStance(tick, squad, stance));
+                }
+
                 case "ability":
                 {
                     string retainer = item.RequireString("retainer");
@@ -152,7 +176,7 @@ namespace Knez.Sim.Content
 
                 default:
                     throw item.Error(value.Get("order")!, item.MemberPath("order"),
-                        $"unknown order '{order}' (known: move, formation, attach, detach, attack, ability)");
+                        $"unknown order '{order}' (known: move, formation, attach, detach, attack, ability, stance)");
             }
         }
 
@@ -230,6 +254,7 @@ namespace Knez.Sim.Content
             string formationId = item.RequireString("formation");
             FixVec2 position = item.RequireVec2("position");
             Angle facing = Angle.FromDegrees(item.RequireFix("facing"));
+            SquadStance stance = item.Member("stance") == null ? SquadStance.Hold : StanceOf(item, "stance");
             item.RejectUnknownMembers(SquadMembers);
 
             BodyDef? body = defs.FindBody(bodyId);
@@ -256,7 +281,7 @@ namespace Knez.Sim.Content
                     $"unknown formation '{formationId}' (known: {defs.FormationIds()})");
             }
 
-            return Build(item, value, () => new SquadSpawnDef(name, side, body, men, formation, position, facing));
+            return Build(item, value, () => new SquadSpawnDef(name, side, body, men, formation, position, facing, stance));
         }
 
         private static SquadMenDef ReadMen(JsonValue value, string path, string sourceName, CombatDef rules)
@@ -299,7 +324,23 @@ namespace Knez.Sim.Content
             return string.Join(", ", ids);
         }
 
-        /// <summary>Runs a def constructor and turns its <see cref="ArgumentException"/> into a located content error.</summary>
+        /// <summary>A stance by name: "hold", "advance" or "pursue" (M4 step 1).</summary>
+        private static SquadStance StanceOf(JsonObjectReader item, string member)
+        {
+            string stance = item.RequireString(member);
+            switch (stance)
+            {
+                case "hold":
+                    return SquadStance.Hold;
+                case "advance":
+                    return SquadStance.Advance;
+                case "pursue":
+                    return SquadStance.Pursue;
+                default:
+                    throw item.Error(item.Member(member)!, item.MemberPath(member), $"unknown stance '{stance}' (known: hold, advance, pursue)");
+            }
+        }
+
         /// <summary>A wall's optional <c>kind</c>: "house" or "obstacle" (the default).</summary>
         private static WallKind WallKindOf(JsonObjectReader wall)
         {
@@ -316,6 +357,7 @@ namespace Knez.Sim.Content
             }
         }
 
+        /// <summary>Runs a def constructor and turns its <see cref="ArgumentException"/> into a located content error.</summary>
         private static T Build<T>(JsonObjectReader reader, JsonValue at, Func<T> create)
         {
             try

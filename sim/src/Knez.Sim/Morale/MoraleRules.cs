@@ -113,9 +113,12 @@ namespace Knez.Sim.Morale
         }
 
         /// <summary>
-        /// Where a routing man heads this tick: his <see cref="RetreatPoint"/>, unless a wall stands between him and his
-        /// edge — then he runs sideways round its nearer end (an end against the map edge doesn't count), and straight on
-        /// once past it. Walls are axis-aligned boxes and edges axis-aligned lines, so "between" is a span test.
+        /// Where a routing man heads this tick (and, since M4 step 2, a man walking off the field with his squad): his
+        /// <see cref="RetreatPoint"/>, unless a wall stands between him and his edge — then he makes for the corner of its
+        /// near face at its nearer end (an end against the map edge doesn't count), and straight on once past it. The corner,
+        /// not a point straight beside him, so he gains ground every tick: aimed sideways, a man between two staggered
+        /// walls whose nearer ends point into each other's lanes swapped between them for ever (found in the M4 step 2
+        /// review). Walls are axis-aligned boxes and edges axis-aligned lines, so "between" is a span test.
         /// </summary>
         public static FixVec2 FleeTarget(BattleState state, Fighter fighter)
         {
@@ -164,7 +167,15 @@ namespace Knez.Sim.Morale
             }
 
             Fix side = !rightOk || (leftOk && across - left <= right - across) ? left : right;
-            return vertical ? new FixVec2(side, along) : new FixVec2(along, side);
+            Fix face = down ? (vertical ? block.Max.Y : block.Max.X) : (vertical ? block.Min.Y : block.Min.X);
+            return vertical ? new FixVec2(side, face) : new FixVec2(face, side);
+        }
+
+        /// <summary>The way a man faces to go to his side's retreat edge (<see cref="Edge"/>).</summary>
+        public static Angle EdgeFacing(ScenarioDef scenario, int side)
+        {
+            int edge = Edge(scenario, side);
+            return Angle.FromDegrees(edge == 0 ? 270 : edge == 1 ? 90 : edge == 2 ? 180 : 0);
         }
 
         /// <summary>True when a routing man has reached his side's map edge (as close as his body lets him).</summary>

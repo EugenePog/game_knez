@@ -13,7 +13,9 @@ namespace Knez.Sim.Movement
     /// (<see cref="Crowding.Slide"/>): men slide along bodies instead of walking into them, and along walls
     /// (<see cref="Terrain.SlideAlongWalls"/>). Passing through allied ranks is slow (<see cref="Crowding.Squeeze"/>). When the squad stands still, nobody crowds the
     /// member and its gap is under 2 cm, it steps exactly onto the slot. M3: a routing man runs for his edge; in a squad
-    /// standing in melee whose formation doesn't keep its ranks, men close in on the enemy (battle-sim.md §11).
+    /// standing in melee whose formation doesn't keep its ranks, men close in on the enemy (battle-sim.md §11). M4 step 1:
+    /// a routing man runs at the morale rules' <c>routPace</c> of his run; men of a chasing squad break ranks and run the
+    /// runners down (<c>Chase</c>).
     /// </summary>
     public sealed class SteeringSystem : ISimSystem
     {
@@ -203,6 +205,48 @@ namespace Knez.Sim.Movement
             return step <= Fix.Zero || toward == FixVec2.Zero ? FixVec2.Zero : toward.WithLength(step);
         }
 
+        /// <summary>
+        /// Pursuit (battle-sim.md §10, M4 step 1): a man of a chasing squad runs at the nearest enemy runner within the
+        /// pursuit range of where the chase began, at his run (slowed by wounds), stopping half his reach short so he
+        /// strikes; a steady enemy in reach holds him (the melee lock); at the edge of the range he stops.
+        /// </summary>
+        private static FixVec2 Chase(BattleState state, Squad squad, Fighter fighter)
+        {
+            Fighter? engaged = fighter.IsEngaged ? state.FindFighter(fighter.Target) : null;
+            if (engaged != null && !engaged.IsRouting)
+            {
+                return FixVec2.Zero;
+            }
+
+            Fix range = state.Scenario.Movement.PursuitRange;
+            Fighter? runner = null;
+            Fix best = Fix.Zero;
+            Fix reach = range * range;
+            List<Fighter> fighters = state.FighterList;
+            for (int i = 0; i < fighters.Count; i++)
+            {
+                Fighter other = fighters[i];
+                if (!Orders.OrderSystem.Chaseable(state, other, fighter.SideId) || (other.Position - squad.PursuitFrom).LengthSquared > reach)
+                {
+                    continue;
+                }
+
+                Fix d = (other.Position - fighter.Position).LengthSquared;
+                if (runner == null || d < best)
+                {
+                    runner = other; // in id order: a tie keeps the lower id
+                    best = d;
+                }
+            }
+
+            Fix run = fighter.Body.RunPerTick * Combat.Wounds.Pace(state.Scenario.Combat, fighter.Wound);
+            FixVec2 step = StepIn(fighter, runner, run);
+            // The leash: no step that takes him further out once he is past the range (toward a runner inside it, he goes).
+            Fix now = (fighter.Position - squad.PursuitFrom).LengthSquared;
+            Fix next = (fighter.Position + step - squad.PursuitFrom).LengthSquared;
+            return next > reach && next > now ? FixVec2.Zero : step;
+        }
+
         private static bool SquadInMelee(BattleState state, TickContext context, EntityId squadId)
         {
             if (squadId.IsNone)
@@ -282,9 +326,11 @@ namespace Knez.Sim.Movement
         {
             if (fighter.IsRouting)
             {
-                // Routing (battle-sim.md §12): run for his side's map edge, ignoring his squad and its orders.
+                // Routing (battle-sim.md §12): run for his side's map edge, ignoring his squad and its orders — at routPace of
+                // his run (M4 step 1: 0.9, so a pursuer at full run catches some).
                 FixVec2 away = Morale.MoraleRules.FleeTarget(state, fighter) - fighter.Position;
-                return (away == FixVec2.Zero ? FixVec2.Zero : away.WithLength(fighter.Body.RunPerTick)) + separation;
+                Fix flee = fighter.Body.RunPerTick * state.Scenario.Morale.RoutPace;
+                return (away == FixVec2.Zero ? FixVec2.Zero : away.WithLength(flee)) + separation;
             }
 
             Squad? squad = fighter.SquadId.IsNone ? null : state.FindSquad(fighter.SquadId);
@@ -296,6 +342,25 @@ namespace Knez.Sim.Movement
             if (squad.Broken)
             {
                 return separation; // a man who rallied while his squad is broken stands where he stopped, until it re-forms
+            }
+
+            if (squad.Leaving && squad.Order.Kind == Orders.SquadOrderKind.None)
+            {
+                // M4 step 2: its march off the field has ended — at the edge, or as near as its route got (a wall against
+                // the edge) — so its men walk the last stretch one by one, round a wall in the way as runners do, and each
+                // leaves at the edge (cleanup).
+                FixVec2 off = Morale.MoraleRules.FleeTarget(state, fighter) - fighter.Position;
+                Fix pace = fighter.Body.WalkPerTick * Combat.Wounds.Pace(state.Scenario.Combat, fighter.Wound);
+                if (fighter.IsEngaged)
+                {
+                    pace = pace * state.Scenario.Movement.StepBackPace; // out of a melee as a withdrawing squad steps back
+                }
+                return (off == FixVec2.Zero ? FixVec2.Zero : off.WithLength(FixMath.Min(off.Length, pace))) + separation;
+            }
+
+            if (squad.Pursuing && fighter.MoraleState != Morale.MoraleState.Rallying)
+            {
+                return Chase(state, squad, fighter) + separation; // M4 step 1: ranks broken, running the runners down
             }
 
             // A slot past the map edge or inside a wall is reached as close as a body fits, on the squad's side of the

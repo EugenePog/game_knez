@@ -17,8 +17,10 @@ namespace Knez.Sim.Defs
         }
 
         private ScriptedOrderDef(ScriptedOrderKind kind, int tick, string? squadName, string? retainerName, FixVec2 target,
-            Angle? facing, string? formationId, EntityId enemy)
+            Angle? facing, string? formationId, EntityId enemy, string? enemySquadName = null, Orders.SquadStance stance = Orders.SquadStance.Hold)
         {
+            EnemySquadName = enemySquadName;
+            Stance = stance;
             Kind = kind;
             Tick = DefChecks.Range(tick, 1, int.MaxValue, nameof(tick));
             SquadName = squadName;
@@ -38,6 +40,16 @@ namespace Knez.Sim.Defs
         public static ScriptedOrderDef Attach(int tick, string retainerName, string squadName) =>
             new ScriptedOrderDef(ScriptedOrderKind.AttachRetainer, tick, DefChecks.Id(squadName, "squad"),
                 DefChecks.Id(retainerName, "retainer"), FixVec2.Zero, null, null, EntityId.None);
+
+        /// <summary>The squad <paramref name="squadName"/> attacks the enemy squad <paramref name="enemySquadName"/> (M4 step 1).</summary>
+        public static ScriptedOrderDef AttackSquad(int tick, string squadName, string enemySquadName) =>
+            new ScriptedOrderDef(ScriptedOrderKind.AttackSquad, tick, DefChecks.Id(squadName, "squad"), null, FixVec2.Zero, null, null,
+                EntityId.None, DefChecks.Id(enemySquadName, "enemy"));
+
+        /// <summary>The squad <paramref name="squadName"/> takes <paramref name="stance"/> (M4 step 1).</summary>
+        public static ScriptedOrderDef SetStance(int tick, string squadName, Orders.SquadStance stance) =>
+            new ScriptedOrderDef(ScriptedOrderKind.SetStance, tick, DefChecks.Id(squadName, "squad"), null, FixVec2.Zero, null, null,
+                EntityId.None, null, stance);
 
         /// <summary>The Retainer <paramref name="retainerName"/> uses his ability (M3 step 11).</summary>
         public static ScriptedOrderDef Ability(int tick, string retainerName) =>
@@ -80,8 +92,14 @@ namespace Knez.Sim.Defs
         /// <summary>Facing on arrival, or null for the march direction.</summary>
         public Angle? Facing { get; }
 
-        /// <summary>The enemy fighter of an attack.</summary>
+        /// <summary>The enemy fighter of a Retainer's attack.</summary>
         public EntityId Enemy { get; }
+
+        /// <summary>The enemy squad of a squad's attack (M4 step 1), else null.</summary>
+        public string? EnemySquadName { get; }
+
+        /// <summary>The stance of a stance order (M4 step 1).</summary>
+        public Orders.SquadStance Stance { get; }
 
         internal void AddTo(ref Fnv1a64 hash)
         {
@@ -95,6 +113,8 @@ namespace Knez.Sim.Defs
             hash.Add(Facing.HasValue ? (int)Facing.Value.Raw : 0);
             hash.Add(FormationId ?? string.Empty);
             hash.Add(Enemy.Value);
+            hash.Add(EnemySquadName ?? string.Empty);
+            hash.Add((int)Stance);
         }
     }
 }

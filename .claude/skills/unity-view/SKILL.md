@@ -17,6 +17,7 @@ game/
     View/   Knez.Game.View.asmdef      → references Knez.Sim
     Input/  Knez.Game.Input.asmdef     → references Knez.Sim, Knez.Game.View
     Tests/  Knez.Game.Tests.asmdef     → EditMode tests (golden replays in Unity)
+    Art/Resources/                     sprites, art-manifest.json, palette.json (docs/art-pipeline.md)
 ```
 
 `sim/src/Knez.Sim` carries `package.json` and `Knez.Sim.asmdef` (`"noEngineReferences": true`) so Unity compiles
@@ -39,8 +40,11 @@ inside the package folder (`Directory.Build.props` redirects it to `sim/artifact
    Pause = stop stepping; commands are still accepted while paused.
 4. **`Fix` → `float` conversion happens in the view** (`FixViewExtensions.ToFloat()`), never in `sim/src`.
 5. **No gameplay in Unity:** no NavMesh, no Rigidbody/Collider for fighters, no animation-driven timing.
-6. **Phase 1 look:** primitives only — circles, facing ticks, squad colours, order arrows, morale bars, a battle log.
-   No art, no asset-store packages without asking.
+6. **Phase 1 look:** the designed art over the primitives (asked for on 2026-11-26): every man a token sprite over his
+   squad-coloured disc, houses and rocks as map sprites over their walls — the rules, fallbacks and how to add art are in
+   [docs/art-pipeline.md](../../../docs/art-pipeline.md). Mapping logic (sim state → sprite) stays plain C#
+   (`FighterArt`, `WallArt`) with tests in `ArtTests`. Order arrows, morale bars, rings and the battle log are unchanged.
+   No new art, animation or asset-store packages without asking.
 7. **What the view remembers lives in `BattleRecord`** (M3 step 8): `SquadTally` (who started where, blows),
    `MoraleLedger` (per man, morale moved by reason since the start or his squad's last re-form) and `BattleLog` (the
    battle in words), all plain C# fed from events after each tick; the words come from `HudText`. Keep logic there,

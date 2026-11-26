@@ -17,7 +17,7 @@ namespace Knez.Sim.Defs
         public MovementDef(Fix pivotTolerance, Fix slotCatchUpTime, Fix personalSpace, Fix separationTime, Fix holdingReach,
             Fix formedUpReach, int collisionPasses, Fix allyPartingDepth, int pathBudget, Fix regroupLead,
             Fix regroupMaxWait, Fix regroupCost, Fix reformPace, Fix stepBackPace, Fix withdrawClearance, Fix closeInRange,
-            Fix turnLagTime)
+            Fix turnLagTime, Fix advanceRange, Fix pursuitTime, Fix pursuitRange)
         {
             PivotTolerance = DefChecks.Positive(pivotTolerance, 90, "°", nameof(pivotTolerance));
             SlotCatchUpTicks = DefChecks.Ticks(slotCatchUpTime, 5, nameof(slotCatchUpTime));
@@ -41,6 +41,9 @@ namespace Knez.Sim.Defs
             }
 
             TurnLagTicks = turnLagTime == Fix.Zero ? 0 : DefChecks.Ticks(turnLagTime, 20, nameof(turnLagTime));
+            AdvanceRange = DefChecks.PositiveMetres(advanceRange, 100, nameof(advanceRange));
+            PursuitTicks = DefChecks.Ticks(pursuitTime, 120, nameof(pursuitTime));
+            PursuitRange = DefChecks.PositiveMetres(pursuitRange, 250, nameof(pursuitRange));
         }
 
         /// <summary>
@@ -65,7 +68,10 @@ namespace Knez.Sim.Defs
             stepBackPace: Fix.Ratio(1, 2),
             withdrawClearance: Fix.FromInt(3),
             closeInRange: Fix.FromInt(3),
-            turnLagTime: Fix.FromInt(4));
+            turnLagTime: Fix.FromInt(4),
+            advanceRange: Fix.FromInt(15),
+            pursuitTime: Fix.FromInt(10),
+            pursuitRange: Fix.FromInt(30));
 
         /// <summary>A squad turns in place until its target is within this many degrees of its front, then marches.</summary>
         public Fix PivotTolerance { get; }
@@ -138,6 +144,16 @@ namespace Knez.Sim.Defs
         /// </summary>
         public int TurnLagTicks { get; }
 
+        /// <summary>Stances (M4 step 1, decided 2026-11-26: 15 m): a squad in Advance or Pursue with no order goes at the
+        /// nearest enemy squad whose man is within this of one of its own (edge to edge, metres).</summary>
+        public Fix AdvanceRange { get; }
+
+        /// <summary>Pursuit (M4 step 1, decided 2026-11-26: 10 s): a chase lasts at most this many ticks.</summary>
+        public int PursuitTicks { get; }
+
+        /// <summary>Pursuit (M4 step 1, decided 2026-11-26: 30 m): men chase only within this of where the chase began.</summary>
+        public Fix PursuitRange { get; }
+
         internal void AddTo(ref Fnv1a64 hash)
         {
             hash.Add(PivotTolerance.Raw);
@@ -157,6 +173,9 @@ namespace Knez.Sim.Defs
             hash.Add(WithdrawClearance.Raw);
             hash.Add(CloseInRange.Raw);
             hash.Add(TurnLagTicks);
+            hash.Add(AdvanceRange.Raw);
+            hash.Add(PursuitTicks);
+            hash.Add(PursuitRange.Raw);
         }
     }
 }

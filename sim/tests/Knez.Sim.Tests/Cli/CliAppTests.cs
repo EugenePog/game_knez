@@ -73,6 +73,8 @@ public class CliAppTests
     [TestCase(new[] { "batch", "x.json", "--runs", "3" }, "unknown option")]
     [TestCase(new[] { "bench", "x.json", "--runs", "0" }, "--runs needs a positive whole number")]
     [TestCase(new[] { "bench", "x.json", "--seeds", "1-2" }, "unknown option")]
+    [TestCase(new[] { "run", "x.json", "--ai", "two" }, "--ai needs the sides the AI plays")]
+    [TestCase(new[] { "batch", "x.json", "--ai" }, "--ai needs the sides the AI plays")]
     public void BadArguments_ExitWithUsageCodeAndExplain(string[] args, string message)
     {
         var (exit, _, stderr) = Invoke(args);
@@ -137,6 +139,25 @@ public class CliAppTests
             Assert.That(root.GetProperty("slotError").GetProperty("worst").GetDouble(), Is.GreaterThanOrEqualTo(0));
             Assert.That(root.GetProperty("engaged").GetProperty("openOrders").GetInt32(), Is.GreaterThan(0), "100 ticks: still marching");
             Assert.That(root.TryGetProperty("longestFarFromSlotTicks", out _), Is.True);
+        });
+    }
+
+    [Test]
+    public void Ai_OverridesTheScenariosSides_DroppingTheirScriptOrders()
+    {
+        string s6 = RepoPaths.Scenario("bench/s6-lines"); // scripted: both lines are ordered to close
+        var (plainExit, plain, _) = Invoke("run", s6, "--ticks", "200", "--json");
+        var (aiExit, ai, _) = Invoke("run", s6, "--ticks", "200", "--ai", "0,1", "--json");
+        var (noneExit, none, _) = Invoke("run", RepoPaths.Scenario("m4/m4-ai"), "--ticks", "200", "--ai", "none", "--json");
+        var (badExit, _, badErr) = Invoke("run", s6, "--ai", "5");
+        string Hash(string json) => System.Text.Json.JsonDocument.Parse(json).RootElement.GetProperty("finalHash").GetString()!;
+        Assert.Multiple(() =>
+        {
+            Assert.That((plainExit, aiExit, noneExit), Is.EqualTo((CliApp.ExitOk, CliApp.ExitOk, CliApp.ExitOk)));
+            Assert.That(Hash(ai), Is.Not.EqualTo(Hash(plain)), "the AI plays both lines instead of the script");
+            Assert.That(Hash(none), Is.Not.Empty);
+            Assert.That(badExit, Is.EqualTo(CliApp.ExitUsage));
+            Assert.That(badErr, Does.Contain("side 5 has no squads"));
         });
     }
 

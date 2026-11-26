@@ -13,6 +13,39 @@ namespace Knez.Sim.Formations
     internal static class SlotAssignment
     {
         /// <summary>
+        /// Re-forms <paramref name="squad"/> where its men stand (a broken squad rallying, §12; a chase ending, M4 step 1): the
+        /// anchor moves to the centre of its living men not running — fitted like a move order's target, the whole formation
+        /// on the map and the anchor clear of walls, or some places can't be reached and the men walking to them never count
+        /// as back — and places go to the nearest men. Nothing when no such man is left.
+        /// </summary>
+        internal static void ReformAtCentre(BattleState state, Squad squad)
+        {
+            long x = 0;
+            long y = 0;
+            int n = 0;
+            List<EntityId> members = squad.MemberList;
+            for (int m = 0; m < members.Count; m++)
+            {
+                Fighter? man = state.FindFighter(members[m]);
+                if (man != null && man.IsAlive && !man.IsRouting)
+                {
+                    x += man.Position.X.Raw;
+                    y += man.Position.Y.Raw;
+                    n++;
+                }
+            }
+
+            if (n > 0)
+            {
+                var centre = new FixVec2(Fix.FromRaw(x / n), Fix.FromRaw(y / n));
+                FixVec2 anchor = Commands.MoveSquadCommand.FitInside(state, squad, centre, squad.Facing);
+                Fighter? any = state.FindFighter(members[0]);
+                squad.Anchor = Movement.Terrain.Constrain(state.Scenario.Map, anchor, any != null ? any.Radius : Fix.Zero);
+                Nearest(state, squad);
+            }
+        }
+
+        /// <summary>
         /// Drops the dead from <paramref name="squad"/> and closes the gaps they leave: each gap, front rank first, is filled
         /// by the nearest man (sideways) from the nearest rank behind that still has men, whose own place then becomes a gap
         /// in turn, so the gaps end up in the rear rank. The front keeps its width until fewer men are left than its files.

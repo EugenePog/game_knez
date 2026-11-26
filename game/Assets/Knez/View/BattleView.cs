@@ -24,11 +24,21 @@ namespace Knez.Game.View
     /// a gold ring round every Retainer; he takes the colour of the squad he is in, a dark side colour while he stands
     /// alone, and a thin gold line shows where a lone Retainer is going (or whom he is going at). M3 step 11: a battle cry
     /// shows as a gold disc as wide as its reach, fading out where he gave it.
+    /// Art (2026-11-26, docs/art-pipeline.md): with <see cref="useArt"/> on, every man also wears a token from
+    /// <c>Art/Resources</c> — his side's shield, his kit, a Retainer's own look — turned with his facing, over his squad's
+    /// disc as a base; houses and rocks get map sprites over their footprint, and the grass of the art's palette is the
+    /// ground. Anything the art lacks keeps the primitive; the overlays above are unchanged.
     /// </summary>
     public sealed class BattleView : MonoBehaviour
     {
         [SerializeField] private BattleRunner? runner;
         [SerializeField] private Camera? viewCamera;
+
+        [Tooltip("Draw the art from Assets/Knez/Art/Resources (tokens, buildings, rocks); off = the plain shapes only. Read when the battle is built.")]
+        [SerializeField] private bool useArt = true;
+
+        [Tooltip("The art side each sim side wears, by side id: clan, ruler or bandits (docs/art-pipeline.md).")]
+        [SerializeField] private string[] sideArt = { "clan", "ruler" };
 
         private static readonly Color[] SideZero = { new Color(0.20f, 0.45f, 0.85f), new Color(0.15f, 0.60f, 0.45f), new Color(0.45f, 0.35f, 0.80f), new Color(0.10f, 0.55f, 0.75f) };
         private static readonly Color[] SideOne = { new Color(0.80f, 0.25f, 0.20f), new Color(0.85f, 0.55f, 0.15f), new Color(0.65f, 0.20f, 0.45f), new Color(0.70f, 0.40f, 0.25f) };
@@ -38,6 +48,17 @@ namespace Knez.Game.View
         private static readonly Color Obstacle = new Color(0.43f, 0.45f, 0.47f); // stone
         private static readonly Color[] Lone = { new Color(0.10f, 0.18f, 0.45f), new Color(0.45f, 0.09f, 0.08f) }; // a Retainer alone, by side
         private static readonly Color Gold = new Color(0.83f, 0.63f, 0.09f);
+        private static readonly Color Running = new Color(1f, 1f, 1f, 0.65f); // a running man's token
+        private static readonly Color Departed = new Color(1f, 1f, 1f, 0.3f); // a man who fled or left the field: a faint token
+        private const float PlotAlpha = 0.35f; // a wall's footprint under its art: what the sim blocks
+        private const int PlotOrder = -5; // over the ground (-10), under the selection halo (-1) and the art (0)
+        private const int TokenOrder = 3; // over his base (2), under his wound (4)
+        private const int LyingOrder = 2; // a fallen or departed man's token: under the living men's tokens, over a Retainer's ring (1)
+        private const float BaseScale = 1.25f; // with a token on, the squad's disc shows as a rim round it (x the body)
+
+        private readonly List<SpriteRenderer?> _tokens = new List<SpriteRenderer?>(); // a man's art token; null = primitive only
+        private readonly List<WallSprite> _placed = new List<WallSprite>();
+        private readonly List<Sprite> _wallSprites = new List<Sprite>();
 
         private readonly List<Transform> _bodies = new List<Transform>();
         private readonly List<SpriteRenderer> _bodyRenderers = new List<SpriteRenderer>();
@@ -99,14 +120,17 @@ namespace Knez.Game.View
 
             BattleState state = sim.State;
             MapDef map = state.Scenario.Map;
-            Make("Ground", ShapeSprites.Square, Ground, -10, new Vector2(map.Width.ToFloat() / 2, map.Height.ToFloat() / 2),
-                new Vector2(map.Width.ToFloat(), map.Height.ToFloat()));
+            ArtLibrary? art = useArt ? new ArtLibrary() : null;
+            if (art != null && art.Problem != null)
+            {
+                Debug.LogWarning("Art: " + art.Problem + " — drawing the plain shapes");
+            }
+
+            Make("Ground", ShapeSprites.Square, art != null ? art.MapColour("grass", Ground) : Ground, -10,
+                new Vector2(map.Width.ToFloat() / 2, map.Height.ToFloat() / 2), new Vector2(map.Width.ToFloat(), map.Height.ToFloat()));
             foreach (WallDef wall in map.Walls)
             {
-                Vector2 min = wall.Min.ToVector2();
-                Vector2 max = wall.Max.ToVector2();
-                bool house = wall.Kind == WallKind.House;
-                Make(house ? "House" : "Obstacle", ShapeSprites.Square, house ? House : Obstacle, 0, (min + max) / 2, max - min);
+                Wall(wall, art);
             }
 
             int zero = 0;
@@ -141,6 +165,15 @@ namespace Knez.Game.View
                 tick.transform.SetParent(body.transform, false);
                 tick.transform.localPosition = new Vector3(0.3f, 0, 0); // local units: the body is one unit across
                 tick.transform.localScale = new Vector3(0.45f, 0.14f, 1);
+                SpriteRenderer? token = art != null ? Token(art, fighter, state.Scenario.Combat.Kits, body.transform) : null;
+                if (token != null)
+                {
+                    tick.enabled = false; // the token faces where he faces
+                    body.transform.localScale = new Vector3(diameter * BaseScale, diameter * BaseScale, 1);
+                    token.transform.localScale = new Vector3(1 / (diameter * BaseScale), 1 / (diameter * BaseScale), 1);
+                }
+
+                _tokens.Add(token);
                 // Under the walls (0), over the ground (-10): a Retainer's ring (1) shows inside it.
                 SpriteRenderer halo = Make("Selected", ShapeSprites.Disc, new Color(1f, 1f, 0.85f, 0.9f), -1, Vector2.zero, Vector2.one);
                 halo.transform.SetParent(body.transform, false);
@@ -332,6 +365,15 @@ namespace Knez.Game.View
                 _bodies[i].position = Vector2.Lerp(_previous[i], _current[i], t);
                 _bodies[i].rotation = Quaternion.Euler(0, 0, Mathf.LerpAngle(_previousFacing[i], _currentFacing[i], t));
                 _bodyRenderers[i].color = Colour(fighter);
+                SpriteRenderer? token = _tokens[i];
+                if (token != null)
+                {
+                    TokenState look = FighterArt.State(fighter);
+                    token.color = TokenColour(look);
+                    token.sortingOrder = look == TokenState.Fallen || look == TokenState.Gone ? LyingOrder : TokenOrder;
+                    _bodyRenderers[i].enabled = look == TokenState.Fighting || look == TokenState.Routing; // his squad's base
+                }
+
                 _halos[i].enabled = fighter.IsAlive && (fighter.IsRetainer && fighter.Id == _selectedRetainer
                     || !fighter.SquadId.IsNone && _selection.Contains(fighter.SquadId));
                 SpriteRenderer? ring = _rings[i];
@@ -347,6 +389,7 @@ namespace Knez.Game.View
                 if (hurt)
                 {
                     float size = fighter.Wound == WoundLevel.Heavy ? 0.55f : 0.3f; // local units: the body is one unit across
+                    size /= _tokens[i] != null ? BaseScale : 1f; // the same size in metres when the base is widened
                     _wounds[i].transform.localScale = new Vector3(size, size, 1);
                 }
             }
@@ -497,6 +540,74 @@ namespace Knez.Game.View
             }
 
             return fighter.IsRetainer ? Lone[fighter.SideId == 0 ? 0 : 1] : Color.grey;
+        }
+
+        /// <summary>
+        /// A wall: its map art (<see cref="WallArt"/>) over its footprint, the footprint kept as a faint plot in its kind's
+        /// colour so what the sim blocks stays visible; with no art for it, the plain rectangle as before.
+        /// </summary>
+        private void Wall(WallDef wall, ArtLibrary? art)
+        {
+            Vector2 min = wall.Min.ToVector2();
+            Vector2 max = wall.Max.ToVector2();
+            bool house = wall.Kind == WallKind.House;
+            Color colour = house ? House : Obstacle;
+            _placed.Clear();
+            _wallSprites.Clear();
+            bool drawn = art != null && WallArt.Place(art.Catalog, wall.Kind, min.x, min.y, max.x, max.y, _placed);
+            for (int p = 0; drawn && p < _placed.Count; p++)
+            {
+                Sprite? sprite = art!.Sprite(_placed[p].Sprite);
+                if (sprite == null)
+                {
+                    drawn = false;
+                }
+                else
+                {
+                    _wallSprites.Add(sprite);
+                }
+            }
+
+            Make(house ? "House" : "Obstacle", ShapeSprites.Square, drawn ? new Color(colour.r, colour.g, colour.b, PlotAlpha) : colour,
+                drawn ? PlotOrder : 0, (min + max) / 2, max - min);
+            for (int p = 0; drawn && p < _placed.Count; p++)
+            {
+                WallSprite placed = _placed[p];
+                SpriteRenderer drawing = Make((house ? "House art " : "Obstacle art ") + placed.ObjectId, _wallSprites[p], Color.white, 0,
+                    new Vector2(placed.X, placed.Y), new Vector2(placed.Scale, placed.Scale));
+                drawing.transform.rotation = Quaternion.Euler(0, 0, placed.Rotation);
+            }
+        }
+
+        /// <summary>A man's art token as a child of his body, or null when the art has none for him (he stays a disc).</summary>
+        private SpriteRenderer? Token(ArtLibrary art, Fighter fighter, IReadOnlyList<KitDef> kits, Transform body)
+        {
+            Sprite? sprite = art.Sprite(FighterArt.Token(art.Catalog, fighter, FighterArt.Side(sideArt, fighter.SideId), kits));
+            if (sprite == null)
+            {
+                return null;
+            }
+
+            SpriteRenderer token = Make("Token", sprite, Color.white, TokenOrder, Vector2.zero, Vector2.one);
+            token.transform.SetParent(body, false);
+            token.transform.localPosition = Vector3.zero;
+            token.transform.localRotation = Quaternion.Euler(0, 0, -90); // drawn facing north; the body turns with his facing (0° = east)
+            return token; // the caller sets the scale that undoes the body's: the sprite is drawn in metres
+        }
+
+        private static Color TokenColour(TokenState look)
+        {
+            switch (look)
+            {
+                case TokenState.Routing:
+                    return Running;
+                case TokenState.Fallen:
+                    return Fallen;
+                case TokenState.Gone:
+                    return Departed;
+                default:
+                    return Color.white;
+            }
         }
 
         private void FitCamera(MapDef map)

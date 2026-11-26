@@ -15,13 +15,19 @@ namespace Knez.Game.Input
     /// <see cref="BattleSimulation.Enqueue"/>; nothing here writes the state.
     /// <list type="bullet">
     /// <item>Left click: select a squad of yours (Shift adds); left drag: box-select; Esc: clear.</item>
-    /// <item>Right click: move there; right drag: move there facing the drag's direction.</item>
+    /// <item>Right click: move there; right drag: move there facing the drag's direction; on an enemy man: attack his
+    /// squad (M4 step 1).</item>
+    /// <item>H / G / P: the selected squads hold, advance (go at enemies within 15 m on their own) or pursue (advance, and
+    /// run the runners down when the enemy breaks) (M4 step 1).</item>
     /// <item>1 / 2 / 3: line, shield wall, column (formations from the scenario's catalogue).</item>
     /// <item>Space: pause; = / −: faster / slower.</item>
     /// <item>L: battle log on/off; B: morale bars over the men on/off (M3 step 8).</item>
-    /// <item>Retainers (M3 step 10): drag one onto a squad of yours to join it, onto open ground to leave his squad and
-    /// walk there; click one to select him, then right-click: ground — walk there (drag: facing), an enemy — go at him, a
-    /// squad of yours — join it; X: leave his squad; Q (or the HUD's button): his ability (M3 step 11).</item>
+    /// <item>Retainers (M3 step 10): one in a squad is chained to it (<see cref="RetainerChains"/>): clicks and drags on
+    /// him mean his squad, its orders move him with it, and Q with the squad selected uses his ability. U (or the HUD's
+    /// button) unchains him — selected on his own — and chains him back. A Retainer on his own (alone, or unchained): drag
+    /// him onto a squad of yours to join it, onto open ground to leave his squad and walk there; click him to select him,
+    /// then right-click: ground — walk there (drag: facing), an enemy — go at him, a squad of yours — join it; X: leave his
+    /// squad; Q (or the HUD's button): his ability (M3 step 11). Joining a squad chains him again.</item>
     /// <item>Clicks and the wheel over the HUD's panels (<see cref="BattleHud.Covers"/>) don't reach the map.</item>
     /// <item>WASD or arrows, or middle drag: pan; scroll: zoom.</item>
     /// </list>
@@ -43,9 +49,13 @@ namespace Knez.Game.Input
         private LineRenderer? _dragLine;
         private Vector2? _rightDown;
         private SpriteRenderer? _box;
+        private readonly RetainerChains _ownChains = new RetainerChains(); // only without a HUD
 
         /// <summary>The selected squads, by id.</summary>
         public IReadOnlyList<EntityId> Selected => _selected;
+
+        /// <summary>Which Retainers are chained to their squads: the HUD's, so its buttons and these keys agree.</summary>
+        public RetainerChains Chains => hud != null ? hud.Chains : _ownChains;
 
         private void Start()
         {
@@ -85,6 +95,20 @@ namespace Knez.Game.Input
             _dragLine.positionCount = 2;
             _dragLine.useWorldSpace = true;
             _dragLine.enabled = false;
+            if (hud != null)
+            {
+                hud.RetainerPicked += SelectRetainer;
+                hud.SquadPicked += SelectSquad;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (hud != null)
+            {
+                hud.RetainerPicked -= SelectRetainer;
+                hud.SquadPicked -= SelectSquad;
+            }
         }
 
         /// <summary>The selected Retainer, or none.</summary>
@@ -101,9 +125,12 @@ namespace Knez.Game.Input
             }
 
             DropDeadRetainer(sim.State);
+            Chains.Forget(sim.State);
+            FollowChain(sim.State);
             if (hud != null)
             {
-                hud.SelectedRetainer = _selectedRetainer; // the HUD draws his ability's button
+                hud.SelectedRetainer = _selectedRetainer; // the HUD draws buttons for the selection's Retainers
+                hud.SelectedSquads = _selected;
                 hud.PlayerSide = side;
             }
 
@@ -115,7 +142,7 @@ namespace Knez.Game.Input
             if (mouse.leftButton.wasPressedThisFrame && !overHud)
             {
                 _leftDown = world;
-                _draggedRetainer = RetainerOrders.At(sim.State, world, side); // a press on a Retainer drags him
+                _draggedRetainer = RetainerOrders.At(sim.State, world, side, Chains); // a press on a Retainer on his own drags him
             }
 
             if (!_draggedRetainer.IsNone && _leftDown.HasValue && _dragLine != null)
@@ -180,7 +207,11 @@ namespace Knez.Game.Input
             {
                 List<ICommand> commands = !_selectedRetainer.IsNone
                     ? RetainerOrders.Order(sim.State, _selectedRetainer, _rightDown.Value, world, side)
-                    : OrderBuilder.Moves(sim.State, _selected, _rightDown.Value, world, side);
+                    : OrderBuilder.Attacks(sim.State, _selected, _rightDown.Value, side);
+                if (commands.Count == 0 && _selectedRetainer.IsNone)
+                {
+                    commands = OrderBuilder.Moves(sim.State, _selected, _rightDown.Value, world, side);
+                }
                 foreach (ICommand command in commands)
                 {
                     runner.Enqueue(command);
@@ -203,6 +234,60 @@ namespace Knez.Game.Input
             {
                 view.SetSelection(_selected);
                 view.SetSelectedRetainer(retainer);
+            }
+        }
+
+        /// <summary>Selects one squad of yours alone (a Retainer chained back to it).</summary>
+        private void SelectSquad(EntityId squad)
+        {
+            SelectRetainer(EntityId.None);
+            _selected.Clear();
+            _selected.Add(squad);
+            if (view != null)
+            {
+                view.SetSelection(_selected);
+            }
+        }
+
+        /// <summary>A selected Retainer who has become chained (he joined a squad) hands the selection to his squad.</summary>
+        private void FollowChain(BattleState state)
+        {
+            Fighter? selected = _selectedRetainer.IsNone ? null : state.FindFighter(_selectedRetainer);
+            if (selected != null && Chains.IsChained(selected))
+            {
+                SelectSquad(selected.SquadId);
+            }
+        }
+
+        /// <summary>U: unchains the selected squads' Retainers (selecting him when it is one), or chains the selected one back.</summary>
+        private void ToggleChain(BattleState state)
+        {
+            Fighter? selected = _selectedRetainer.IsNone ? null : state.FindFighter(_selectedRetainer);
+            if (selected != null)
+            {
+                if (!selected.SquadId.IsNone)
+                {
+                    Chains.Chain(selected.Id);
+                    SelectSquad(selected.SquadId);
+                }
+
+                return;
+            }
+
+            var freed = new List<Fighter>();
+            foreach (EntityId squad in _selected)
+            {
+                freed.AddRange(Chains.ChainedTo(state, squad));
+            }
+
+            foreach (Fighter retainer in freed)
+            {
+                Chains.Unchain(retainer.Id);
+            }
+
+            if (freed.Count == 1)
+            {
+                SelectRetainer(freed[0].Id);
             }
         }
 
@@ -274,9 +359,39 @@ namespace Knez.Game.Input
                 runner!.Enqueue(new DetachRetainerCommand(side, _selectedRetainer)); // X: he leaves his squad
             }
 
-            if (keyboard.qKey.wasPressedThisFrame && !_selectedRetainer.IsNone)
+            if (keyboard.qKey.wasPressedThisFrame)
             {
-                runner!.Enqueue(new UseAbilityCommand(side, _selectedRetainer)); // Q: his ability
+                if (!_selectedRetainer.IsNone)
+                {
+                    runner!.Enqueue(new UseAbilityCommand(side, _selectedRetainer)); // Q: his ability
+                }
+                else
+                {
+                    foreach (EntityId squad in _selected)
+                    {
+                        foreach (Fighter retainer in Chains.ChainedTo(sim.State, squad))
+                        {
+                            runner!.Enqueue(new UseAbilityCommand(side, retainer.Id)); // with his squad selected: its Retainers'
+                        }
+                    }
+                }
+            }
+
+            if (keyboard.uKey.wasPressedThisFrame)
+            {
+                ToggleChain(sim.State);
+            }
+
+            Knez.Sim.Orders.SquadStance? stance = keyboard.hKey.wasPressedThisFrame ? Knez.Sim.Orders.SquadStance.Hold
+                : keyboard.gKey.wasPressedThisFrame ? Knez.Sim.Orders.SquadStance.Advance
+                : keyboard.pKey.wasPressedThisFrame ? Knez.Sim.Orders.SquadStance.Pursue
+                : (Knez.Sim.Orders.SquadStance?)null;
+            if (stance.HasValue)
+            {
+                foreach (EntityId id in _selected)
+                {
+                    runner!.Enqueue(new SetStanceCommand(side, id, stance.Value)); // H / G / P (M4 step 1)
+                }
             }
 
             if (keyboard.escapeKey.wasPressedThisFrame)

@@ -155,6 +155,10 @@ namespace Knez.Game.View
                 {
                     stats.Fled++;
                 }
+                else if (fighter.MoraleState == MoraleState.Left)
+                {
+                    stats.Left++;
+                }
                 else if (fighter.IsAlive)
                 {
                     stats.InFight++;

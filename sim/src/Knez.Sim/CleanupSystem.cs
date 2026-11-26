@@ -5,7 +5,8 @@ using Knez.Sim.Units;
 namespace Knez.Sim
 {
     /// <summary>
-    /// Tick stage 12: squad bookkeeping after the tick's deaths (battle-sim.md §9, §10): the fallen leave their squad and
+    /// Tick stage 12: squad bookkeeping after the tick's deaths (battle-sim.md §9, §10): men of a squad marching off the
+    /// field who reach their edge leave it (M4 step 2); the fallen, the fled and the left leave their squad and
     /// the ranks close up from the back (<see cref="SlotAssignment.CloseRanks"/>). Dead fighters stay in the fighter list,
     /// marked dead, for the view. Then, once, the victory check: the battle is decided when at most one side has men in the
     /// fight who aren't routing (<see cref="BattleState.Winner"/>, a <see cref="Events.BattleEnded"/> event).
@@ -18,6 +19,11 @@ namespace Knez.Sim
             List<Squad> squads = state.SquadList;
             for (int i = 0; i < squads.Count; i++)
             {
+                if (squads[i].Leaving)
+                {
+                    Leave(state, squads[i]);
+                }
+
                 SlotAssignment.CloseRanks(state, squads[i]);
             }
 
@@ -26,6 +32,25 @@ namespace Knez.Sim
                 Decide(state);
             }
         }
+
+        /// <summary>A man still in the fight of a squad marching off the field leaves once he is within half a metre of his
+        /// side's map edge (body to edge): the march's front rank stands a body's width from it (M4 step 2).</summary>
+        private static void Leave(BattleState state, Squad squad)
+        {
+            List<EntityId> members = squad.MemberList;
+            for (int m = 0; m < members.Count; m++)
+            {
+                Fighter? man = state.FindFighter(members[m]);
+                if (man != null && man.IsAlive && !man.IsRouting
+                    && (Morale.MoraleRules.RetreatPoint(state, man) - man.Position).Length <= man.Radius + LeaveSlack)
+                {
+                    Morale.MoraleSystem.LeaveField(state, man);
+                }
+            }
+        }
+
+        // How near his edge (body to edge, metres) a man of a squad leaving the field leaves it.
+        private static readonly Numerics.Fix LeaveSlack = Numerics.Fix.Ratio(1, 2);
 
         /// <summary>
         /// The battle is decided once at most one side has a man in the fight who isn't routing (battle-sim.md §12): that

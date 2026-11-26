@@ -421,6 +421,27 @@ public class MoraleTests
     }
 
     [Test]
+    public void Router_BetweenStaggeredWalls_GainsGroundRoundBoth_AndFlees()
+    {
+        // Found in the M4 step 2 review: wall 1's nearer end (east) lies in wall 2's way, and wall 2's nearer end (west) back
+        // in wall 1's. Aimed straight sideways at each in turn he swapped between them for ever; aimed at the corners he
+        // gains ground every tick.
+        var map = new MapDef(Fix.FromInt(60), Fix.FromInt(40),
+            [new WallDef(FixVec2.FromInts(10, 20), FixVec2.FromInts(24, 22)), new WallDef(FixVec2.FromInts(22, 12), FixVec2.FromInts(40, 14))]);
+        var state = Setup(count: 1, enemyX: 20, map: map); // the enemy due north: he runs south
+        var man = Of(state, "A").Single();
+        man.Position = new FixVec2(Fix.Ratio(238, 10), Fix.FromInt(28));
+        man.Morale = 100;
+        var sim = new BattleSimulation(state);
+        for (int t = 0; t < 30 * BattleState.TicksPerSecond && man.IsAlive; t++)
+        {
+            sim.Step();
+        }
+
+        Assert.That(man.MoraleState, Is.EqualTo(MoraleState.Fled));
+    }
+
+    [Test]
     [Category("Scenario")]
     public void HeadOn_EqualLines_OneBreaksAfterLosingAboutAQuarter()
     {

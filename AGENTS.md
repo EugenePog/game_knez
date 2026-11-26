@@ -17,16 +17,21 @@ Engine: **Unity 6**, but the battle simulation is **pure C# outside Unity** and 
 - Battle simulation spec: [docs/battle-sim.md](docs/battle-sim.md)
 - Roadmap and current milestone: [docs/roadmap.md](docs/roadmap.md)
 - Decision records: [docs/adr/](docs/adr/)
+- Art assets (sprites, manifest, palette for the Unity view): [docs/art-assets.md](docs/art-assets.md); how the view
+  draws them: [docs/art-pipeline.md](docs/art-pipeline.md)
 
 ## Current phase — read before writing code
 
 **Phase 1: internal 2D skirmish vs AI.** One battle on a small map: 2 player squads + 2 Retainers vs 3 enemy
-squads, top-down 2D view (circles, order arrows, morale bars). Orders, 2–3 formations, morale, wounds, Retainers
-with leadership and a trait ability, the standoff and duels (D-021), enemy AI. Exit criterion: *the battle is still
-interesting the 20th time.*
+squads, top-down 2D view (token sprites over squad-coloured discs, order arrows, morale bars). Orders, 2–3
+formations, morale, wounds, Retainers with leadership and a trait ability, the standoff and duels (D-021), enemy AI.
+Exit criterion: *the battle is still interesting the 20th time.*
 
 Until that criterion is met, **do not build**: campaign, global map, economy, settlement, relationships
-beyond what a battle needs, 3D, art pipeline, Steam integration, save/load of campaigns, multiplayer.
+beyond what a battle needs, 3D, Steam integration, save/load of campaigns, multiplayer. The 2D art pipeline is the
+one exception, asked for by the user on 2026-11-26 (roadmap, "Art in the phase-1 view"): the battle view draws the
+designed sprites from `docs/design/art/` ([docs/art-pipeline.md](docs/art-pipeline.md)); new art, animation, 3D
+models or asset-store packages still need asking.
 If a task seems to need one of these, stop and ask. Designing them on paper (`docs/design/`) is allowed; a design
 doc is not a task to build it. Cut from the concept for good: magic, mass battles
 (50–100 per side), Stronghold-style economy, multiple independent parties in MVP.
@@ -154,7 +159,9 @@ text aren't in the code yet, and the roadmap step that builds them may still cha
 | стена щитов | `ShieldWall` | formation + stance |
 | приказ | `Order` | squad-level intent inside the sim |
 | команда (ввод) | `Command` | external input stamped with a tick |
-| держать / наступать / преследовать | `Hold` / `Advance` / `Pursue` | squad stances |
+| держать / наступать / преследовать | `Hold` / `Advance` / `Pursue` | squad stances, `SquadStance` (M4 step 1): fight what comes / go at enemies within 15 m / also chase the runners |
+| ИИ противника | `AiSystem`, `SquadAiState` | the enemy AI (M4 step 2): a scenario's `ai` sides; per squad `Idle`, `Advance` (round a flank), `Engage`, `Hold`, `Regroup`, `Withdraw`; rules in `AiDef` (`ai.json`) |
+| уйти с поля | `Leaving`, `MoraleState.Left` | a squad marching off the field in order (the AI's withdrawal); its men leave alive at the edge — not a rout (`Fled`) |
 | мораль | `Morale` | per fighter, 0..1000 |
 | сплочённость | `Cohesion` | squad-level, from leadership and bonds |
 | усталость | `Fatigue` | |

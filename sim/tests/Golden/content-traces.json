@@ -1,194 +1,201 @@
 {
-  "about": "Cross-runtime goldens (battle-sim.md \u00a715, M2 step 3): every content scenario, seed 1, 600 ticks. trace = FNV-1a 64 fold of each tick's total state hash (offset basis 14695981039346656037, prime 1099511628211); final = the total hash after the last tick. Checked by the dotnet tests (ContentTraceGoldenTests) and by Unity EditMode (CrossRuntimeGoldenTests): both must match. Re-record only when a change is meant to change outcomes, and say why in the commit.",
+  "about": "Cross-runtime goldens (battle-sim.md §15, M2 step 3): every content scenario, seed 1, 600 ticks. trace = FNV-1a 64 fold of each tick's total state hash (offset basis 14695981039346656037, prime 1099511628211); final = the total hash after the last tick. Checked by the dotnet tests (ContentTraceGoldenTests) and by Unity EditMode (CrossRuntimeGoldenTests): both must match. Re-record only when a change is meant to change outcomes, and say why in the commit.",
   "entries": [
     {
       "scenario": "scenarios/bench/s1-clash.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "56b29945e9f934f2",
-      "final": "af0eaaeb2f6b8878"
+      "trace": "befecb58bc7c7b43",
+      "final": "e375473a550000c4"
     },
     {
       "scenario": "scenarios/bench/s2-gate.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "4663d12444fbf139",
-      "final": "3d68f80441d02d2e"
+      "trace": "381015af88564aae",
+      "final": "6cec4552874c858a"
     },
     {
       "scenario": "scenarios/bench/s3-crossing.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "8bfd76e4160197f2",
-      "final": "6e2e074ebe1323f3"
+      "trace": "31d25ae8951f6798",
+      "final": "514884b2f5da2344"
     },
     {
       "scenario": "scenarios/bench/s4-wheel.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "606ac44c4f32d807",
-      "final": "25404ce1d1a7d022"
+      "trace": "a30119af2a2c002f",
+      "final": "7312e41a92f629cc"
     },
     {
       "scenario": "scenarios/bench/s5-shieldwall.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "75d622b0cc22e5cb",
-      "final": "b1db5832c7aa6b6a"
+      "trace": "8c019fb96bf75231",
+      "final": "1f08945db962d843"
     },
     {
       "scenario": "scenarios/bench/s6-lines.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "728cfd127c6d7c4a",
-      "final": "e78ba424f81077ca"
+      "trace": "57c496b297a4bf56",
+      "final": "665c4c8ba1e28765"
     },
     {
       "scenario": "scenarios/bench/s7-flank.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "db0595f6014c806a",
-      "final": "676b78cf5e6ef925"
+      "trace": "561bff728e69aa00",
+      "final": "ff9663d201f6c7f6"
     },
     {
       "scenario": "scenarios/bench/s8-leader.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "42b9eb5b13199805",
-      "final": "328eb47205b4f6b7"
+      "trace": "79cd2c2ad43a7c39",
+      "final": "4c2f68ecf9a0ce61"
     },
     {
       "scenario": "scenarios/bench/s9-battle-cry.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "52e5a985ed3694f8",
-      "final": "d48a8a1140b11ed0"
+      "trace": "adef2472d2e24c1a",
+      "final": "7a654898cdca90f3"
     },
     {
       "scenario": "scenarios/bench/s10-close-ranks.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "5fbe2205d8a157b4",
-      "final": "f6d9f488af83053d"
+      "trace": "f3f252c3eddd4db4",
+      "final": "c639ec70cb5a346e"
     },
     {
       "scenario": "scenarios/bench/s11-stand-fast.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "884422d340004e30",
-      "final": "116bbe1ebfb32df6"
+      "trace": "a13775d26868d827",
+      "final": "e1a1c6931d813c1a"
     },
     {
       "scenario": "scenarios/crowding.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "afb58a71eb8b43ca",
-      "final": "a4d3e596d932d8c6"
+      "trace": "a1cb61d7113c16c5",
+      "final": "34a7bcdcd3723c8a"
     },
     {
       "scenario": "scenarios/drill.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "9596b10766cef9be",
-      "final": "3aa6b92b634aa075"
+      "trace": "5c6b76697c2cb3c9",
+      "final": "dfbd6a8711c017a8"
     },
     {
       "scenario": "scenarios/formations.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "d8f37e7ada045e23",
-      "final": "0ccd21abd4b7e595"
+      "trace": "553beb6f5a9068c5",
+      "final": "925b13c5c1eb14f3"
     },
     {
       "scenario": "scenarios/m3/m3-flank.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "fc933906477d7203",
-      "final": "a9827ebdf2d86bb8"
+      "trace": "32e6759b2aa1a9d5",
+      "final": "a69f5752107f2f4f"
     },
     {
       "scenario": "scenarios/m3/m3-lines.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "27240f94c3b63e61",
-      "final": "3815db6059a49e3b"
+      "trace": "d13f8d6a49a77501",
+      "final": "733c9a1d5167dd16"
     },
     {
       "scenario": "scenarios/m3/m3-rally.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "07af1275d3fc5365",
-      "final": "c7a59a02b63b850d"
+      "trace": "80b402102df65679",
+      "final": "f95a9654ad8afeba"
     },
     {
       "scenario": "scenarios/m3/m3-retainers.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "9ab9e3fe57318fd3",
-      "final": "952abb4bd91ea4b3"
+      "trace": "8749c110b9c53d9d",
+      "final": "bbe58c6065590bb6"
     },
     {
       "scenario": "scenarios/m3/m3-shieldwall.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "e49010a2858b8e7c",
-      "final": "5e9500f6b2006adc"
+      "trace": "2bc27292dcb3fd60",
+      "final": "f0f34c5c7654ef92"
     },
     {
       "scenario": "scenarios/m3/m3-spears.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "afde91b53b08618e",
-      "final": "4b1bf5017216bed2"
+      "trace": "42fb36df54af57f7",
+      "final": "b3a1d9f918a776b6"
     },
     {
       "scenario": "scenarios/m3/m3-veterans.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "6e6ff0925a57a8e6",
-      "final": "fbeb7dc448496b11"
+      "trace": "099301f09932166d",
+      "final": "a1d8c6e4fc280842"
     },
     {
       "scenario": "scenarios/m3/m3-withdraw.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "48a1a7797a9dd857",
-      "final": "563674de61ee45d0"
+      "trace": "bdf781d424a9363d",
+      "final": "e657471947931fc7"
     },
     {
       "scenario": "scenarios/march.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "73a655a24684c42a",
-      "final": "9486618685c42498"
+      "trace": "c1df881e3cea93ff",
+      "final": "2ade979506aefe6f"
     },
     {
       "scenario": "scenarios/paths.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "03aaa8e03f65ce39",
-      "final": "b1eab6da37b97f12"
+      "trace": "86db84fa9b683949",
+      "final": "66194a6aeefea195"
     },
     {
       "scenario": "scenarios/sandbox/villages-assault.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "0bb046e35ef03cce",
-      "final": "a91c632e51af999b"
+      "trace": "be4b7cf31537a92b",
+      "final": "d7bac103c1ab8c00"
     },
     {
       "scenario": "scenarios/sandbox/villages.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "5800d456e7a1b63f",
-      "final": "0f48d631c0e5ab48"
+      "trace": "32156cdf09607489",
+      "final": "3ac9b9311783acaf"
     },
     {
       "scenario": "scenarios/walls.json",
       "seed": 1,
       "ticks": 600,
-      "trace": "7c158377f2a921f0",
-      "final": "8ed7e9c532c3e1eb"
+      "trace": "e55f273ec2692702",
+      "final": "f7b3589346229bd5"
+    },
+    {
+      "scenario": "scenarios/m4/m4-ai.json",
+      "seed": 1,
+      "ticks": 600,
+      "trace": "f870d856763b4d9c",
+      "final": "ab10b8d78ee622be"
     }
   ]
 }

@@ -16,8 +16,9 @@ namespace Knez.Sim.Defs
 
         /// <summary>Creates a spawn entry; throws <see cref="ArgumentException"/> on invalid values.</summary>
         public SquadSpawnDef(string name, int sideId, BodyDef body, IReadOnlyList<SquadMenDef> men, FormationDef formation,
-            FixVec2 position, Angle facing)
+            FixVec2 position, Angle facing, Orders.SquadStance stance = Orders.SquadStance.Hold)
         {
+            Stance = stance;
             Name = DefChecks.Id(name, nameof(name));
             SideId = DefChecks.Range(sideId, 0, MaxSideId, "side");
             Body = body ?? throw new ArgumentNullException(nameof(body));
@@ -43,6 +44,9 @@ namespace Knez.Sim.Defs
 
         /// <summary>Sanity bound for <see cref="Count"/>, not a balance number (phase 1 squads have 5–8).</summary>
         public const int MaxCount = 64;
+
+        /// <summary>The stance it starts in (M4 step 1): Hold unless the scenario says otherwise.</summary>
+        public Orders.SquadStance Stance { get; }
 
         /// <summary>Highest side id (phase 1 uses 0 and 1).</summary>
         public const int MaxSideId = 7;
@@ -108,6 +112,7 @@ namespace Knez.Sim.Defs
             Formation.AddTo(ref hash);
             hash.Add(Position.X.Raw);
             hash.Add(Position.Y.Raw);
+            hash.Add((int)Stance);
             hash.Add((int)Facing.Raw);
         }
     }

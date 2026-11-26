@@ -23,6 +23,28 @@ namespace Knez.Game.Input
         /// <summary>Room between neighbouring squads ordered together: 2 m.</summary>
         public const float Gap = 2f;
 
+        /// <summary>
+        /// A right-click on an enemy man in a squad (M4 step 1): every selected squad attacks his squad. Empty when the
+        /// click isn't on such a man — then it is a move (<see cref="Moves"/>).
+        /// </summary>
+        public static List<ICommand> Attacks(BattleState state, IReadOnlyList<EntityId> selected, Vector2 at, int side)
+        {
+            var commands = new List<ICommand>();
+            EntityId enemyId = RetainerOrders.EnemyAt(state, at, side);
+            Fighter? enemy = enemyId.IsNone ? null : state.FindFighter(enemyId);
+            if (enemy == null || enemy.SquadId.IsNone)
+            {
+                return commands;
+            }
+
+            foreach (EntityId squad in selected)
+            {
+                commands.Add(new AttackSquadCommand(side, squad, enemy.SquadId));
+            }
+
+            return commands;
+        }
+
         /// <summary>The commands, in selection (id) order, for side <paramref name="side"/>.</summary>
         public static List<ICommand> Moves(BattleState state, IReadOnlyList<EntityId> selected, Vector2 from, Vector2 to, int side)
         {

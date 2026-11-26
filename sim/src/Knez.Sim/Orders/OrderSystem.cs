@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Knez.Sim.Defs;
 using Knez.Sim.Formations;
 using Knez.Sim.Movement;
 using Knez.Sim.Numerics;
@@ -16,6 +17,8 @@ namespace Knez.Sim.Orders
     /// each only on clear ground, else it pivots in place. On arrival it turns to the order's facing; a face-about there
     /// was planned for (the route runs a depth past the target) or is followed by a step back, so the front rank ends on
     /// the ordered point. The order ends when the squad is formed up: every living member within 30 cm of his slot.
+    /// M4 step 1, before the march: attacks (a march aimed at the target squad, re-aimed), stances (Advance and Pursue go
+    /// at nearby enemies on their own) and chases (see <c>Engage</c>).
     /// </summary>
     public sealed class OrderSystem : ISimSystem
     {
@@ -33,6 +36,7 @@ namespace Knez.Sim.Orders
                     squad.Reforming = false; // in its new formation: back to full pace
                 }
 
+                Engage(state, squad);
                 if (squad.Order.Kind == SquadOrderKind.Move)
                 {
                     Move(state, squad);
@@ -40,6 +44,358 @@ namespace Knez.Sim.Orders
             }
 
             EndLoneOrders(state);
+        }
+
+        /// <summary>An attack re-aims when its target's anchor has moved this far from the order's point (metres).</summary>
+        private static readonly Fix Reaim = Fix.FromInt(2);
+
+        /// <summary>
+        /// Attacks, stances and pursuit (battle-sim.md §10, M4 step 1; decided by the user 2026-11-26), before the march:
+        /// <list type="bullet">
+        /// <item>A chase ends when its time is up or no runner is left within the pursuit range of where it began; the
+        /// squad re-forms where its men stand.</item>
+        /// <item>An attack ends when its target breaks or has nobody left in the fight; the squad stops where it is, and
+        /// its stance decides at once what's next. Otherwise, once a second and out of melee, the march is re-aimed when
+        /// the target's anchor has moved more than 2 m.</item>
+        /// <item>Once a second (staggered by id), a squad in Advance or Pursue with no order and not in melee: in Pursue,
+        /// with runners of the enemy within the advance range of its men, it starts a chase (not again within a chase's
+        /// length of the last one ending); else it attacks the nearest enemy squad within the advance range.</item>
+        /// </list>
+        /// </summary>
+        private static void Engage(BattleState state, Squad squad)
+        {
+            if (squad.Broken)
+            {
+                return; // running: no orders, no stance (morale cleared its attack and chase when it broke)
+            }
+
+            if (!Standing(state, squad))
+            {
+                // Nobody left to fight with (the last man fell, or its only Retainer left): no attack, no chase.
+                if (!squad.AttackTarget.IsNone)
+                {
+                    squad.AttackTarget = EntityId.None;
+                    squad.Order = SquadOrder.None;
+                    squad.ClearPath();
+                }
+
+                EndChase(state, squad, reform: false);
+                return;
+            }
+
+            MovementDef rules = state.Scenario.Movement;
+            if (squad.Pursuing)
+            {
+                if (state.Tick >= squad.PursuitUntil || !RunnerWithin(state, squad, squad.PursuitFrom, rules.PursuitRange))
+                {
+                    EndChase(state, squad, reform: true);
+                }
+
+                return;
+            }
+
+            bool decide = (state.Tick + squad.Id.Value) % BattleState.TicksPerSecond == 0;
+            if (!squad.AttackTarget.IsNone)
+            {
+                Squad? target = state.FindSquad(squad.AttackTarget);
+                if (target == null || Fleeing(state, target) || !Standing(state, target))
+                {
+                    squad.AttackTarget = EntityId.None; // done (broken, or leaving with most of it running): the stance says what's next, now
+                    squad.Order = SquadOrder.None;
+                    squad.ClearPath();
+                    decide = true;
+                }
+                else
+                {
+                    // Not while it steps back out of a melee or regroups for a gap: a new march would cancel either.
+                    if (decide && !InMelee(state, squad) && !squad.Withdrawing && squad.RegroupSince < 0 && squad.PathRequestTick < 0
+                        && Stale(state, squad, target))
+                    {
+                        Aim(state, squad, target);
+                    }
+
+                    return;
+                }
+            }
+
+            if (!decide || squad.Stance == SquadStance.Hold || squad.Order.Kind != SquadOrderKind.None || InMelee(state, squad))
+            {
+                return;
+            }
+
+            bool rested = squad.PursuitUntil < 0 || state.Tick >= squad.PursuitUntil + rules.PursuitTicks;
+            if (squad.Stance == SquadStance.Pursue && rested && RunnerNearMen(state, squad, rules.AdvanceRange))
+            {
+                squad.Pursuing = true;
+                squad.PursuitUntil = state.Tick + rules.PursuitTicks;
+                squad.PursuitFrom = squad.Anchor;
+                squad.Order = SquadOrder.None;
+                squad.ClearPath();
+                return;
+            }
+
+            Squad? nearest = NearestEnemy(state, squad, rules.AdvanceRange);
+            if (nearest != null)
+            {
+                Attack(state, squad, nearest);
+            }
+        }
+
+        /// <summary>Orders <paramref name="squad"/> to attack <paramref name="target"/>: it marches at it (M4 step 1).</summary>
+        internal static void Attack(BattleState state, Squad squad, Squad target)
+        {
+            squad.AttackTarget = target.Id;
+            Aim(state, squad, target);
+        }
+
+        /// <summary>A chase ends (time up, no runner left, or another order): with <paramref name="reform"/> the squad
+        /// re-forms where its men stand; else the new order's march gathers them.</summary>
+        internal static void EndChase(BattleState state, Squad squad, bool reform)
+        {
+            if (!squad.Pursuing)
+            {
+                return;
+            }
+
+            squad.Pursuing = false;
+            squad.PursuitUntil = state.Tick; // when it ended: no new chase for a chase's length
+            if (reform)
+            {
+                Formations.SlotAssignment.ReformAtCentre(state, squad);
+            }
+        }
+
+        /// <summary>Whether <paramref name="squad"/> has a living man who isn't running (someone left in the fight).</summary>
+        internal static bool Standing(BattleState state, Squad squad)
+        {
+            List<EntityId> members = squad.MemberList;
+            for (int m = 0; m < members.Count; m++)
+            {
+                Fighter? man = state.FindFighter(members[m]);
+                if (man != null && man.IsAlive && !man.IsRouting)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // The march aimed at the target, facing it from where the squad stands.
+        private static void Aim(BattleState state, Squad squad, Squad target)
+        {
+            FixVec2 aim = AimPoint(state, target);
+            Commands.MoveSquadCommand.March(state, squad, aim, FacingTo(squad, aim));
+        }
+
+        // Whether the march no longer goes where an aim now would (more than 2 m off), or has ended away from it.
+        private static bool Stale(BattleState state, Squad squad, Squad target)
+        {
+            FixVec2 aim = AimPoint(state, target);
+            FixVec2 fitted = Commands.MoveSquadCommand.Fit(state, squad, aim, FacingTo(squad, aim), out _);
+            FixVec2 from = squad.Order.Kind == SquadOrderKind.Move ? squad.Order.Target : squad.Anchor;
+            return (fitted - from).Length > Reaim;
+        }
+
+        private static Angle? FacingTo(Squad squad, FixVec2 aim)
+        {
+            FixVec2 to = aim - squad.Anchor;
+            return to.Length > MovementRules.ArriveDistance ? FixMath.Atan2(to.Y, to.X) : (Angle?)null;
+        }
+
+        // The target's anchor; while it chases, the centre of its men who aren't running (its anchor stays where the
+        // chase began, up to 30 m from them).
+        internal static FixVec2 AimPoint(BattleState state, Squad target)
+        {
+            if (!target.Pursuing)
+            {
+                return target.Anchor;
+            }
+
+            long x = 0;
+            long y = 0;
+            int n = 0;
+            List<EntityId> members = target.MemberList;
+            for (int m = 0; m < members.Count; m++)
+            {
+                Fighter? man = state.FindFighter(members[m]);
+                if (man != null && man.IsAlive && !man.IsRouting)
+                {
+                    x += man.Position.X.Raw;
+                    y += man.Position.Y.Raw;
+                    n++;
+                }
+            }
+
+            return n == 0 ? target.Anchor : new FixVec2(Fix.FromRaw(x / n), Fix.FromRaw(y / n));
+        }
+
+        /// <summary>
+        /// Whether <paramref name="man"/> is a runner a chase goes after (M4 step 1): an enemy running from a squad that
+        /// broke — the user's rule is "when the enemy it fights breaks", so one man running from a squad that holds
+        /// doesn't draw a chase (nor a Retainer running alone).
+        /// </summary>
+        internal static bool Chaseable(BattleState state, Fighter man, int side)
+        {
+            if (!man.IsAlive || !man.IsRouting || man.SideId == side || man.SquadId.IsNone)
+            {
+                return false;
+            }
+
+            Squad? squad = state.FindSquad(man.SquadId);
+            return squad != null && Fleeing(state, squad);
+        }
+
+        /// <summary>
+        /// Whether <paramref name="squad"/>'s runners are fair game for a chase: it broke — or, leaving the field (M4 step 2:
+        /// a leaving squad doesn't break), more of its men in the fight are running than would break it.
+        /// </summary>
+        internal static bool Fleeing(BattleState state, Squad squad)
+        {
+            if (squad.Broken)
+            {
+                return true;
+            }
+
+            if (!squad.Leaving)
+            {
+                return false;
+            }
+
+            int inFight = 0;
+            int routing = 0;
+            List<EntityId> members = squad.MemberList;
+            for (int m = 0; m < members.Count; m++)
+            {
+                Fighter? man = state.FindFighter(members[m]);
+                if (man != null && man.IsAlive)
+                {
+                    inFight++;
+                    routing += man.IsRouting ? 1 : 0;
+                }
+            }
+
+            return inFight > 0 && routing * 1000L > (long)state.Scenario.Morale.BreakShare * inFight;
+        }
+
+        /// <summary>In melee: one of its men in the fight is engaged with an enemy who isn't running — runners in reach are
+        /// struck at, but don't hold a squad. From the fighters' own state, not a scratch buffer, so a restored snapshot
+        /// decides the same.</summary>
+        internal static bool InMelee(BattleState state, Squad squad)
+        {
+            List<EntityId> members = squad.MemberList;
+            for (int m = 0; m < members.Count; m++)
+            {
+                Fighter? man = state.FindFighter(members[m]);
+                if (man == null || !man.IsAlive || man.IsRouting || !man.IsEngaged)
+                {
+                    continue;
+                }
+
+                Fighter? enemy = state.FindFighter(man.Target);
+                if (enemy != null && !enemy.IsRouting)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // The nearest enemy squad, not broken, with a man in the fight within range (edge to edge) of one of the squad's
+        // men in the fight; ties to the lower id.
+        private static Squad? NearestEnemy(BattleState state, Squad squad, Fix range)
+        {
+            Squad? best = null;
+            Fix bestGap = Fix.Zero;
+            List<Squad> squads = state.SquadList;
+            for (int s = 0; s < squads.Count; s++)
+            {
+                Squad other = squads[s];
+                if (other.SideId == squad.SideId || other.Broken)
+                {
+                    continue;
+                }
+
+                Fix gap = Gap(state, squad, other.MemberList, range, runners: false);
+                if (gap <= range && (best == null || gap < bestGap))
+                {
+                    best = other;
+                    bestGap = gap;
+                }
+            }
+
+            return best;
+        }
+
+        // Whether a runner of a broken enemy squad is within range (edge to edge) of one of the squad's men in the fight.
+        private static bool RunnerNearMen(BattleState state, Squad squad, Fix range)
+        {
+            List<Squad> squads = state.SquadList;
+            for (int s = 0; s < squads.Count; s++)
+            {
+                if (squads[s].SideId != squad.SideId && Fleeing(state, squads[s]) && Gap(state, squad, squads[s].MemberList, range, runners: true) <= range)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // Whether a runner worth chasing stands within range of a point (centre to centre).
+        private static bool RunnerWithin(BattleState state, Squad squad, FixVec2 point, Fix range)
+        {
+            Fix reach = range * range;
+            List<Fighter> fighters = state.FighterList;
+            for (int i = 0; i < fighters.Count; i++)
+            {
+                Fighter man = fighters[i];
+                if (Chaseable(state, man, squad.SideId) && (man.Position - point).LengthSquared <= reach)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // The smallest edge-to-edge gap between the squad's men in the fight and the given enemies (in the fight, or
+        // running when runners); past range counts as range + 1 m, so no square root for the far ones.
+        private static Fix Gap(BattleState state, Squad squad, List<EntityId> enemies, Fix range, bool runners)
+        {
+            Fix best = range + Fix.One;
+            List<EntityId> members = squad.MemberList;
+            for (int m = 0; m < members.Count; m++)
+            {
+                Fighter? man = state.FindFighter(members[m]);
+                if (man == null || !man.IsAlive || man.IsRouting)
+                {
+                    continue;
+                }
+
+                for (int e = 0; e < enemies.Count; e++)
+                {
+                    Fighter? enemy = state.FindFighter(enemies[e]);
+                    if (enemy == null || !enemy.IsAlive || enemy.IsRouting != runners)
+                    {
+                        continue;
+                    }
+
+                    Fix bodies = man.Radius + enemy.Radius;
+                    Fix limit = best + bodies;
+                    FixVec2 to = enemy.Position - man.Position;
+                    if (FixMath.Abs(to.X) > limit || FixMath.Abs(to.Y) > limit)
+                    {
+                        continue;
+                    }
+
+                    Fix gap = to.Length - bodies;
+                    best = gap < best ? gap : best;
+                }
+            }
+
+            return best;
         }
 
         /// <summary>

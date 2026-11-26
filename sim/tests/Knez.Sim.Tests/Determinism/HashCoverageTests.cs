@@ -54,6 +54,15 @@ public class HashCoverageTests
         yield return Case("SquadRegroupSince", "Squads", s => s.SquadList[0].RegroupSince = 0);
         yield return Case("SquadPathIndex", "Squads", s => s.SquadList[0].PathIndex = 1);
         yield return Case("SquadPathRequest", "Squads", s => s.SquadList[0].PathRequestTick = 0);
+        yield return Case("SquadStance", "Squads", s => s.SquadList[0].Stance = Knez.Sim.Orders.SquadStance.Pursue); // M4 step 1
+        yield return Case("SquadAttackTarget", "Squads", s => s.SquadList[0].AttackTarget = s.SquadList[1].Id);
+        yield return Case("SquadPursuing", "Squads", s => s.SquadList[0].Pursuing = true);
+        yield return Case("SquadPursuitUntil", "Squads", s => s.SquadList[0].PursuitUntil = 40);
+        yield return Case("SquadPursuitFrom", "Squads", s => s.SquadList[0].PursuitFrom = new FixVec2(Fix.FromRaw(1), Fix.Zero));
+        yield return Case("SquadAiState", "Squads", s => s.SquadList[0].AiState = Knez.Sim.Ai.SquadAiState.Hold); // M4 step 2
+        yield return Case("SquadAiSince", "Squads", s => s.SquadList[0].AiSince = 20);
+        yield return Case("SquadAiTarget", "Squads", s => s.SquadList[0].AiTarget = s.SquadList[1].Id);
+        yield return Case("SquadLeaving", "Squads", s => s.SquadList[0].Leaving = true);
         yield return Case("Rng", "Rng", s => s.Rng(RngStream.Misc).NextUInt());
         yield return Case("IdCounter", "Core", s => s.AllocateId());
     }

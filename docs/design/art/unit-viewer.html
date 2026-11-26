@@ -1,0 +1,821 @@
+<title>Облик дружины</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+SC:wght@500;700&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: a workbench (figure on a stage + controls), then the battle view from above, the roster, the palette and the rules. */
+  :root {
+    --bg: #E6E9E3;          /* birch-bark fog */
+    --surface: #F3F4F0;
+    --stage: #DADFD3;
+    --ink: #24221F;
+    --muted: #5B6058;
+    --line: #C5CBBF;
+    --accent: #9E3B26;      /* red ochre */
+    --accent-ink: #FFF8F0;
+    --ground: #7B8760;      /* the battlefield from above, same in both themes */
+    --ground-ink: #F1F2EA;
+    --focus: #3F5D7E;
+    --display: "Alegreya SC", "Alegreya", Georgia, serif;
+    --body: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #181A16; --surface: #21241F; --stage: #2B2F28; --ink: #E9E7E0; --muted: #A5AA9F;
+      --line: #3A3F36; --accent: #D0684D; --accent-ink: #1A1110; --focus: #8FB0D0; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #181A16; --surface: #21241F; --stage: #2B2F28; --ink: #E9E7E0; --muted: #A5AA9F;
+    --line: #3A3F36; --accent: #D0684D; --accent-ink: #1A1110; --focus: #8FB0D0; color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.5;
+  }
+  .wrap {
+    max-width: 1180px; margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 28px 56px;
+    display: grid; gap: 56px;
+  }
+  h1, h2, h3 { font-family: var(--display); font-weight: 700; text-wrap: balance; margin: 0; letter-spacing: 0.01em; }
+  h1 { font-size: clamp(2.2rem, 5vw, 3.4rem); line-height: 1.02; }
+  h2 { font-size: 1.6rem; line-height: 1.1; }
+  h3 { font-size: 1.08rem; font-weight: 500; }
+  p { margin: 0; }
+  .eyebrow { font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .lede { max-width: 64ch; color: var(--muted); font-size: 1.05rem; }
+  code, .mono { font-family: var(--mono); font-size: 0.82em; }
+
+  header.mast { display: grid; gap: 12px; }
+
+  section { display: grid; gap: 18px; min-width: 0; }
+  .section-head { display: grid; gap: 6px; }
+  .section-head p { max-width: 70ch; color: var(--muted); }
+
+  /* ---------- workbench ---------- */
+  .bench { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+  .stage {
+    background: var(--stage); border-radius: 6px; padding: 18px;
+    display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 16px; align-items: end;
+    position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px);
+  }
+  .stage .front svg { width: 100%; height: auto; max-height: 620px; display: block; }
+  .stage .side { display: grid; gap: 14px; align-content: end; }
+  .token { background: var(--ground); border-radius: 4px; padding: 4px; }
+  .token svg { width: 100%; height: auto; display: block; }
+  .token-cap { font-size: 0.75rem; color: var(--muted); }
+  .whois { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+  .whois h3 { font-size: 1.3rem; }
+  .whois span { color: var(--muted); }
+
+  .kit { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 10px; font-size: 0.82rem; margin: 0; }
+  .kit dt { color: var(--muted); }
+  .kit dd { margin: 0; font-variant-numeric: tabular-nums; }
+  .kit .warn { color: var(--accent); }
+
+  .controls { display: grid; gap: 18px; min-width: 0; }
+  fieldset { border: 0; border-top: 1px solid var(--line); margin: 0; padding: 12px 0 0; display: grid; gap: 10px; min-width: 0; }
+  legend { font-family: var(--display); font-size: 1.05rem; padding: 0 8px 0 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font: inherit; font-size: 0.86rem; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+    padding: 4px 10px; border-radius: 999px; cursor: pointer;
+  }
+  .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .chip:hover { border-color: var(--muted); }
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
+  label.sel { display: grid; gap: 2px; font-size: 0.8rem; color: var(--muted); min-width: 0; }
+  select, button.btn {
+    font: inherit; font-size: 0.9rem; color: var(--ink); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; min-width: 0; width: 100%;
+  }
+  button.btn { cursor: pointer; width: auto; }
+  button.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  .swrow { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px; align-items: center; }
+  .swrow > span { font-size: 0.8rem; color: var(--muted); }
+  .sw { display: flex; flex-wrap: wrap; gap: 4px; }
+  .sw button {
+    width: 22px; height: 22px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.35); cursor: pointer; padding: 0;
+    position: relative;
+  }
+  .sw button[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 1px; }
+  .sw button.none { background: repeating-linear-gradient(45deg, var(--surface) 0 4px, var(--line) 4px 6px); }
+
+  /* ---------- formation ---------- */
+  .field { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 20px; align-items: start; }
+  .scene { background: var(--ground); border-radius: 6px; overflow: hidden; }
+  .scene svg { width: 100%; height: auto; display: block; }
+  .field-notes { display: grid; gap: 12px; font-size: 0.92rem; }
+  .field-notes p { color: var(--muted); }
+
+  /* ---------- roster ---------- */
+  .roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px; cursor: pointer;
+    display: grid; grid-template-rows: auto auto 1fr; gap: 6px; text-align: left; font: inherit; color: inherit;
+  }
+  .card:hover { border-color: var(--muted); }
+  .card .pics { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 6px; align-items: end; }
+  [hidden] { display: none !important; }
+  .card .pics svg { width: 100%; height: auto; display: block; }
+  .card .pics .token { padding: 2px; }
+  .card h3 { font-size: 1rem; }
+  .card p { font-size: 0.8rem; color: var(--muted); }
+  .side-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--muted); }
+  .side-tag i { width: 20px; height: 12px; border-radius: 2px; border: 1px solid var(--muted); display: inline-block; }
+
+  /* ---------- palette ---------- */
+  .pal { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px 28px; }
+  .pal-group { display: grid; gap: 6px; align-content: start; }
+  .pal-group h3 { font-size: 1rem; }
+  .pal-group p { font-size: 0.82rem; color: var(--muted); }
+  .pal-item { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 0.85rem; }
+  .pal-item i { width: 30px; height: 20px; border-radius: 3px; border: 1px solid rgba(0,0,0,.3); display: block; }
+  .pal-item .mono { color: var(--muted); }
+
+  .sides { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { font-weight: 500; color: var(--muted); font-size: 0.8rem; }
+  td svg { display: block; }
+
+  /* ---------- objects ---------- */
+  .obj-tools { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+  .check { display: inline-flex; gap: 6px; align-items: center; font-size: 0.88rem; color: var(--muted); }
+  .objects { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+  .obj {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px;
+    display: grid; grid-template-rows: 170px auto auto; gap: 8px; min-width: 0;
+  }
+  .obj .v { display: flex; align-items: center; justify-content: center; background: var(--stage); border-radius: 4px; min-height: 0; }
+  .obj .v svg { max-width: 100%; max-height: 160px; width: auto; height: auto; display: block; }
+  .obj .pl { display: flex; justify-content: center; background: var(--ground); border-radius: 4px; padding: 4px; }
+  .obj .pl svg { max-width: 100%; max-height: 120px; width: auto; height: auto; display: block; }
+  .obj h3 { font-size: 1rem; }
+  .obj .meta { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 0.78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .obj p { font-size: 0.82rem; color: var(--muted); }
+  .tag { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 0 8px; font-size: 0.75rem; color: var(--ink); }
+  .tag.house { border-color: #9C7446; }
+  .tag.obstacle { border-color: #8A867D; }
+  .tag.water { border-color: #5F84A0; }
+  .hide-sim .simfoot { display: none; }
+  .village-box { overflow-x: auto; border-radius: 6px; background: var(--ground); }
+  .village-box svg { display: block; width: 100%; height: auto; }
+  .village-box.zoom svg { width: 220%; max-width: none; }
+
+  /* ---------- rules ---------- */
+  .rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+  .rules ol, .rules ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+  .rules li { max-width: 60ch; }
+  .rules b { font-weight: 700; }
+  .foot { font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 14px; }
+
+  @media (max-width: 900px) {
+    .bench { grid-template-columns: minmax(0, 1fr); }
+    .stage { position: static; }
+    .field { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 520px) {
+    .stage { grid-template-columns: minmax(0, 1fr) 110px; padding: 12px; }
+    .grid2 { grid-template-columns: minmax(0, 1fr); }
+    .swrow { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .chip, .card, .sw button { transition: border-color .15s, background-color .15s; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="mast">
+    <p class="eyebrow">Game_knez · эскиз облика · Балтика VIII–IX веков</p>
+    <h1>Облик дружины</h1>
+    <p class="lede">Один базовый человек и сменные слои поверх: одежда, доспех, шапка или шлем, оружие или орудие, щит, украшения. Из одного описания рисуются фигура спереди (карточка, вербовка, эталон для 3D-модели) и фишка вида сверху для схватки фазы 1. Ниже — мирные жители, постройки и предметы карты удела. Цвета взяты только из того, чем красили тогда.</p>
+  </header>
+
+  <section aria-labelledby="bench-h">
+    <div class="section-head">
+      <h2 id="bench-h">Кукла</h2>
+      <p>Выберите бойца из нынешнего состава или соберите своего: набор и опыт из <code>combat.json</code>, затем любой слой и цвет.</p>
+    </div>
+    <div class="bench">
+      <div class="stage">
+        <div class="front" id="fig-front"></div>
+        <div class="side">
+          <div>
+            <div class="token" id="fig-top"></div>
+            <p class="token-cap">Сверху, смотрит вверх</p>
+          </div>
+          <dl class="kit" id="kit-card"></dl>
+        </div>
+        <div class="whois"><h3 id="who-name"></h3><span id="who-sub"></span></div>
+      </div>
+
+      <div class="controls">
+        <fieldset>
+          <legend>Нынешний состав</legend>
+          <div class="chips" id="roster-chips"></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Мирные жители</legend>
+          <div class="chips" id="people-chips"></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Кто он</legend>
+          <div class="grid2">
+            <label class="sel">Роль<select id="g-role"></select></label>
+            <label class="sel">Сторона<select id="g-side"></select></label>
+            <label class="sel" id="w-kit">Набор (combat.json)<select id="g-kit"></select></label>
+            <label class="sel" id="w-exp">Опыт<select id="g-exp"></select></label>
+            <label class="sel" id="w-wealth" hidden>Достаток<select id="g-wealth"></select></label>
+            <label class="sel" id="w-style" hidden>Убор<select id="g-style"></select></label>
+          </div>
+          <div><button class="btn primary" id="g-new" type="button">Другой человек</button></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Слои</legend>
+          <div class="grid2" id="layer-selects"></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Цвета</legend>
+          <div id="swatches" style="display:grid;gap:8px"></div>
+        </fieldset>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="field-h">
+    <div class="section-head">
+      <h2 id="field-h">Строй сверху</h2>
+      <p>Тот же боец в первом ряду своего отряда напротив врага. Расстояния из <code>formations.json</code>, 1 клетка сетки — 1 м.</p>
+    </div>
+    <div class="field">
+      <div class="scene" id="scene"></div>
+      <div class="field-notes">
+        <div class="grid2" style="grid-template-columns:minmax(0,1fr)">
+          <label class="sel">Строй<select id="s-form">
+            <option value="shieldwall">Стена щитов — 0,75 м в ряду, 1,0 м между рядами</option>
+            <option value="line">Линия — 1,0 м в ряду, 1,2 м между рядами</option>
+          </select></label>
+          <label class="sel">Напротив<select id="s-enemy">
+            <option value="bandits">Разбойники (Raiders из m3)</option>
+            <option value="ruler-militia">Ополчение правителя</option>
+            <option value="ruler-hird">Дружинники правителя (D-020)</option>
+            <option value="clan-militia">Ополчение клана</option>
+          </select></label>
+        </div>
+        <p>Сторона читается по краске щита, отряд — по узору, дружинник — по плащу, шлему и своему щиту. Полоски морали и кольца выбора рисует интерфейс поверх фишки.</p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="roster-h">
+    <div class="section-head">
+      <h2 id="roster-h">Кто есть сейчас</h2>
+      <p>Наборы из <code>combat.json</code>, дружинники и противники из сценариев M3 и <code>enemies.md</code>. Нажмите на карточку, чтобы разобрать бойца на слои.</p>
+    </div>
+    <div class="roster" id="roster"></div>
+  </section>
+
+  <section aria-labelledby="people-h">
+    <div class="section-head">
+      <h2 id="people-h">Люди селений</h2>
+      <p>Та же база без оружия, доспеха и щита: щит на фишке значит «боец», его отсутствие — «мирный». Мужчины одеты как ополченцы в будни, женщины — в одном из четырёх уборов. Местное племя балтской культуры, клан смешанный, поэтому у женщин клана уборы разные.</p>
+    </div>
+    <div class="roster" id="people"></div>
+  </section>
+
+  <section aria-labelledby="obj-h">
+    <div class="section-head">
+      <h2 id="obj-h">Постройки и предметы</h2>
+      <p>Всё, что стоит на карте удела по <code>home-location.md</code> и <code>settlements.md</code>. Сверху — вид 3/4, ниже — план в метрах. Пунктир — прямоугольник стены для симуляции (<code>MapDef.walls</code>), как дома и камни в песочнице <code>villages.json</code>.</p>
+    </div>
+    <div class="obj-tools">
+      <div class="chips" id="obj-groups"></div>
+      <label class="check"><input type="checkbox" id="obj-sim" checked> Стены для симуляции</label>
+    </div>
+    <div class="objects" id="objects"></div>
+  </section>
+
+  <section aria-labelledby="village-h">
+    <div class="section-head">
+      <h2 id="village-h">Селение сверху</h2>
+      <p>Пример: малое селение у реки, собранное из тех же планов, с жителями и четырьмя ополченцами правителя в настоящем масштабе. Так могла бы выглядеть 2D-карта фазы 1.</p>
+    </div>
+    <div class="obj-tools">
+      <button class="btn" id="v-zoom" type="button" aria-pressed="false">Крупнее</button>
+      <label class="check"><input type="checkbox" id="v-sim"> Стены для симуляции</label>
+    </div>
+    <div class="village-box" id="village"></div>
+  </section>
+
+  <section aria-labelledby="pal-h">
+    <div class="section-head">
+      <h2 id="pal-h">Палитра</h2>
+      <p>Ткани красили растениями, щиты — минеральными красками. Яркий цвет стоил дорого и говорил о богатстве: некрашеная шерсть у ополчения, марена и вайда у дружины, привозной шёлк в отделке у лучших.</p>
+    </div>
+    <div class="pal" id="palette"></div>
+    <div class="sides" id="sides"></div>
+  </section>
+
+  <section aria-labelledby="rules-h">
+    <div class="section-head">
+      <h2 id="rules-h">Правила облика</h2>
+    </div>
+    <div class="rules">
+      <div>
+        <h3>Как читается боец</h3>
+        <ol>
+          <li><b>Сторона — краска щита.</b> Самая большая цветная площадь и сверху, и спереди. Клан игрока — жёлтая охра и сажа, правитель — красная охра и мел.</li>
+          <li><b>Отряд — узор щита</b> в цветах стороны: половины, четверти, кайма, клинья, полоса.</li>
+          <li><b>Дружинник — цвет одежды и плаща,</b> шлем и свой щит. Каждый одет по-своему, черта характера показывается значком в интерфейсе, а не одеждой.</li>
+          <li><b>Опыт — достаток:</b> отделка тесьмой, пояс с бляшками, браслет, у элиты гривна, шёлк и наборный пояс.</li>
+          <li><b>Набор — силуэт:</b> копьё выше головы, топор с бородкой, меч, стёганка с продольной стёжкой, кольчуга, шапка или шлем.</li>
+          <li><b>Мирный — без щита.</b> В руках орудие или ноша: заступ, серп, прялка, корзина, ведро.</li>
+        </ol>
+      </div>
+      <div>
+        <h3>Чего не рисуем</h3>
+        <ul>
+          <li>Рогатые и крылатые шлемы, латы, каплевидные щиты, высокие остроконечные шлемы — это не наш век.</li>
+          <li>Кресты, солнечные колёса и коловраты, валькнут, руны-эмблемы, свастики в любом виде, сочетания цветов современных флагов.</li>
+          <li>Узоры щитов с загнутыми лучами: только прямые деления.</li>
+          <li>Народ как злодей. Люди колдуна отличаются знаком веры, а не племенной одеждой.</li>
+          <li>Кожаные «байкерские» доспехи, меха на каждом, двуручные секиры у всех.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="foot">Подробно — в <code>docs/design/art-style.md</code>. Генераторы — <code>docs/design/art/paperdoll.js</code> (люди) и <code>docs/design/art/objects.js</code> (постройки); это эскизы для решений и эталон для 3D-моделей, не игровые ассеты.</p>
+  </section>
+</div>
+
+<script src="paperdoll.js"></script>
+<script src="objects.js"></script>
+<script>
+(function () {
+  'use strict';
+  var PD = window.Paperdoll;
+  if (!PD) { document.querySelector('.wrap').insertAdjacentHTML('afterbegin', '<p>Не загрузился paperdoll.js.</p>'); return; }
+
+  // Числа из content/defs/combat.json на 26.11.2026
+  var DATA = {
+    weapon: { sword: { n: 'меч', reach: 0.5, pen: 0 }, axe: { n: 'топор', reach: 0.5, pen: 300 },
+              spear: { n: 'копьё', reach: 1.5, pen: 200 }, seax: { n: 'сакс', reach: 0.3, pen: 100 } },
+    body: { none: { n: 'нет', p: 0 }, padded: { n: 'стёганка', p: 70 }, mail: { n: 'кольчуга', p: 140 } },
+    head: { none: { n: 'нет', p: 0 }, cap: { n: 'шапка', p: 30 }, helm: { n: 'шлем', p: 60 } },
+    exp: { 'new': { morale: 600, def: 0 }, experienced: { morale: 750, def: 40 }, professional: { morale: 850, def: 80 }, elite: { morale: 950, def: 120 } }
+  };
+  var ROLE = { militia: 'Ополченец', warrior: 'Боец отряда', retainer: 'Дружинник', bandit: 'Разбойник', citizen: 'Мирный житель', woman: 'Женщина' };
+  function civil(s) { return s.role === 'citizen' || s.role === 'woman'; }
+  var KITN = {
+    'axe-shield': 'топор и щит', 'spear-shield': 'копьё и щит', 'axe-shield-padded': 'топор, стёганка, шапка',
+    'spear-shield-padded': 'копьё, стёганка, шапка', 'sword-shield-padded': 'меч, стёганка, шапка',
+    'sword-shield-mail': 'меч, кольчуга, шлем', 'axe-shield-mail': 'топор, кольчуга, шлем'
+  };
+
+  var state = {
+    entry: PD.ROSTER[5],
+    gen: Object.assign({}, PD.ROSTER[5].make),
+    spec: PD.rosterSpec(PD.ROSTER[5]),
+    formation: 'shieldwall',
+    enemy: 'bandits'
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function el(tag, attrs, html) {
+    var e = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    if (html != null) e.innerHTML = html;
+    return e;
+  }
+  function options(sel, map) {
+    sel.innerHTML = '';
+    Object.keys(map).forEach(function (k) { sel.appendChild(el('option', { value: k }, map[k])); });
+  }
+  function fmt(n) { return String(n).replace('.', ','); }
+
+  // ---------- состав ----------
+  var chips = $('roster-chips');
+  PD.ROSTER.forEach(function (e, i) {
+    var b = el('button', { type: 'button', class: 'chip', 'data-i': i }, e.chip);
+    b.addEventListener('click', function () { loadEntry(e); });
+    chips.appendChild(b);
+  });
+
+  var pchips = $('people-chips');
+  PD.PEOPLE.forEach(function (e, i) {
+    var b = el('button', { type: 'button', class: 'chip', 'data-p': i }, e.chip);
+    b.addEventListener('click', function () { loadEntry(e); });
+    pchips.appendChild(b);
+  });
+
+  function loadEntry(e) {
+    state.entry = e;
+    state.gen = Object.assign({}, e.make);
+    state.spec = PD.rosterSpec(e);
+    state.enemy = e.side === 'clan' ? (state.enemy === 'clan-militia' ? 'bandits' : state.enemy) : 'clan-militia';
+    $('s-enemy').value = state.enemy;
+    render();
+  }
+
+  // ---------- генератор ----------
+  options($('g-role'), ROLE);
+  var sideMap = {}; Object.keys(PD.SIDES).forEach(function (k) { sideMap[k] = PD.SIDES[k].name; });
+  options($('g-side'), sideMap);
+  var kitMap = {}; Object.keys(PD.KITS).forEach(function (k) { kitMap[k] = k; });
+  options($('g-kit'), kitMap);
+  options($('g-exp'), PD.LABELS.exp);
+  options($('g-wealth'), PD.LABELS.wealth);
+  options($('g-style'), PD.LABELS.style);
+  ['role', 'side', 'kit', 'exp', 'wealth', 'style'].forEach(function (k) {
+    $('g-' + k).addEventListener('change', function (ev) {
+      state.gen[k] = ev.target.value;
+      if (k === 'role' && (ev.target.value === 'citizen' || ev.target.value === 'woman') && state.gen.wealth == null) state.gen.wealth = 1;
+      if (k === 'role' && !(ev.target.value === 'citizen' || ev.target.value === 'woman')) { state.gen.kit = state.gen.kit || 'axe-shield'; state.gen.exp = state.gen.exp || 'new'; }
+      if (k === 'exp' && state.gen.role !== 'retainer' && (ev.target.value === 'professional' || ev.target.value === 'elite')) {
+        state.gen.role = 'retainer';
+      }
+      regenerate();
+    });
+  });
+  $('g-new').addEventListener('click', function () {
+    state.gen.seed = (state.gen.seed || 1) + 1 + Math.floor(Math.random() * 97);
+    regenerate();
+  });
+  function regenerate() {
+    state.entry = null;
+    state.spec = PD.make(state.gen);
+    render();
+  }
+
+  // ---------- слои ----------
+  var WEAPONS = Object.assign({ none: 'без оружия' }, PD.LABELS.weapon);
+  var LAYERS = [
+    ['head', 'Голова', PD.LABELS.head, 'm'],
+    ['outer', 'Корпус', PD.LABELS.outer, 'm'],
+    ['weapon', 'Оружие', WEAPONS, 'm'],
+    ['shield', 'Щит', { yes: 'круглый', '': 'нет' }, 'm'],
+    ['shield.pattern', 'Узор щита', PD.LABELS.pattern, 'm'],
+    ['sidearm', 'На поясе', { '': 'ничего', seax: 'сакс' }, 'm'],
+    ['tool', 'В правой руке', PD.LABELS.tool, 'all'],
+    ['carry', 'В левой руке', PD.LABELS.carry, 'all'],
+    ['dress', 'Платье', PD.LABELS.dress, 'f'],
+    ['fhead', 'Голова', PD.LABELS.fhead, 'f'],
+    ['shawl', 'Шаль', { '': 'нет', yes: 'есть' }, 'f'],
+    ['apron', 'Передник', { '': 'нет', yes: 'есть' }, 'f'],
+    ['brooches', 'Фибулы', PD.LABELS.brooches, 'f'],
+    ['beads', 'Бусы', { '': 'нет', yes: 'есть' }, 'f'],
+    ['cloak', 'Плащ', { '': 'нет', yes: 'есть' }, 'all'],
+    ['belt', 'Пояс', PD.LABELS.belt, 'm'],
+    ['trouserCut', 'Штаны', { narrow: 'узкие', wide: 'широкие, со сборкой' }, 'm'],
+    ['hairStyle', 'Волосы', PD.LABELS.hairStyle, 'm'],
+    ['beard', 'Борода', PD.LABELS.beard, 'm'],
+    ['armRing', 'Браслет', { '': 'нет', bronze: 'бронза', silver: 'серебро', gold: 'золото' }, 'm'],
+    ['neckRing', 'Гривна', { '': 'нет', bronze: 'бронза', silver: 'серебро' }, 'all'],
+    ['metal', 'Металл отделки', { bronze: 'бронза', silver: 'серебро' }, 'all']
+  ];
+  var ls = $('layer-selects');
+  LAYERS.forEach(function (L) {
+    var lab = el('label', { class: 'sel', 'data-for': L[3] }, L[1]);
+    var s = el('select', { id: 'l-' + L[0].replace('.', '-') });
+    options(s, L[2]);
+    s.addEventListener('change', function () { setLayer(L[0], s.value); });
+    lab.appendChild(s);
+    ls.appendChild(lab);
+  });
+  function getLayer(k) {
+    var s = state.spec;
+    if (k === 'cloak') return s.cloak ? 'yes' : '';
+    if (k === 'shield') return s.shield ? 'yes' : '';
+    if (k === 'shawl' || k === 'apron') return s[k] ? 'yes' : '';
+    if (k === 'beads') return s.beads ? 'yes' : '';
+    if (k === 'shield.pattern') return s.shield ? s.shield.pattern : 'plain';
+    var v = s[k];
+    return v == null ? '' : v;
+  }
+  function setLayer(k, v) {
+    var s = state.spec;
+    if (k === 'cloak') s.cloak = v ? (s.cloak || { color: 'woad-dark' }) : null;
+    else if (k === 'shield') s.shield = v ? (s.shield || { pattern: PD.SIDES[s.side || 'clan'].pattern, c1: PD.SIDES[s.side || 'clan'].c1, c2: PD.SIDES[s.side || 'clan'].c2, rim: true }) : null;
+    else if (k === 'shawl') s.shawl = v ? (s.shawl || 'wool-cream') : null;
+    else if (k === 'apron') s.apron = v ? (s.apron || 'woad-dark') : null;
+    else if (k === 'beads') s.beads = !!v;
+    else if (k === 'shield.pattern') { if (s.shield) s.shield.pattern = v; }
+    else if (k === 'outer') {
+      s.outer = v;
+      if ((v === 'padded' || v === 'caftan') && !s.outerColor) s.outerColor = v === 'padded' ? 'linen' : 'madder';
+    } else s[k] = v || null;
+    if (k === 'cloak' && !v) {} // nothing
+    state.entry = null;
+    render();
+  }
+
+  // ---------- цвета ----------
+  var CLOTH = Object.keys(PD.COLORS).filter(function (k) { var g = PD.COLORS[k].group; return g === 'cloth' || g === 'dye' || g === 'silk'; });
+  var PIG = Object.keys(PD.COLORS).filter(function (k) { return PD.COLORS[k].group === 'pigment'; });
+  var HAIR = Object.keys(PD.COLORS).filter(function (k) { return PD.COLORS[k].group === 'hair'; });
+  var SKIN = Object.keys(PD.COLORS).filter(function (k) { return PD.COLORS[k].group === 'skin'; });
+  var SWATCHES = [
+    ['tunic', 'Рубаха', CLOTH, false, 'all'], ['trousers', 'Штаны', CLOTH, false, 'm'], ['wraps', 'Обмотки', CLOTH, false, 'm'],
+    ['outerColor', 'Стёганка, кафтан', CLOTH, false, 'm'], ['dressColor', 'Платье, юбка', CLOTH, false, 'f'],
+    ['shawl', 'Шаль', CLOTH, false, 'f'], ['apron', 'Передник', CLOTH, false, 'f'], ['beltColor', 'Тканый пояс', CLOTH, false, 'f'],
+    ['trim', 'Отделка', CLOTH, true, 'all'],
+    ['cloak.color', 'Плащ', CLOTH, false, 'all'], ['cloak.lining', 'Подкладка', CLOTH, true, 'all'], ['headColor', 'Шапка, платок', CLOTH, false, 'all'],
+    ['shield.c1', 'Щит, поле', PIG, false, 'm'], ['shield.c2', 'Щит, узор', PIG, false, 'm'], ['hair', 'Волосы', HAIR, false, 'all'], ['skin', 'Кожа', SKIN, false, 'all']
+  ];
+  var swBox = $('swatches');
+  SWATCHES.forEach(function (S) {
+    var row = el('div', { class: 'swrow', role: 'group', 'aria-label': S[1], 'data-for': S[4] });
+    row.appendChild(el('span', null, S[1]));
+    var box = el('div', { class: 'sw', 'data-key': S[0] });
+    if (S[3]) {
+      var nb = el('button', { type: 'button', class: 'none', 'data-v': '', title: 'нет', 'aria-label': 'нет' });
+      box.appendChild(nb);
+    }
+    S[2].forEach(function (k) {
+      var b = el('button', { type: 'button', 'data-v': k, title: PD.COLORS[k].name, 'aria-label': PD.COLORS[k].name });
+      b.style.background = PD.COLORS[k].hex;
+      box.appendChild(b);
+    });
+    box.addEventListener('click', function (ev) {
+      var b = ev.target.closest('button'); if (!b) return;
+      setColor(S[0], b.getAttribute('data-v'));
+    });
+    row.appendChild(box);
+    swBox.appendChild(row);
+  });
+  function getColor(k) {
+    var s = state.spec, parts = k.split('.');
+    if (parts.length === 2) return s[parts[0]] ? (s[parts[0]][parts[1]] || '') : null;
+    return s[k] || '';
+  }
+  function setColor(k, v) {
+    var s = state.spec, parts = k.split('.');
+    if (parts.length === 2) {
+      if (parts[0] === 'cloak' && !s.cloak) s.cloak = { color: 'woad-dark' };
+      if (!s[parts[0]]) return;
+      s[parts[0]][parts[1]] = v || null;
+    } else {
+      s[k] = v || null;
+      if (k === 'trim' && v && (!s.trimAt || !s.trimAt.length)) s.trimAt = ['neck', 'cuffs', 'hem'];
+    }
+    state.entry = null;
+    render();
+  }
+
+  // ---------- карточка набора ----------
+  function kitOf(s) {
+    var body = s.outer === 'padded' ? 'padded' : s.outer === 'mail' ? 'mail' : 'none';
+    var head = (s.head || '').indexOf('helm') === 0 ? 'helm' : (s.head || '').indexOf('cap') === 0 ? 'cap' : 'none';
+    var id = null;
+    Object.keys(PD.KITS).forEach(function (k) {
+      var K = PD.KITS[k];
+      if (K.weapon === s.weapon && K.body === body && K.head === head && s.shield) id = k;
+    });
+    return { id: id, body: body, head: head };
+  }
+  function renderKit() {
+    var s = state.spec, k = kitOf(s), w = DATA.weapon[s.weapon], e = DATA.exp[s.exp] || DATA.exp['new'];
+    var h = '';
+    if (civil(s) || !w) {
+      h += '<dt>Кто</dt><dd>' + (civil(s) ? 'мирный, в бою не участвует' : 'без оружия') + '</dd>';
+      if (s.wealth != null) h += '<dt>Достаток</dt><dd>' + PD.LABELS.wealth[s.wealth] + '</dd>';
+      if (s.style) h += '<dt>Убор</dt><dd>' + PD.LABELS.style[s.style] + '</dd>';
+      h += '<dt>В руках</dt><dd>' + ([PD.LABELS.tool[s.tool || ''], PD.LABELS.carry[s.carry || '']].filter(function (x) { return x && x !== 'ничего'; }).join(', ') || 'ничего') + '</dd>';
+      h += '<dt>Сверху</dt><dd>без щита</dd>';
+      $('kit-card').innerHTML = h;
+      return;
+    }
+    h += '<dt>Набор</dt><dd>' + (k.id ? '<span class="mono">' + k.id + '</span>' : '<span class="warn">нет в combat.json</span>') + '</dd>';
+    h += '<dt>Оружие</dt><dd>' + w.n + ', досяг ' + fmt(w.reach) + ' м, пробивание ' + w.pen + '‰</dd>';
+    h += '<dt>Щит</dt><dd>' + (s.shield ? 'круглый, 220‰' : 'нет') + '</dd>';
+    h += '<dt>Доспех</dt><dd>' + DATA.body[k.body].n + (DATA.body[k.body].p ? ', ' + DATA.body[k.body].p + '‰' : '') + '</dd>';
+    h += '<dt>Голова</dt><dd>' + DATA.head[k.head].n + (DATA.head[k.head].p ? ', ' + DATA.head[k.head].p + '‰' : '') + '</dd>';
+    h += '<dt>Опыт</dt><dd>' + PD.LABELS.exp[s.exp] + ', мораль ' + e.morale + '</dd>';
+    $('kit-card').innerHTML = h;
+  }
+
+  // ---------- строй сверху ----------
+  function mates(spec, n, base) {
+    var g;
+    if (spec.role === 'retainer') g = { role: 'warrior', side: spec.side, kit: 'sword-shield-padded', exp: 'experienced' };
+    else g = { role: spec.role, side: spec.side, kit: spec.kit, exp: spec.exp };
+    if (g.side === 'ruler' && g.role === 'warrior') g.pattern = 'rim';
+    var out = [];
+    for (var i = 0; i < n; i++) out.push(PD.make(Object.assign({ seed: base + i * 7 }, g)));
+    return out;
+  }
+  function enemyLine(kind) {
+    var g, lead = null;
+    if (kind === 'bandits') g = { role: 'bandit', side: 'bandits', kit: 'axe-shield-padded', exp: 'experienced' };
+    else if (kind === 'ruler-militia') g = { role: 'militia', side: 'ruler', kit: 'spear-shield', exp: 'new' };
+    else if (kind === 'ruler-hird') { g = { role: 'retainer', side: 'ruler', kit: 'sword-shield-mail', exp: 'professional' }; lead = PD.rosterSpec(PD.ROSTER[8]); }
+    else g = { role: 'militia', side: 'clan', kit: 'spear-shield-padded', exp: 'experienced' };
+    var out = [];
+    for (var i = 0; i < 8; i++) out.push(PD.make(Object.assign({ seed: 300 + i * 11 }, g)));
+    if (lead) out[2] = lead;
+    return out;
+  }
+  function renderScene() {
+    var F = state.formation === 'line' ? { sp: 100, rk: 120 } : { sp: 75, rk: 100 };
+    var W = 640, H = 640, cx = W / 2;
+    var o = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Два отряда сверху">';
+    // сетка 1 м
+    o += '<g stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="1">';
+    for (var x = 20; x < W; x += 100) o += '<line x1="' + x + '" y1="0" x2="' + x + '" y2="' + H + '"/>';
+    for (var y = 30; y < H; y += 100) o += '<line x1="0" y1="' + y + '" x2="' + W + '" y2="' + y + '"/>';
+    o += '</g>';
+    // пучки травы и камни (детерминированно)
+    var seed = 7;
+    function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+    for (var t = 0; t < 70; t++) {
+      var gx = rnd() * W, gy = rnd() * H;
+      o += '<path d="M' + gx.toFixed(1) + ',' + gy.toFixed(1) + ' l-3,-6 M' + gx.toFixed(1) + ',' + gy.toFixed(1) + ' l1,-7 M' + gx.toFixed(1) + ',' + gy.toFixed(1) + ' l4,-5" stroke="#5E6A45" stroke-width="1.4" fill="none" stroke-linecap="round"/>';
+    }
+    var enemy = enemyLine(state.enemy);
+    var own = civil(state.spec) || !state.spec.shield
+      ? mates({ role: 'militia', side: state.spec.side === 'bandits' ? 'bandits' : (state.spec.side || 'clan'), kit: 'axe-shield-padded', exp: 'experienced' }, 8, 100)
+      : mates(state.spec, 8, 100);
+    if (!civil(state.spec) && state.spec.shield) own[1] = state.spec;
+    var frontOwn = 410, frontEnemy = 220;
+    function place(list, front, dir) {
+      var g = '';
+      // задний ряд первым, чтобы передний перекрывал
+      for (var r = 1; r >= 0; r--) {
+        for (var i = 0; i < 4; i++) {
+          var s = list[r * 4 + i];
+          var px = cx + (i - 1.5) * F.sp;
+          var py = front + dir * r * F.rk;
+          g += '<g transform="translate(' + px + ',' + py + ') rotate(' + (dir > 0 ? 0 : 180) + ')">' + PD.topInner(s) + '</g>';
+        }
+      }
+      return g;
+    }
+    o += place(enemy, frontEnemy, -1);
+    o += place(own, frontOwn, 1);
+    // масштаб
+    o += '<g transform="translate(24,' + (H - 28) + ')"><rect width="100" height="6" fill="#F1F2EA"/><rect width="50" height="6" fill="#2B2826"/>' +
+         '<text x="0" y="-6" fill="#F1F2EA" font-family="Alegreya Sans, sans-serif" font-size="15">1 м</text></g>';
+    o += '</svg>';
+    $('scene').innerHTML = o;
+  }
+  $('s-form').addEventListener('change', function (e) { state.formation = e.target.value; renderScene(); });
+  $('s-enemy').addEventListener('change', function (e) { state.enemy = e.target.value; renderScene(); });
+
+  // ---------- состав: карточки ----------
+  function sideSwatch(id) {
+    var S = PD.SIDES[id];
+    return '<i style="background:linear-gradient(90deg,' + PD.col(S.c1) + ' 50%,' + PD.col(S.c2) + ' 50%)"></i>' + S.name;
+  }
+  var rosterBox = $('roster');
+  PD.ROSTER.forEach(function (e) {
+    var s = PD.rosterSpec(e);
+    var b = el('button', { type: 'button', class: 'card', 'aria-label': e.title + ': ' + e.sub });
+    b.innerHTML = '<div class="pics">' + PD.front(s, { title: e.title }) + '<div class="token">' + PD.top(s, { title: e.title + ', сверху' }) + '</div></div>' +
+      '<h3>' + e.title + '</h3><div style="display:grid;gap:4px;align-content:start"><p>' + e.sub + '</p><span class="side-tag">' + sideSwatch(e.side) + '</span></div>';
+    b.addEventListener('click', function () {
+      loadEntry(e);
+      document.getElementById('bench-h').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    });
+    rosterBox.appendChild(b);
+  });
+
+  // ---------- люди: карточки ----------
+  var peopleBox = $('people');
+  PD.PEOPLE.forEach(function (e) {
+    var s = PD.rosterSpec(e);
+    var b = el('button', { type: 'button', class: 'card', 'aria-label': e.title + ': ' + e.sub });
+    b.innerHTML = '<div class="pics">' + PD.front(s, { title: e.title }) + '<div class="token">' + PD.top(s, { title: e.title + ', сверху' }) + '</div></div>' +
+      '<h3>' + e.title + '</h3><div style="display:grid;gap:4px;align-content:start"><p>' + e.sub + '</p><span class="side-tag">' + (e.side === 'clan' ? 'клан игрока' : 'селение удела') + '</span></div>';
+    b.addEventListener('click', function () {
+      loadEntry(e);
+      document.getElementById('bench-h').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    });
+    peopleBox.appendChild(b);
+  });
+
+  // ---------- постройки и предметы ----------
+  var OB = window.Objects;
+  if (OB) {
+    var objBox = $('objects'), groupBox = $('obj-groups'), current = 'all';
+    var groups = Object.assign({ all: 'Все' }, OB.GROUPS);
+    Object.keys(groups).forEach(function (g) {
+      var b = el('button', { type: 'button', class: 'chip', 'data-g': g, 'aria-pressed': String(g === 'all') }, groups[g]);
+      b.addEventListener('click', function () {
+        current = g;
+        Array.prototype.forEach.call(groupBox.children, function (c) { c.setAttribute('aria-pressed', String(c.getAttribute('data-g') === g)); });
+        Array.prototype.forEach.call(objBox.children, function (c) { c.hidden = !(g === 'all' || c.getAttribute('data-g') === g); });
+      });
+      groupBox.appendChild(b);
+    });
+    OB.OBJECTS.forEach(function (o) {
+      var card = el('article', { class: 'obj', 'data-g': o.group });
+      var size = fmt(o.size[0]) + ' × ' + fmt(o.size[1]) + ' м';
+      card.innerHTML = '<div class="v">' + OB.view(o.id) + '</div>' +
+        '<div class="pl">' + OB.plan(o.id) + '</div>' +
+        '<div style="display:grid;gap:4px"><h3>' + o.name + '</h3>' +
+        '<div class="meta"><span>' + size + '</span><span>высота ' + fmt(o.h) + ' м</span><span class="tag ' + o.sim + '">' + OB.SIM[o.sim] + '</span></div>' +
+        '<p>' + o.where + '</p><p>' + o.note + '</p></div>';
+      objBox.appendChild(card);
+    });
+    $('obj-sim').addEventListener('change', function (e) { objBox.classList.toggle('hide-sim', !e.target.checked); });
+    var vBox = $('village');
+    function renderVillage() { vBox.innerHTML = OB.village(PD, { sim: $('v-sim').checked }); }
+    $('v-sim').addEventListener('change', renderVillage);
+    $('v-zoom').addEventListener('click', function () {
+      var z = vBox.classList.toggle('zoom');
+      this.setAttribute('aria-pressed', String(z));
+      this.textContent = z ? 'Мельче' : 'Крупнее';
+    });
+    renderVillage();
+  }
+
+  // ---------- палитра ----------
+  var GROUPS = [
+    ['cloth', 'Без краски', 'Шерсть разных овец и небелёный лён. Основная одежда ополчения и бедняков.'],
+    ['dye', 'Растительные красители', 'Марена, вайда, резеда, кора, лишайник. Чем гуще цвет, тем дороже ткань.'],
+    ['silk', 'Привозной шёлк', 'Полосы на ворот, обшлага и полы кафтана. Только у профессионалов и элиты.'],
+    ['pigment', 'Краски щитов', 'Охры, мел, сажа на досках, по коже или прямо по дереву. Ярь-медянка — редкость.'],
+    ['metal', 'Металл', 'Железо оружия и доспеха, бронза и серебро украшений, золото — почти никогда.'],
+    ['leather', 'Кожа, мех, дерево', '']
+  ];
+  var pal = $('palette');
+  GROUPS.forEach(function (G) {
+    var box = el('div', { class: 'pal-group' });
+    box.appendChild(el('h3', null, G[1]));
+    if (G[2]) box.appendChild(el('p', null, G[2]));
+    Object.keys(PD.COLORS).forEach(function (k) {
+      var c = PD.COLORS[k];
+      if (c.group !== G[0]) return;
+      box.appendChild(el('div', { class: 'pal-item' }, '<i style="background:' + c.hex + '"></i><span>' + c.name + '</span><span class="mono">' + c.hex + '</span>'));
+    });
+    pal.appendChild(box);
+  });
+
+  // стороны
+  function miniShield(sh) { return PD.shield(sh, { width: 44 }); }
+  var SIDE_ROWS = [
+    ['Клан игрока', 'жёлтая охра и сажа', 'половины, четверти, кайма', { pattern: 'halves', c1: 'ochre-yellow', c2: 'soot', rim: true }, 'Жёлто-чёрные щиты известны по находкам эпохи; светлое и тёмное различимы и при нарушении цветового зрения.'],
+    ['Ополчение клана', 'дерево и полоса сажи', 'полоса', { pattern: 'band', c1: 'wood', c2: 'soot', rim: false }, 'Селение под защитой клана красит на свои щиты полосу его цвета.'],
+    ['Правитель', 'красная охра и мел', 'кайма, клинья', { pattern: 'spokes', c1: 'ochre-red', c2: 'chalk', rim: true }, 'Тёплый средний тон против тёмного и светлого у клана.'],
+    ['Ополчение правителя', 'дерево и полоса охры', 'полоса', { pattern: 'band', c1: 'wood', c2: 'ochre-red', rim: false }, ''],
+    ['Разбойники', 'некрашеное дерево', 'обрывки чужой краски', { pattern: 'scraps', c1: 'wood', c2: 'chalk', rim: false }, 'Щиты добыты в разных местах; ни одного общего знака.']
+  ];
+  var t = '<table><thead><tr><th>Кто</th><th>Щит</th><th>Цвета</th><th>Узоры</th><th>Зачем так</th></tr></thead><tbody>';
+  SIDE_ROWS.forEach(function (r) {
+    t += '<tr><td>' + r[0] + '</td><td>' + miniShield(r[3]) + '</td><td>' + r[1] + '</td><td>' + r[2] + '</td><td style="color:var(--muted)">' + r[4] + '</td></tr>';
+  });
+  t += '</tbody></table>';
+  $('sides').innerHTML = t;
+
+  // ---------- отрисовка ----------
+  function render() {
+    var s = state.spec;
+    $('fig-front').innerHTML = PD.front(s, { title: 'Боец спереди' });
+    $('fig-top').innerHTML = PD.top(s, { title: 'Боец сверху' });
+    var name = state.entry ? state.entry.title : ROLE[s.role] || 'Боец';
+    var sub = state.entry ? state.entry.sub : civil(s)
+      ? (PD.LABELS.wealth[s.wealth] + (s.style ? ' · ' + PD.LABELS.style[s.style] : '') + ' · ' + PD.SIDES[s.side].name.toLowerCase())
+      : (PD.LABELS.exp[s.exp] + ' · ' + (KITN[s.kit] || s.kit) + ' · ' + PD.SIDES[s.side].name.toLowerCase());
+    $('who-name').textContent = name;
+    $('who-sub').textContent = sub;
+    renderKit();
+    // контролы
+    $('g-role').value = state.gen.role; $('g-side').value = state.gen.side;
+    var cv = civil(s), fem = s.sex === 'f';
+    $('w-kit').hidden = cv; $('w-exp').hidden = cv; $('w-wealth').hidden = !cv; $('w-style').hidden = !(cv && fem);
+    if (state.gen.kit) $('g-kit').value = state.gen.kit;
+    if (state.gen.exp) $('g-exp').value = state.gen.exp;
+    $('g-wealth').value = String(state.gen.wealth == null ? 1 : state.gen.wealth);
+    $('g-style').value = s.style || 'shawl';
+    LAYERS.forEach(function (L) { $('l-' + L[0].replace('.', '-')).value = getLayer(L[0]); });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-for]'), function (n) {
+      var f = n.getAttribute('data-for');
+      n.hidden = !(f === 'all' || (f === 'f') === fem);
+    });
+    Array.prototype.forEach.call(swBox.querySelectorAll('.sw'), function (box) {
+      var v = getColor(box.getAttribute('data-key'));
+      Array.prototype.forEach.call(box.children, function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-v') === (v || ''))); });
+    });
+    Array.prototype.forEach.call(chips.children, function (b) {
+      b.setAttribute('aria-pressed', String(state.entry === PD.ROSTER[+b.getAttribute('data-i')]));
+    });
+    Array.prototype.forEach.call(pchips.children, function (b) {
+      b.setAttribute('aria-pressed', String(state.entry === PD.PEOPLE[+b.getAttribute('data-p')]));
+    });
+    renderScene();
+  }
+  render();
+})();
+</script>

@@ -1,0 +1,16 @@
+{
+  "id": "m4-ai",
+  "ai": [1],
+  "description": "M4 step 2, the AI frame (battle-sim.md §14): your two squads hold a line (side 0, no orders: Hold); the enemy AI plays the raiders (side 1). Outnumbering you, they attack: each squad goes for the nearest of yours, at most two on one while the other stands free, and the second squad on a target goes round to its open flank before it strikes. Ulfr (proud, elite) leads the Raider line and gives his battle cry once he is in contact with at least 4 of your men. Watch the replay for the flank march, the cry and, if a raider squad breaks, its regrouping.",
+  "map": {"width": 80, "height": 60},
+  "squads": [
+    {"name": "Hird line", "side": 0, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line", "position": [30, 20], "facing": 90},
+    {"name": "Shield wall", "side": 0, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "shieldwall", "position": [50, 20], "facing": 90},
+    {"name": "Raider line", "side": 1, "body": "man", "men": [{ "count": 7, "experience": "experienced", "kit": "sword-shield-padded" }], "formation": "line", "position": [30, 44], "facing": 270},
+    {"name": "Raider spears", "side": 1, "body": "man", "men": [{ "count": 8, "experience": "experienced", "kit": "spear-shield-padded" }], "formation": "line", "position": [52, 44], "facing": 270},
+    {"name": "Raider levy", "side": 1, "body": "man", "men": [{ "count": 8, "experience": "new", "kit": "axe-shield" }], "formation": "line", "position": [40, 52], "facing": 270}
+  ],
+  "retainers": [
+    { "name": "Ulfr", "side": 1, "trait": "proud", "body": "man", "experience": "elite", "kit": "sword-shield-mail", "squad": "Raider line" }
+  ]
+}

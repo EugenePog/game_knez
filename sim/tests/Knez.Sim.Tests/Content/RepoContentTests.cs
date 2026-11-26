@@ -93,6 +93,17 @@ public class RepoContentTests
     }
 
     [Test]
+    public void Repo_AiRules_ComeFromContent_AndEqualTheCodesStandardCopy()
+    {
+        var ai = ScenarioFiles.Load(Path.Combine(RepoPaths.Content, "scenarios", "march.json")).Ai;
+        Assert.Multiple(() =>
+        {
+            Assert.That(ai, Is.Not.SameAs(Knez.Sim.Defs.AiDef.Standard));
+            Assert.That(ai.Fingerprint, Is.EqualTo(Knez.Sim.Defs.AiDef.Standard.Fingerprint), "ai.json and AiDef.Standard differ; change both together");
+        });
+    }
+
+    [Test]
     public void Repo_HasAtLeastOneScenario()
     {
         Assert.That(ScenarioFilesInRepo(), Is.Not.Empty);

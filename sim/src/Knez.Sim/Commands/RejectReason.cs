@@ -44,8 +44,14 @@ namespace Knez.Sim.Commands
         /// <summary>The Retainer's ability is still cooling down (M3 step 11).</summary>
         public static readonly RejectReason CoolingDown = new RejectReason("cooling-down");
 
+        /// <summary>The squad to attack is broken already (M4 step 1): its men are running; a Pursue stance chases them.</summary>
+        public static readonly RejectReason TargetBroken = new RejectReason("target-broken");
+
         /// <summary>The Retainer's ability is defined but not built yet (M3 step 11: promise loot, front-rank rush, no quarter).</summary>
         public static readonly RejectReason NotBuilt = new RejectReason("not-built");
+
+        /// <summary>The AI plays that side (M4 step 2): it gives its own orders, and a player's would fight them.</summary>
+        public static readonly RejectReason AiSide = new RejectReason("ai-side");
 
         private RejectReason(string code)
         {

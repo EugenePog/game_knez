@@ -109,6 +109,53 @@ namespace Knez.Game.Tests
         }
 
         [Test]
+        public void AttackAndStance_InWords()
+        {
+            // M4 step 1.
+            var sim = Formations();
+            var mine = sim.State.Squads.First(s => s.SideId == 0);
+            var enemy = sim.State.Squads.FirstOrDefault(s => s.SideId == 1);
+            Assert.That(HudText.Stance(mine.Stance), Is.EqualTo("hold"));
+            Assert.That(HudText.Fight(sim.State, mine), Is.Empty);
+            sim.Enqueue(new SetStanceCommand(0, mine.Id, Knez.Sim.Orders.SquadStance.Pursue));
+            sim.Step();
+            Assert.That(HudText.Stance(mine.Stance), Is.EqualTo("pursue"));
+            sim.Enqueue(new AttackSquadCommand(0, mine.Id, mine.Id));
+            sim.Step();
+            var rejected = sim.State.Events.OfType<CommandRejected>().Single();
+            Assert.That(HudText.Refusal(sim.State, rejected.Command, rejected.Reason), Is.EqualTo(mine.Name + ": that squad is yours"));
+            if (enemy != null)
+            {
+                sim.Enqueue(new AttackSquadCommand(0, mine.Id, enemy.Id));
+                sim.Step();
+                Assert.That(HudText.Fight(sim.State, mine), Is.EqualTo("attacking " + enemy.Name));
+            }
+        }
+
+        [Test]
+        public void Ai_InWords_WhatItHasEachSquadDoing()
+        {
+            // M4 step 2: in m4-ai (seed 1) the raiders decide within their first second.
+            var sim = new BattleSimulation(BattleSetup.Create(ContentFiles.LoadScenario(ContentFiles.DefaultRoot(), "scenarios/m4/m4-ai.json"), 1));
+            var levy = sim.State.Squads.Single(s => s.Name == "Raider levy");
+            var mine = sim.State.Squads.Single(s => s.Name == "Hird line");
+            Assert.That(HudText.Ai(sim.State, levy), Is.Empty, "no decision yet");
+            for (int t = 0; t < BattleState.TicksPerSecond; t++)
+            {
+                sim.Step();
+            }
+
+            Assert.That(HudText.Ai(sim.State, levy), Is.EqualTo("AI: going round Hird line's flank"));
+            Assert.That(HudText.Ai(sim.State, sim.State.Squads.Single(s => s.Name == "Raider line")), Is.EqualTo("AI: attacking Hird line"));
+            Assert.That(HudText.Ai(sim.State, mine), Is.Empty, "the player's own squads have no AI");
+
+            sim.Enqueue(new SetStanceCommand(1, levy.Id, Knez.Sim.Orders.SquadStance.Hold));
+            sim.Step();
+            var rejected = sim.State.Events.OfType<CommandRejected>().Single();
+            Assert.That(HudText.Refusal(sim.State, rejected.Command, rejected.Reason), Is.EqualTo("Raider levy: the AI commands that side"));
+        }
+
+        [Test]
         public void ARetainersRefusedOrder_NamesHim_InPlainWords()
         {
             var sim = M3("m3-veterans");

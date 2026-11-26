@@ -14,7 +14,7 @@ namespace Knez.Sim.Defs
         public MoraleDef(int shaken, int wavering, int routing, int hysteresis, Fix lossWeight, int ownLightWound,
             int ownHeavyWound, int mateHeavyWound, int flankBlow, int rearBlow, int mateFlankBlow, int mateRearBlow,
             int mateRouts, int allySquadBroke, int enemySquadBroke, Fix nearby, int recoveryPerSecond, Fix safeDistance,
-            int rallyAt, int breakShare, int reformShare, int waveringHitPenalty, Fix leaderFell)
+            int rallyAt, int breakShare, int reformShare, int waveringHitPenalty, Fix leaderFell, Fix routPace)
         {
             Shaken = DefChecks.Permille(shaken, "shaken");
             Wavering = DefChecks.Permille(wavering, "wavering");
@@ -49,6 +49,7 @@ namespace Knez.Sim.Defs
             ReformShare = DefChecks.Range(reformShare, 1, 999, nameof(reformShare));
             WaveringHitPenalty = DefChecks.Permille(waveringHitPenalty, nameof(waveringHitPenalty));
             LeaderFell = DefChecks.NonNegative(leaderFell, 10, string.Empty, nameof(leaderFell));
+            RoutPace = DefChecks.Fraction(routPace, nameof(routPace));
             Fingerprint = ComputeFingerprint();
         }
 
@@ -60,7 +61,7 @@ namespace Knez.Sim.Defs
             lossWeight: Fix.FromInt(2), ownLightWound: 50, ownHeavyWound: 150, mateHeavyWound: 20, flankBlow: 20, rearBlow: 40,
             mateFlankBlow: 5, mateRearBlow: 10, mateRouts: 30, allySquadBroke: 150, enemySquadBroke: 100, nearby: Fix.FromInt(20),
             recoveryPerSecond: 20, safeDistance: Fix.FromInt(10), rallyAt: 350, breakShare: 500, reformShare: 500,
-            waveringHitPenalty: 40, leaderFell: Fix.One);
+            waveringHitPenalty: 40, leaderFell: Fix.One, routPace: DefChecks.Decimal(9, 10));
 
         /// <summary>Below this a steady man is shaken.</summary>
         public int Shaken { get; }
@@ -135,6 +136,10 @@ namespace Knez.Sim.Defs
         /// §13; decided 2026-11-26: as one mate), instead of it.</summary>
         public Fix LeaderFell { get; }
 
+        /// <summary>A routing man runs at this share of his run speed (M4 step 1, decided 2026-11-26: 0.9 — panic and dropped
+        /// gear), so pursuers at full run catch some.</summary>
+        public Fix RoutPace { get; }
+
         /// <summary>FNV-1a hash of every number above, in order; part of the scenario's fingerprint.</summary>
         public ulong Fingerprint { get; }
 
@@ -166,6 +171,7 @@ namespace Knez.Sim.Defs
             hash.Add(ReformShare);
             hash.Add(WaveringHitPenalty);
             hash.Add(LeaderFell.Raw);
+            hash.Add(RoutPace.Raw);
             return hash.Value;
         }
     }

@@ -1,0 +1,9 @@
+{
+  "description": "Enemy AI rules (battle-sim.md §14, M4 step 2; decided by the user 2026-11-26). A scenario lists the sides the AI plays in 'ai'. Strength is men in the fight, a heavily wounded man counting half. Once a second each AI squad decides: its side attacks while its strength is at least attackAt (permille) of the enemy's, else holds its ground in Advance; a squad already attacking holds only below holdBelow (permille; decided by the user 2026-11-26: 0.7, so odds hovering at attackAt don't start and stop it every second); below leaveBelow (permille, a third) the side leaves the field for good, marching off its edge. A squad not in melee whose men average under regroupMorale falls back regroupDistance (m) toward its nearest ally (or its start) and stands until they average readyMorale (or what they started with, if less); a broken squad does the same once it re-forms. Targets: the nearest enemy squad, helpBonus (m) nearer if an ally already fights it, at most maxOnTarget squads on one while another stands free, plus up to jitter (m) at random; the second squad on a target, standing in its front, first marches to a point flankOffset (m) beyond its open flank. AI Retainers use their built abilities: battle cry with at least cryEnemies enemy men within its radius and his squad in melee or an enemy within cryContact (m, edge to edge); close ranks with his squad in melee or a man of an enemy squad attacking it within closeRanksRange (m); stand to the death with his squad in melee and at least standShare (permille) of its living men wavering or running.",
+  "ai": {
+    "attackAt": 800, "holdBelow": 700, "leaveBelow": 333,
+    "regroupMorale": 400, "readyMorale": 600, "regroupDistance": 20,
+    "helpBonus": 10, "flankOffset": 8, "maxOnTarget": 2, "jitter": 5,
+    "cryEnemies": 4, "cryContact": 5, "closeRanksRange": 10, "standShare": 250
+  }
+}

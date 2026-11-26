@@ -43,13 +43,14 @@ public static class TestDefs
     private static MovementDef WithoutCloseIn(MovementDef s) => new(s.PivotTolerance, Fix.Ratio(s.SlotCatchUpTicks, 20),
         s.PersonalSpace, Fix.Ratio(s.SeparationTicks, 20), s.HoldingReach, s.FormedUpReach, s.CollisionPasses, s.AllyPartingDepth,
         s.PathBudget, s.RegroupLead, Fix.Ratio(s.RegroupMaxWaitTicks, 20), s.RegroupCost, s.ReformPace, s.StepBackPace,
-        s.WithdrawClearance, closeInRange: Fix.Zero, turnLagTime: Fix.Ratio(s.TurnLagTicks, 20));
+        s.WithdrawClearance, closeInRange: Fix.Zero, turnLagTime: Fix.Ratio(s.TurnLagTicks, 20), s.AdvanceRange,
+        Fix.Ratio(s.PursuitTicks, 20), s.PursuitRange);
 
     /// <summary><paramref name="s"/> with <paramref name="turnLagTime"/> seconds of turn lag (0 = men swing rigidly with their slots).</summary>
     public static MovementDef WithTurnLag(MovementDef s, Fix turnLagTime) => new(s.PivotTolerance, Fix.Ratio(s.SlotCatchUpTicks, 20),
         s.PersonalSpace, Fix.Ratio(s.SeparationTicks, 20), s.HoldingReach, s.FormedUpReach, s.CollisionPasses, s.AllyPartingDepth,
         s.PathBudget, s.RegroupLead, Fix.Ratio(s.RegroupMaxWaitTicks, 20), s.RegroupCost, s.ReformPace, s.StepBackPace,
-        s.WithdrawClearance, s.CloseInRange, turnLagTime);
+        s.WithdrawClearance, s.CloseInRange, turnLagTime, s.AdvanceRange, Fix.Ratio(s.PursuitTicks, 20), s.PursuitRange);
 
     /// <summary><paramref name="scenario"/> with <see cref="NoCloseIn"/> movement rules.</summary>
     public static ScenarioDef WithoutCloseIn(ScenarioDef scenario) =>

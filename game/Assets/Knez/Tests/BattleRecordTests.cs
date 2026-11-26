@@ -184,6 +184,37 @@ namespace Knez.Game.Tests
         }
 
         [Test]
+        public void AiDecisions_TheLogSaysWhatTheAiHasEachSquadDo_ASideLeavingOnce()
+        {
+            // M4 step 2.
+            var sim = Load("scenarios/m4/m4-ai.json");
+            var record = new BattleRecord();
+            record.Begin(sim.State);
+            for (int t = 0; t < BattleState.TicksPerSecond; t++)
+            {
+                sim.Step();
+                record.Observe(sim.State);
+            }
+
+            var lines = record.Log.Lines.Where(l => l.Kind == LogKind.Ai).Select(l => l.Text).ToList();
+            Assert.That(lines, Is.EquivalentTo(new[]
+            {
+                "Raider line attacks Hird line", "Raider levy goes round Hird line's flank", "Raider spears attacks Shield wall",
+            }));
+
+            // Two squads of a side leaving: one line for the side.
+            var raiders = sim.State.Squads.Where(s => s.SideId == 1).ToList();
+            foreach (var squad in raiders.Take(2))
+            {
+                record.Log.Apply(sim.State, new Knez.Sim.Events.SquadAiChanged(sim.State.Tick, squad.Id, Knez.Sim.Ai.SquadAiState.Engage,
+                    Knez.Sim.Ai.SquadAiState.Withdraw, EntityId.None), sweptAlong: false);
+            }
+
+            Assert.That(record.Log.Lines.Last().Text, Is.EqualTo("Side 1 leaves the field: too few left to fight on"));
+            Assert.That(record.Log.Lines.Count(l => l.Text.StartsWith("Side 1 leaves")), Is.EqualTo(1));
+        }
+
+        [Test]
         public void Retainer_CountsForTheSquadHeIsIn_StandingAloneForNone()
         {
             // M3 step 10: he leaves Veterans and stands alone, then joins them again; the tally follows him.

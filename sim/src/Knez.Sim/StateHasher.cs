@@ -67,6 +67,16 @@ namespace Knez.Sim
                 squads.Add(squad.StartCount);
                 squads.Add(squad.Broken);
                 squads.Add(squad.RegroupSince);
+                squads.Add((int)squad.Stance); // M4 step 1
+                squads.Add(squad.AttackTarget.Value);
+                squads.Add(squad.Pursuing);
+                squads.Add(squad.PursuitUntil);
+                squads.Add(squad.PursuitFrom.X.Raw);
+                squads.Add(squad.PursuitFrom.Y.Raw);
+                squads.Add((int)squad.AiState); // M4 step 2
+                squads.Add(squad.AiSince);
+                squads.Add(squad.AiTarget.Value);
+                squads.Add(squad.Leaving);
                 List<AbilityEffect> effects = squad.EffectList; // M3 step 11; the numbers are in the fingerprint
                 squads.Add(effects.Count);
                 for (int e = 0; e < effects.Count; e++)

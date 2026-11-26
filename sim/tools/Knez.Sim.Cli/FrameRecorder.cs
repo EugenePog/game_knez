@@ -24,7 +24,8 @@ public sealed class FrameRecorder : IDisposable
     /// <summary>Event types whose fields <see cref="WriteEvent"/> writes; any other type is written as its name only.
     /// A test fails when a <see cref="SimEvent"/> subclass is missing here.</summary>
     public static readonly IReadOnlyList<Type> DescribedEventTypes = [typeof(CommandRejected), typeof(BlowStruck), typeof(Wounded),
-        typeof(MoraleChanged), typeof(MoraleStateChanged), typeof(SquadBroke), typeof(BattleEnded), typeof(AbilityUsed)];
+        typeof(MoraleChanged), typeof(MoraleStateChanged), typeof(SquadBroke), typeof(BattleEnded), typeof(AbilityUsed),
+        typeof(SquadAiChanged)];
 
     /// <summary>Flush to the stream once this much is buffered, so long battles don't sit in memory.</summary>
     private const int FlushThresholdBytes = 64 * 1024;
@@ -44,6 +45,13 @@ public sealed class FrameRecorder : IDisposable
         _json.WriteString("description", initial.Scenario.Description);
         _json.WriteString("seed", initial.Seed.ToString(CultureInfo.InvariantCulture)); // a string: JS numbers lose ulongs above 2^53
         _json.WriteNumber("ticksPerSecond", BattleState.TicksPerSecond);
+        _json.WriteStartArray("ai"); // M4 step 2: the sides the AI plays
+        foreach (int side in initial.Scenario.AiSides)
+        {
+            _json.WriteNumberValue(side);
+        }
+
+        _json.WriteEndArray();
 
         _json.WriteStartObject("map");
         _json.WriteNumber("width", Metres(initial.Scenario.Map.Width));
@@ -131,6 +139,12 @@ public sealed class FrameRecorder : IDisposable
             _json.WriteStringValue(squad.Formation.Id); // changes with SetFormation (step 7)
             _json.WriteNumberValue(squad.Files); // narrowed for a gap, 0 = its own width
             _json.WriteNumberValue(squad.Broken ? 1 : 0); // M3: its men are running
+            _json.WriteStringValue(squad.Stance.ToString().ToLowerInvariant()); // M4 step 1: hold, advance, pursue
+            _json.WriteNumberValue(squad.AttackTarget.Value); // the squad it attacks, 0 for none
+            _json.WriteNumberValue(squad.Pursuing ? 1 : 0); // its men are running the runners down
+            _json.WriteStringValue(squad.AiState.ToString().ToLowerInvariant()); // M4 step 2: idle, advance, engage, hold, regroup, withdraw
+            _json.WriteNumberValue(squad.AiTarget.Value); // the squad the AI has it going for, 0 for none
+            _json.WriteNumberValue(squad.Leaving ? 1 : 0); // marching off the field
             _json.WriteEndArray();
         }
 
@@ -274,6 +288,12 @@ public sealed class FrameRecorder : IDisposable
                 _json.WriteNumber("retainer", used.Retainer.Value);
                 _json.WriteString("ability", used.Ability);
                 _json.WriteNumber("squad", used.Squad.Value);
+                break;
+            case SquadAiChanged ai:
+                _json.WriteNumber("squad", ai.Squad.Value);
+                _json.WriteString("from", ai.From.ToString().ToLowerInvariant());
+                _json.WriteString("to", ai.To.ToString().ToLowerInvariant());
+                _json.WriteNumber("target", ai.Target.Value);
                 break;
         }
 

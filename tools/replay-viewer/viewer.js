@@ -401,7 +401,7 @@
       const morale = row.length > 11 ? row[9] : null;
       const state = row.length > 11 ? row[10] : 'steady';
       const wound = row.length > 11 ? row[11] : 'none';
-      if (state === 'fled') continue; // he left the field
+      if (state === 'fled' || state === 'left') continue; // he left the field (ran, or marched off with his squad)
       const info = fighterInfo.get(id);
       // A Retainer (M3 step 10) moves between squads: colour him by the squad he stands in now (row[7]), if any.
       const squad = info && info.retainer ? (row.length > 8 && row[7] > 0 ? squadInfo.get(row[7]) : null) : info && squadInfo.get(info.squad);
@@ -580,7 +580,11 @@
       const morale = moraleSum.has(id) && n > 0 ? ` · morale ${Math.round(moraleSum.get(id) / n)}` : '';
       const run = running.get(id) ? ` · ${running.get(id)} running` : '';
       const broken = row && row.length > 10 && row[10] === 1 ? ' · BROKEN' : '';
-      meta.textContent = `side ${s.side} · ${formation}${files} · ${n}/${s.size}${morale}${run}${broken}`;
+      // M4: its stance (step 1), and on a side the AI plays what the AI has it doing and at whom (step 2).
+      const stance = row && row.length > 11 && row[11] !== 'hold' ? ` · ${row[11]}` : '';
+      const target = row && row.length > 15 && row[15] > 0 && squadInfo.has(row[15]) ? ` ${squadInfo.get(row[15]).name}` : '';
+      const ai = row && row.length > 14 && row[14] !== 'idle' ? ` · AI: ${row[14]}${target}` : '';
+      meta.textContent = `side ${s.side} · ${formation}${files} · ${n}/${s.size}${morale}${run}${broken}${stance}${ai}`;
     }
 
     const events = $('events');
@@ -630,7 +634,8 @@
       `Position ${row[1].toFixed(3)}, ${row[2].toFixed(3)} m`,
       `Facing ${row[3].toFixed(2)}°, radius ${info.radius} m`,
       row[4] ? (row[5] === 1 ? 'In the fight, holding his ground' : row[6] === 1 ? 'In the fight, passing through allied ranks' : 'In the fight')
-        : row.length > 11 && row[10] === 'fled' ? 'Fled the field' : 'Fallen',
+        : row.length > 11 && row[10] === 'fled' ? 'Fled the field'
+        : row.length > 11 && row[10] === 'left' ? 'Left the field with his squad' : 'Fallen',
     ];
     if (row.length > 11) lines.push(`Morale ${row[9]} (${row[10]}), wound: ${row[11]}`);
     for (const text of lines) {

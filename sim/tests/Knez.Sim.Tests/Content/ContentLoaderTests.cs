@@ -83,7 +83,7 @@ public class ContentLoaderTests
     [TestCase("""{ "bodies": [ { "id": "w", "radius": 0.3, "walkSpeed": 1 } ] }""",
         "f.json:1:15: bodies[0]: missing member 'runSpeed'")]
     [TestCase("""{ "fighter": [] }""",
-        "f.json:1:14: fighter: unknown member 'fighter' (allowed: description, bodies, formations, movement, combat, morale, traits)")]
+        "f.json:1:14: fighter: unknown member 'fighter' (allowed: description, bodies, formations, movement, combat, morale, traits, ai)")]
     [TestCase("""{ "fighters": [] }""",
         "f.json:1:15: fighters: fighter types are gone (M3 step 9, ADR-0005): bodies go in 'bodies', kits in combat 'kits', and a scenario's squads name experience and kit per group of men")]
     [TestCase("""[]""",
@@ -213,7 +213,77 @@ public class ContentLoaderTests
         });
     }
 
-    [TestCase("""{ "tick": 5, "order": "charge", "squad": "A", "target": [30, 20] }""", "script[0].order: unknown order 'charge' (known: move, formation, attach, detach, attack, ability)")]
+    [Test]
+    public void ScenarioLoader_Parse_StanceAndSquadAttack_M4Step1()
+    {
+        const string enemy = """{ "name": "E", "side": 1, "body": "man", "men": [{ "count": 4, "experience": "new", "kit": "axe-shield" }], "formation": "line", "position": [20, 30], "facing": 270 }""";
+        string json = Scenario(GoodSquad.Replace("\"facing\": 90 }", "\"facing\": 90, \"stance\": \"advance\" }") + ",\n    " + enemy)
+            .Replace("\n  ]\n}", """
+          ],
+          "script": [
+            { "tick": 5, "order": "stance", "squad": "A", "stance": "pursue" },
+            { "tick": 6, "order": "attack", "squad": "A", "enemy": "E" }
+          ]
+        }
+        """.TrimEnd());
+        var scenario = ScenarioLoader.Parse(new SourceText("s.json", json), Defs());
+        Assert.Multiple(() =>
+        {
+            Assert.That(scenario.Squads[0].Stance, Is.EqualTo(Knez.Sim.Orders.SquadStance.Advance));
+            Assert.That(scenario.Squads[1].Stance, Is.EqualTo(Knez.Sim.Orders.SquadStance.Hold), "no stance: hold");
+            Assert.That((scenario.Script[0].Kind, scenario.Script[0].Stance), Is.EqualTo((ScriptedOrderKind.SetStance, Knez.Sim.Orders.SquadStance.Pursue)));
+            Assert.That((scenario.Script[1].Kind, scenario.Script[1].SquadName, scenario.Script[1].EnemySquadName),
+                Is.EqualTo((ScriptedOrderKind.AttackSquad, "A", "E")));
+        });
+    }
+
+    [Test]
+    public void ScenarioLoader_Parse_AiSidesAndRules_M4Step2()
+    {
+        const string enemy = """{ "name": "E", "side": 1, "body": "man", "men": [{ "count": 4, "experience": "new", "kit": "axe-shield" }], "formation": "line", "position": [20, 30], "facing": 270 }""";
+        string json = Scenario(GoodSquad + ",\n    " + enemy).Replace("\"id\": \"test\",", "\"id\": \"test\",\n  \"ai\": [1],");
+        const string ai = """
+            { "ai": { "attackAt": 700, "holdBelow": 600, "leaveBelow": 300, "regroupMorale": 350, "readyMorale": 650, "regroupDistance": 25, "helpBonus": 12,
+              "flankOffset": 6, "maxOnTarget": 3, "jitter": 2.5, "cryEnemies": 5, "cryContact": 4, "closeRanksRange": 9, "standShare": 300 } }
+            """;
+        var defs = DefLibrary.Parse([new SourceText("formations.json", Formations), new SourceText("bodies.json", Bodies), new SourceText("ai.json", ai)]);
+        var scenario = ScenarioLoader.Parse(new SourceText("s.json", json), defs);
+        Assert.Multiple(() =>
+        {
+            Assert.That(scenario.AiSides, Is.EqualTo(new[] { 1 }));
+            Assert.That(scenario.Ai, Is.SameAs(defs.Ai));
+            Assert.That((scenario.Ai.AttackAt, scenario.Ai.LeaveBelow, scenario.Ai.MaxOnTarget, scenario.Ai.StandShare), Is.EqualTo((700, 300, 3, 300)));
+            Assert.That(scenario.Ai.Jitter, Is.EqualTo(Fix.Ratio(5, 2)));
+            Assert.That(ScenarioLoader.Parse(new SourceText("s.json", json), Defs()).Ai, Is.SameAs(AiDef.Standard), "no ai.json: the standard rules");
+        });
+    }
+
+    [TestCase("\"ai\": [3],", "ai[0]: side 3 has no squads or Retainers")]
+    [TestCase("\"ai\": [0, 0],", "ai[1]: side 0 is listed twice")]
+    [TestCase("\"ai\": [\"one\"],", "ai[0]")]
+    public void ScenarioLoader_Parse_BadAiSides_LocatedError(string member, string expected)
+    {
+        string json = Scenario(GoodSquad).Replace("\"id\": \"test\",", "\"id\": \"test\",\n  " + member);
+        var ex = Assert.Throws<ContentException>(() => ScenarioLoader.Parse(new SourceText("s.json", json), Defs()));
+        Assert.That(ex!.Message, Does.Contain(expected));
+    }
+
+    [Test]
+    public void DefLibrary_Parse_AiRules_UnknownMemberAndBadValue_AreLocatedErrors()
+    {
+        var unknown = Assert.Throws<ContentException>(() => DefLibrary.Parse([new SourceText("ai.json", """{ "ai": { "attackAt": 800, "bravery": 1 } }""")]));
+        var bad = Assert.Throws<ContentException>(() => DefLibrary.Parse([new SourceText("ai.json",
+            """{ "ai": { "attackAt": 300, "holdBelow": 300, "leaveBelow": 400, "regroupMorale": 400, "readyMorale": 600, "regroupDistance": 20, "helpBonus": 10, "flankOffset": 8, "maxOnTarget": 2, "jitter": 5, "cryEnemies": 4, "cryContact": 5, "closeRanksRange": 10, "standShare": 250 } }""")]));
+        Assert.Multiple(() =>
+        {
+            Assert.That(unknown!.Message, Does.Contain("ai"));
+            Assert.That(bad!.Message, Does.Contain("leaveBelow (400) must not be above holdBelow (300)"));
+        });
+    }
+
+    [TestCase("""{ "tick": 5, "order": "stance", "squad": "A", "stance": "charge" }""", "script[0].stance: unknown stance 'charge' (known: hold, advance, pursue)")]
+    [TestCase("""{ "tick": 5, "order": "attack", "squad": "A", "enemy": "Nobody" }""", "script[0]: no squad is named 'Nobody'.")]
+    [TestCase("""{ "tick": 5, "order": "charge", "squad": "A", "target": [30, 20] }""", "script[0].order: unknown order 'charge' (known: move, formation, attach, detach, attack, ability, stance)")]
     [TestCase("""{ "tick": 5, "order": "move", "squad": "Nobody", "target": [30, 20] }""", "script[0]: no squad is named 'Nobody'.")]
     [TestCase("""{ "tick": 0, "order": "move", "squad": "A", "target": [30, 20] }""", "script[0]: tick must be 1..2147483647 (got 0).")]
     [TestCase("""{ "tick": 5, "order": "move", "squad": "A", "target": [99, 20] }""", "script[0]: target (99.00000, 20.00000) is off the")]
@@ -382,7 +452,7 @@ public class ContentLoaderTests
         { "movement": { "pivotTolerance": 45, "slotCatchUpTime": 0.35, "personalSpace": 0.12, "separationTime": 0.25,
           "holdingReach": 1.5, "formedUpReach": 0.4, "collisionPasses": 4, "allyPartingDepth": 0.25, "pathBudget": 2000,
           "regroupLead": 2, "regroupMaxWait": 4, "regroupCost": 0.5, "reformPace": 0.5, "stepBackPace": 0.5, "withdrawClearance": 3, "closeInRange": 3,
-          "turnLagTime": 2.5 } }
+          "turnLagTime": 2.5, "advanceRange": 12, "pursuitTime": 8, "pursuitRange": 25 } }
         """;
 
     [Test]

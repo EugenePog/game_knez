@@ -22,7 +22,7 @@ namespace Knez.Sim.Morale
     /// he stands at his slot again, or routs anew;</item>
     /// <item>each man who began to rout this tick costs every other man of his squad;</item>
     /// <item>squads in id order: more than the break share of its men in the fight routing breaks a squad — all its men
-    /// rout, its order is dropped, and squads nearby lose (allies) or gain (enemies) heart; a broken squad with more than
+    /// rout, its order, attack and chase are dropped (M4 step 1), and squads nearby lose (allies) or gain (enemies) heart; a broken squad with more than
     /// the re-form share back re-forms where its rallied men stand.</item>
     /// </list>
     /// </summary>
@@ -266,11 +266,13 @@ namespace Knez.Sim.Morale
                     continue;
                 }
 
-                if (!squad.Broken && routing * 1000L > (long)rules.BreakShare * inFight)
+                // A squad marching off the field (M4 step 2) doesn't break: its men leaving at the edge would otherwise tip its
+                // runners over half. One broken before its side left re-forms once a man is back, and he marches off with it.
+                if (!squad.Broken && !squad.Leaving && routing * 1000L > (long)rules.BreakShare * inFight)
                 {
                     Break(state, rules, squad, inFight, routing);
                 }
-                else if (squad.Broken && (inFight - routing) * 1000L > (long)rules.ReformShare * inFight)
+                else if (squad.Broken && (squad.Leaving ? inFight > routing : (inFight - routing) * 1000L > (long)rules.ReformShare * inFight))
                 {
                     Reform(state, squad, inFight, routing);
                 }
@@ -282,6 +284,8 @@ namespace Knez.Sim.Morale
             squad.Broken = true;
             squad.Order = SquadOrder.None;
             squad.ClearPath();
+            squad.AttackTarget = EntityId.None; // M4 step 1: a running squad attacks no one…
+            OrderSystem.EndChase(state, squad, reform: false); // …and chases no one
             squad.Reforming = false;
             List<EntityId> members = squad.MemberList;
             for (int m = 0; m < members.Count; m++)
@@ -315,41 +319,32 @@ namespace Knez.Sim.Morale
         /// nearest men, and those still running come back as they rally.</summary>
         private static void Reform(BattleState state, Squad squad, int inFight, int routing)
         {
-            long x = 0;
-            long y = 0;
-            int n = 0;
-            List<EntityId> members = squad.MemberList;
-            for (int m = 0; m < members.Count; m++)
+            squad.Broken = false;
+            if (squad.Leaving)
             {
-                Fighter? man = state.FindFighter(members[m]);
-                if (man != null && man.IsAlive && !man.IsRouting)
-                {
-                    x += man.Position.X.Raw;
-                    y += man.Position.Y.Raw;
-                    n++;
-                }
+                squad.Facing = MoraleRules.EdgeFacing(state.Scenario, squad.SideId); // its men walk off facing the way they go
             }
 
-            squad.Broken = false;
-            if (n > 0)
-            {
-                // Fitted like a move order's target: the whole formation on the map, the anchor clear of walls, or some
-                // places can't be reached and the men walking to them never count as back.
-                var centre = new FixVec2(Fix.FromRaw(x / n), Fix.FromRaw(y / n));
-                FixVec2 anchor = Commands.MoveSquadCommand.FitInside(state, squad, centre, squad.Facing);
-                Fighter? any = state.FindFighter(members[0]);
-                squad.Anchor = Movement.Terrain.Constrain(state.Scenario.Map, anchor, any != null ? any.Radius : Fix.Zero);
-                SlotAssignment.Nearest(state, squad);
-            }
+            SlotAssignment.ReformAtCentre(state, squad);
 
             state.AddEvent(new SquadBroke(state.Tick, squad.Id, reformed: true, inFight, routing));
+        }
+
+        /// <summary>
+        /// <paramref name="man"/> leaves the field in order (M4 step 2: his squad marches off, <see cref="Squad.Leaving"/>):
+        /// out of the fight, alive; cleanup takes him out of his squad.
+        /// </summary>
+        internal static void LeaveField(BattleState state, Fighter man)
+        {
+            man.IsAlive = false;
+            SetState(state, man, MoraleState.Left);
         }
 
         private static void SetState(BattleState state, Fighter man, MoraleState to)
         {
             MoraleState from = man.MoraleState;
             man.MoraleState = to;
-            if (to == MoraleState.Routing || to == MoraleState.Fled)
+            if (to == MoraleState.Routing || to == MoraleState.Fled || to == MoraleState.Left)
             {
                 man.Action = FighterAction.Idle; // a running man strikes no one
                 man.ActionTicks = 0;

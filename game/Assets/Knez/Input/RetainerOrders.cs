@@ -18,8 +18,10 @@ namespace Knez.Game.Input
     public static class RetainerOrders
     {
         /// <summary>The living Retainer of side <paramref name="side"/> nearest <paramref name="point"/>, within his body plus
-        /// <see cref="SquadPicker.ClickSlop"/>; or none. A click on him means him, not his squad.</summary>
-        public static EntityId At(BattleState state, Vector2 point, int side) => FighterAt(state, point, f => f.IsRetainer && f.SideId == side);
+        /// <see cref="SquadPicker.ClickSlop"/>, who takes his own orders — alone, or unchained (<paramref name="chains"/>;
+        /// without it, every Retainer); or none. A click on him means him; on a chained one, his squad.</summary>
+        public static EntityId At(BattleState state, Vector2 point, int side, RetainerChains? chains = null) =>
+            FighterAt(state, point, f => f.IsRetainer && f.SideId == side && (chains == null || chains.OnHisOwn(f)));
 
         /// <summary>The living fighter not of side <paramref name="side"/> nearest <paramref name="point"/>, or none.</summary>
         public static EntityId EnemyAt(BattleState state, Vector2 point, int side) => FighterAt(state, point, f => f.SideId != side);

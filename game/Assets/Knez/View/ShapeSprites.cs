@@ -4,7 +4,7 @@ using UnityEngine;
 namespace Knez.Game.View
 {
     /// <summary>
-    /// Plain white shapes made at run time, tinted per use (phase 1 has no art pipeline): a disc for fighters and a
+    /// Plain white shapes made at run time, tinted per use (overlays, and the fallback where the art has no sprite — docs/art-pipeline.md): a disc for fighters and a
     /// square for walls, ticks and markers. Each is one Unity unit across, so a transform's scale is its size in metres.
     /// </summary>
     public static class ShapeSprites

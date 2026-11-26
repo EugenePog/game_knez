@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Knez.Sim.Ai;
 using Knez.Sim.Defs;
 using Knez.Sim.Numerics;
 using Knez.Sim.Orders;
@@ -30,6 +31,9 @@ namespace Knez.Sim.Units
             _effects = new List<AbilityEffect>();
             PathRequestTick = -1;
             RegroupSince = -1;
+            AttackTarget = EntityId.None;
+            PursuitUntil = -1;
+            AiTarget = EntityId.None;
         }
 
         private Squad(Squad source)
@@ -56,6 +60,15 @@ namespace Knez.Sim.Units
             Withdrawing = source.Withdrawing;
             StartCount = source.StartCount;
             Broken = source.Broken;
+            Stance = source.Stance;
+            AttackTarget = source.AttackTarget;
+            Pursuing = source.Pursuing;
+            PursuitUntil = source.PursuitUntil;
+            PursuitFrom = source.PursuitFrom;
+            AiState = source.AiState;
+            AiSince = source.AiSince;
+            AiTarget = source.AiTarget;
+            Leaving = source.Leaving;
         }
 
         /// <summary>Identity; squads are kept sorted by it.</summary>
@@ -158,11 +171,41 @@ namespace Knez.Sim.Units
         /// <summary>The members list itself, for systems (index with <c>for</c>).</summary>
         internal List<EntityId> MemberList => _members;
 
+        /// <summary>How it fights on its own (M4 step 1): hold, advance, pursue.</summary>
+        public SquadStance Stance { get; internal set; }
+
+        /// <summary>The enemy squad it is ordered to attack (M4 step 1), or none; its move order is aimed at that squad and
+        /// the attack ends when it breaks or is gone.</summary>
+        public EntityId AttackTarget { get; internal set; }
+
+        /// <summary>Its men are running the runners down (M4 step 1), until <see cref="PursuitUntil"/>.</summary>
+        public bool Pursuing { get; internal set; }
+
+        /// <summary>While pursuing, the tick the chase must end; after it, the tick it ended (no new chase for the chase's
+        /// length after it); −1 before any chase.</summary>
+        public int PursuitUntil { get; internal set; }
+
+        /// <summary>Where the chase began (the anchor): men chase only within the pursuit range of it.</summary>
+        public FixVec2 PursuitFrom { get; internal set; }
+
         /// <summary>Lasting abilities used on the squad (M3 step 11), one per kind, in the order first used; an entry whose
         /// <see cref="AbilityEffect.Until"/> has passed no longer acts but stays until the kind is used again.</summary>
         public IReadOnlyList<AbilityEffect> Effects => _effects;
 
         internal List<AbilityEffect> EffectList => _effects;
+
+        /// <summary>What the enemy AI has it doing (M4 step 2); <see cref="SquadAiState.Idle"/> on a side the AI doesn't play.</summary>
+        public SquadAiState AiState { get; internal set; }
+
+        /// <summary>The tick it entered <see cref="AiState"/> (0 at the start).</summary>
+        public int AiSince { get; internal set; }
+
+        /// <summary>The enemy squad the AI has it going for (Advance, Engage), or none.</summary>
+        public EntityId AiTarget { get; internal set; }
+
+        /// <summary>Marching off the field (M4 step 2, the AI's withdrawal): each of its men who reaches his side's map edge
+        /// leaves the battle, alive (<see cref="Morale.MoraleState.Left"/>).</summary>
+        public bool Leaving { get; internal set; }
 
         internal Squad Clone() => new Squad(this);
     }

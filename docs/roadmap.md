@@ -26,6 +26,15 @@ Superseded by the design: M3 step 6's "2–3 abilities per hero" (now leadership
 ask for it — see open question 2), and M4's generic "advance, hold, flank, regroup" AI (now goals by enemy kind and
 trait).
 
+## Art in the phase-1 view (2026-11-26)
+
+The user asked for the art designed in `docs/design/art-style.md` to be used in the 2D battle view, ahead of the
+phase-1 exit — an exception to "art pipeline" in AGENTS.md's do-not-build list, recorded there. Scope: the exported
+sprites (`docs/art-assets.md`) drawn by `BattleView` — tokens for every man (side, kit, experience, Retainer), houses
+and rocks over the walls, the palette's grass — with the old primitives kept as overlays and as the fallback
+([docs/art-pipeline.md](art-pipeline.md)). Not in scope: drawing new art, animation, a 3D view, asset-store packages.
+The principle above stands: the art is what already exists, the battle still has to prove itself.
+
 ## Phase 1 — internal 2D skirmish vs AI
 
 ### M0. Foundation (weeks 1–2)
@@ -379,9 +388,62 @@ Side utility AI + squad FSM inside the sim (deterministic, `Ai` RNG stream, stag
    only 3 m, so a squad can't be told "attack that squad" (one reason the purple squad stood aside in the sandbox). An attack
    order on an enemy squad; stances Hold / Advance / Pursue; pursuit of routers and where it stops. The AI gives the
    same orders.
+   ✅ Built 2026-11-26 (the user's play in Unity still to come). Decided by the user: an attack ends when its target
+   breaks, then the stance decides; squads start in Hold; Advance goes at an enemy squad within 15 m; Pursue (which also
+   advances) breaks ranks and runs the runners down for up to 10 s within 30 m of where the chase began, then re-forms
+   where its men stand; runners run at 0.9 of their run. Built: `AttackSquad`, `SetStance` (refusal `target-broken`
+   added), `Squad.Stance`/`AttackTarget`/`Pursuing`/`PursuitUntil`/`PursuitFrom` (hashed), movement `advanceRange`,
+   `pursuitTime`, `pursuitRange`, morale `routPace`, squads' optional `stance`, script orders `attack` (squad) and
+   `stance`, session files, frames (stance, attack target, pursuing). A squad that has just chased rests a chase's
+   length before the next, so the leash can't be walked past chase by chase. Unity: right-click an enemy man to attack
+   his squad; H / G / P set hold / advance / pursue; the HUD shows each squad's stance and what it is doing ("attacking
+   Raider line", "chasing the runners, 6.2 s"). Every content battle plays as before with runners at full pace (all
+   squads start in Hold); the 0.9 pace re-recorded the goldens and left the balance reference within its pins. The sim
+   review's fixes: an attacker with nobody left no longer faults; a re-aim no longer cancels stepping back out of a
+   melee; only runners of a broken squad start or feed a chase (your rule — a lone runner is no bait); rallying men
+   don't chase; an attack on a chasing squad aims at its men.
+   Also (asked for by the user the same day, Unity only): a Retainer in a squad is chained to it — clicks, drags and
+   orders go to the squad, Q with it selected uses his ability; U or the HUD's button unchains him for his own orders.
 2. **AI frame:** the scenario says which side the AI plays and each enemy squad's kind and leader; side AI every ~1 s
    scores goals per squad; squad FSM (idle, advance, engage, hold, regroup, withdraw) issues internal orders;
    enemy Retainers use their abilities.
+   ✅ Built 2026-11-26 (the user's play in Unity still to come). Decided by the user: the AI side attacks while its men
+   in the fight are at least 0.8 of the enemy's (a heavily wounded man counts half), else holds its ground in Advance;
+   targets — the nearest, 10 m nearer if an ally fights it, at most two on one while another stands free, up to 5 m
+   at random, and the second on a target, standing in its front, goes round to its open flank first (8 m off it);
+   a squad regroups after re-forming, or below 400 average morale out of melee — 20 m back toward an ally (or its start)
+   until 600; the side leaves the field below a third — its squads march off its edge and their men leave alive; AI
+   Retainers use their built abilities at the right moment (battle cry at 4+ enemies in reach and contact, close ranks
+   in melee or with an attacker within 10 m, stand to the death in melee with a quarter wavering or running). Added
+   on top, then kept by the user the same day: a squad already attacking holds only below 0.7 (`holdBelow`) — at exactly 0.8 the
+   sandbox's raiders started and stopped their marches every second as your men rallied one by one. Built: `AiDef`
+   (`content/defs/ai.json`), the scenario's `ai` sides (their commands and script orders are refused, `ai-side`),
+   `AiSystem`, `SquadAiState`, `Squad.AiState`/`AiSince`/`AiTarget`/`Leaving` (hashed), `MoraleState.Left`,
+   `SquadAiChanged`, the CLI's `--ai SIDES` (AI against AI: `--ai 0,1`), frames and viewer; Unity: the HUD says what
+   the AI has each squad doing and the log its decisions. Content: `sandbox/villages` is now played by the AI (side 1);
+   `m4/m4-ai` shows the frame. Each enemy squad's kind and its leader's trait move to steps 3–4, where they are first
+   read. Measured: `m4-ai` (3 squads against your 2 holding) the AI wins 96 % (200 seeds); the villages sandbox
+   against a player who gives no orders, 68 % (60 seeds); S6's lines AI against AI 51 / 49 %. Every content battle
+   the AI doesn't play is unchanged (proved bit for bit with the new fields left out of the hash); the goldens moved
+   for the hash format. The sim review's fixes: a squad leaving the field no longer "breaks" as its men leave (their
+   going tipped its earlier runners over half; in one AI-against-AI seed its rallied men then stood for ever), and one
+   broken before it left re-forms once a man is back; when the march off ends short of the edge (a house against it),
+   its men walk the rest one by one, round the wall as runners do; a holding squad drops an attack whose target has
+   gone beyond 15 m; the target rules apply even over an attack the Advance stance began; a flank march isn't re-aimed
+   while the squad steps back or waits for a route; the CLI counts men who left. Known looks: two squads that attacked
+   the same last enemy stand stacked on its ground and jostle once it breaks (only after a battle is decided, so far);
+   a flank march may go to the side next to another enemy squad (the "open side" counts only the allies fighting the
+   target). A second review pass found the old "runner jammed against a rock" was the flee rule: between two staggered
+   walls a man swapped between their nearer ends for ever, and men walking off use the same rule (villages AI against AI,
+   seed 7, never ended) — fixed: he makes for the wall's corner, gaining ground; also a man walking off in melee steps
+   back at the step-back pace, a re-formed leaving squad faces its edge, a Pursue squad chases a leaving squad's runners
+   once more than half of it runs (its attack on it ends then too), and the CLI's movement metrics leave the walkers out.
+   A Release test runs villages AI against AI on 20 seeds: every battle decided within 6 minutes.
+   Known look for a later step (found checking the stuck counter): an attack marches its anchor onto its target's
+   (step 1), so in tight ground a few attackers end up beside the enemy they attack, 1–2 m from their places, neither
+   fighting nor moving — the same cause as the post-battle stacking. Villages with the player idle, 60 seeds: men stuck
+   over 2 s before the decision in 3 seeds (1–3 men each); everywhere else only after it. Proposal: aim an attack at a
+   point short of the target's front instead of its anchor (M4 step 3 or M6).
 3. **Who it is — goals.** Militia defends its homes: stays near them, breaks early, never pursues. The ruler's
    Retainers break the enemy: keep formation, pursue, challenge to duels (the duel itself is M5). Bandits want loot:
    start from ambush, go for the baggage, leave once it's taken or losses are high. Needs minimal map objects in the

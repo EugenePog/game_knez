@@ -117,9 +117,10 @@ namespace Knez.Sim.Movement
 
                 FighterTicks++;
                 int squadIndex = fighter.SquadId.IsNone ? -1 : IndexOf(squads, fighter.SquadId);
-                if (squadIndex < 0 || fighter.SlotIndex < 0)
+                if (squadIndex < 0 || fighter.SlotIndex < 0
+                    || (squads[squadIndex].Leaving && squads[squadIndex].Order.Kind == Orders.SquadOrderKind.None))
                 {
-                    _still[i] = 0;
+                    _still[i] = 0; // M4 step 2: men walking off the field one by one are off their slots on purpose
                     _far[i] = 0;
                     continue;
                 }

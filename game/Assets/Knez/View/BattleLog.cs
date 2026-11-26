@@ -1,6 +1,7 @@
 #nullable enable
 using System.Collections.Generic;
 using Knez.Sim;
+using Knez.Sim.Ai;
 using Knez.Sim.Combat;
 using Knez.Sim.Defs;
 using Knez.Sim.Events;
@@ -23,6 +24,7 @@ namespace Knez.Game.View
 
         private readonly List<LogLine> _lines = new List<LogLine>();
         private readonly Dictionary<int, string> _whyBroke = new Dictionary<int, string>();
+        private readonly HashSet<int> _sidesLeaving = new HashSet<int>();
         private readonly SquadTally _tally;
         private readonly MoraleLedger _ledger;
         private bool _firstBlow;
@@ -48,6 +50,7 @@ namespace Knez.Game.View
         {
             _lines.Clear();
             _whyBroke.Clear();
+            _sidesLeaving.Clear();
             _firstBlow = false;
             Added = 0;
         }
@@ -107,6 +110,31 @@ namespace Knez.Game.View
                 case AbilityUsed used:
                     Add(used.Tick, LogKind.Ability, SideOf(state, used.Retainer), Used(state, used));
                     break;
+                case SquadAiChanged ai:
+                    Ai(state, ai);
+                    break;
+            }
+        }
+
+        // An AI decision (M4 step 2); a side's leaving gets one line, not one per squad.
+        private void Ai(BattleState state, SquadAiChanged changed)
+        {
+            Squad? squad = state.FindSquad(changed.Squad);
+            int side = squad != null ? squad.SideId : -1;
+            if (changed.To == SquadAiState.Withdraw)
+            {
+                if (_sidesLeaving.Add(side))
+                {
+                    Add(changed.Tick, LogKind.Ai, side, $"Side {side} leaves the field: too few left to fight on");
+                }
+
+                return;
+            }
+
+            string line = HudText.AiLine(state, changed);
+            if (line.Length > 0)
+            {
+                Add(changed.Tick, LogKind.Ai, side, line);
             }
         }
 

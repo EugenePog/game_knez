@@ -21,5 +21,9 @@ namespace Knez.Sim.Morale
 
         /// <summary>Left the battle over his side's map edge (out of the fight, alive).</summary>
         Fled = 5,
+
+        /// <summary>Left the field in order with his squad (M4 step 2): it marched off its side's map edge (out of the
+        /// fight, alive; not a rout).</summary>
+        Left = 6,
     }
 }

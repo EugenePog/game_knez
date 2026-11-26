@@ -23,5 +23,11 @@ namespace Knez.Sim.Defs
 
         /// <summary>A Retainer uses his ability (UseAbility, M3 step 11).</summary>
         UseAbility = 6,
+
+        /// <summary>A squad attacks an enemy squad (AttackSquad, M4 step 1).</summary>
+        AttackSquad = 7,
+
+        /// <summary>A squad takes a stance (SetStance, M4 step 1).</summary>
+        SetStance = 8,
     }
 }

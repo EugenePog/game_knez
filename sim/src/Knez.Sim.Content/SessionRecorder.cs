@@ -157,6 +157,19 @@ namespace Knez.Sim.Content
                     return squad == null ? null : ScriptedOrderDef.Formation(tick, squad.Name, formation.FormationId);
                 }
 
+                case AttackSquadCommand attack:
+                {
+                    Squad? squad = state.FindSquad(attack.SquadId);
+                    Squad? enemy = state.FindSquad(attack.TargetId);
+                    return squad == null || enemy == null ? null : ScriptedOrderDef.AttackSquad(tick, squad.Name, enemy.Name);
+                }
+
+                case SetStanceCommand stance:
+                {
+                    Squad? squad = state.FindSquad(stance.SquadId);
+                    return squad == null ? null : ScriptedOrderDef.SetStance(tick, squad.Name, stance.Stance);
+                }
+
                 case AttachRetainerCommand attach:
                 {
                     string? name = RetainerName(state, attach.RetainerId);
@@ -241,6 +254,14 @@ namespace Knez.Sim.Content
                 case ScriptedOrderKind.Formation:
                     writer.Raw(", \"order\": \"formation\", \"squad\": ").String(order.SquadName!)
                         .Raw(", \"formation\": ").String(order.FormationId!).Raw(" }");
+                    return;
+                case ScriptedOrderKind.AttackSquad:
+                    writer.Raw(", \"order\": \"attack\", \"squad\": ").String(order.SquadName!)
+                        .Raw(", \"enemy\": ").String(order.EnemySquadName!).Raw(" }");
+                    return;
+                case ScriptedOrderKind.SetStance:
+                    writer.Raw(", \"order\": \"stance\", \"squad\": ").String(order.SquadName!)
+                        .Raw(", \"stance\": ").String(order.Stance.ToString().ToLowerInvariant()).Raw(" }");
                     return;
                 case ScriptedOrderKind.AttachRetainer:
                     writer.Raw(", \"order\": \"attach\", \"retainer\": ").String(order.RetainerName!)

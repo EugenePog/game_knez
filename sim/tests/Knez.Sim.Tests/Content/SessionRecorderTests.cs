@@ -3,6 +3,7 @@ using Knez.Sim.Commands;
 using Knez.Sim.Content;
 using Knez.Sim.Defs;
 using Knez.Sim.Numerics;
+using Knez.Sim.Orders;
 using Knez.Sim.Tests.Support;
 using Knez.Sim.Units;
 
@@ -58,11 +59,13 @@ public class SessionRecorderTests
         string file = RepoPaths.Scenario("sandbox/villages");
         var (live, recorder) = Play(file, seed: 3, Orders);
 
-        // Only the applied orders: the off-map move and the wrong-side move were rejected.
-        Assert.That(recorder.Orders, Has.Count.EqualTo(7));
+        // Only the applied orders: the off-map move, the wrong-side move and the move for the raiders (the AI plays them,
+        // M4 step 2) were rejected.
+        Assert.That(recorder.Orders, Has.Count.EqualTo(6));
 
         ScenarioDef replayDef = ParseWritten(recorder, file);
-        Assert.That(replayDef.Script, Has.Count.EqualTo(7));
+        Assert.That(replayDef.Script, Has.Count.EqualTo(6));
+        Assert.That(replayDef.AiSides, Is.EqualTo(new[] { 1 }), "the session keeps the scenario's AI side");
         var replay = new BattleSimulation(BattleSetup.Create(replayDef, 3));
         replay.StepTicks(Ticks);
 
@@ -145,7 +148,7 @@ public class SessionRecorderTests
                 break;
             case 300:
                 enqueue.Add(new MoveSquadCommand(0, Named("Hird line").Id, new FixVec2(Fix.FromInt(140), Fix.Ratio(1001, 19))));
-                enqueue.Add(new MoveSquadCommand(1, Named("Raider levy").Id, new FixVec2(Fix.FromInt(120), Fix.FromInt(40)), Angle.FromRaw(32768)));
+                enqueue.Add(new MoveSquadCommand(1, Named("Raider levy").Id, new FixVec2(Fix.FromInt(120), Fix.FromInt(40)), Angle.FromRaw(32768))); // the AI's side: refused
                 enqueue.Add(new MoveSquadCommand(0, Named("Levy").Id, new FixVec2(Fix.FromInt(130), Fix.FromInt(45))));
                 break;
         }
@@ -170,6 +173,36 @@ public class SessionRecorderTests
         var replay = new BattleSimulation(BattleSetup.Create(replayDef, 5));
         replay.StepTicks(Ticks);
         AssertSameBattle(live, replay);
+    }
+
+    [Test]
+    public void Write_AttackAndStance_ReplayToTheSameState()
+    {
+        // M4 step 1: the Hird line takes Pursue and attacks the Raider line; a stance for the other side's squad is refused.
+        string file = RepoPaths.Scenario("bench/s6-lines");
+        var (live, recorder) = Play(file, seed: 4, AttackOrders);
+        Assert.That(recorder.Orders.Select(o => o.Kind), Is.EqualTo(new[] { ScriptedOrderKind.SetStance, ScriptedOrderKind.AttackSquad }));
+        ScenarioDef replayDef = ParseWritten(recorder, file);
+        Assert.That(replayDef.Script.Where(o => o.Kind == ScriptedOrderKind.SetStance).Select(o => o.Stance).Single(), Is.EqualTo(SquadStance.Pursue));
+        var replay = new BattleSimulation(BattleSetup.Create(replayDef, 4));
+        replay.StepTicks(Ticks);
+        AssertSameBattle(live, replay);
+    }
+
+    private static void AttackOrders(BattleSimulation sim, List<ICommand> enqueue)
+    {
+        BattleState state = sim.State;
+        Squad hird = state.Squads.First(s => s.SideId == 0);
+        Squad raiders = state.Squads.First(s => s.SideId == 1);
+        if (state.Tick == 4)
+        {
+            enqueue.Add(new SetStanceCommand(0, hird.Id, SquadStance.Pursue));
+            enqueue.Add(new SetStanceCommand(0, raiders.Id, SquadStance.Advance)); // not his side: refused
+        }
+        else if (state.Tick == 14)
+        {
+            enqueue.Add(new AttackSquadCommand(0, hird.Id, raiders.Id));
+        }
     }
 
     private static void RetainerOrders(BattleSimulation sim, List<ICommand> enqueue)

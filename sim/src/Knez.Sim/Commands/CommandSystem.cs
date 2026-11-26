@@ -73,6 +73,18 @@ namespace Knez.Sim.Commands
                     return new RetainerAttackCommand(retainer.SideId, retainer.Id, entry.Enemy);
                 }
 
+                case ScriptedOrderKind.AttackSquad:
+                {
+                    Squad squad = FindByName(state.SquadList, entry.SquadName!);
+                    return new AttackSquadCommand(squad.SideId, squad.Id, FindByName(state.SquadList, entry.EnemySquadName!).Id);
+                }
+
+                case ScriptedOrderKind.SetStance:
+                {
+                    Squad squad = FindByName(state.SquadList, entry.SquadName!);
+                    return new SetStanceCommand(squad.SideId, squad.Id, entry.Stance);
+                }
+
                 case ScriptedOrderKind.UseAbility:
                 {
                     Fighter retainer = FindRetainer(state, entry.RetainerName!);
@@ -105,7 +117,8 @@ namespace Knez.Sim.Commands
 
         private static void Run(ICommand command, BattleState state, TickContext context)
         {
-            RejectReason reason = command.Validate(state);
+            // The AI gives its sides' orders itself (M4 step 2): a player's would fight them every second.
+            RejectReason reason = state.Scenario.PlaysAi(command.SideId) ? RejectReason.AiSide : command.Validate(state);
             if (reason.IsRejected)
             {
                 context.Emit(new CommandRejected(state.Tick, command, reason));

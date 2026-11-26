@@ -22,6 +22,9 @@ namespace Knez.Game.View
         /// <summary>Men who fled the field.</summary>
         public int Fled { get; internal set; }
 
+        /// <summary>Men who left the field in order with their squad (M4 step 2: the AI's side leaving).</summary>
+        public int Left { get; internal set; }
+
         /// <summary>Average morale of the men in the fight (0 when none).</summary>
         public int Morale { get; internal set; }
 

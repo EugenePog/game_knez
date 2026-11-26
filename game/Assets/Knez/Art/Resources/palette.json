@@ -1,0 +1,268 @@
+{
+  "description": "Named colours of the Game_knez art (docs/design/art-style.md). People: dyes, pigments, metals; map: materials.",
+  "people": {
+    "wool-cream": {
+      "hex": "#E3D7BD",
+      "name": "Шерсть некрашеная, светлая",
+      "group": "cloth"
+    },
+    "wool-grey": {
+      "hex": "#A9A396",
+      "name": "Шерсть серая",
+      "group": "cloth"
+    },
+    "wool-brown": {
+      "hex": "#7B5D45",
+      "name": "Шерсть бурая",
+      "group": "cloth"
+    },
+    "wool-dark": {
+      "hex": "#3F3631",
+      "name": "Шерсть тёмная",
+      "group": "cloth"
+    },
+    "linen": {
+      "hex": "#D6CCB2",
+      "name": "Лён небелёный",
+      "group": "cloth"
+    },
+    "madder": {
+      "hex": "#A63A2B",
+      "name": "Марена — красный",
+      "group": "dye"
+    },
+    "madder-light": {
+      "hex": "#C66B4E",
+      "name": "Марена, слабый раствор",
+      "group": "dye"
+    },
+    "woad": {
+      "hex": "#3F5D7E",
+      "name": "Вайда — синий",
+      "group": "dye"
+    },
+    "woad-dark": {
+      "hex": "#283D57",
+      "name": "Вайда, густой синий",
+      "group": "dye"
+    },
+    "woad-light": {
+      "hex": "#7F9AB2",
+      "name": "Вайда, голубой",
+      "group": "dye"
+    },
+    "weld": {
+      "hex": "#CFA634",
+      "name": "Резеда — жёлтый",
+      "group": "dye"
+    },
+    "green": {
+      "hex": "#5A7340",
+      "name": "Вайда по резеде — зелёный",
+      "group": "dye"
+    },
+    "bark": {
+      "hex": "#6A4A30",
+      "name": "Кора, скорлупа ореха — бурый",
+      "group": "dye"
+    },
+    "lichen": {
+      "hex": "#6E445E",
+      "name": "Лишайник — лиловый",
+      "group": "dye"
+    },
+    "silk-red": {
+      "hex": "#7E1E3A",
+      "name": "Шёлк багряный",
+      "group": "silk"
+    },
+    "silk-gold": {
+      "hex": "#C9982E",
+      "name": "Шёлк золотистый",
+      "group": "silk"
+    },
+    "silk-green": {
+      "hex": "#2E6A55",
+      "name": "Шёлк зелёный",
+      "group": "silk"
+    },
+    "ochre-yellow": {
+      "hex": "#C8963A",
+      "name": "Жёлтая охра",
+      "group": "pigment"
+    },
+    "ochre-red": {
+      "hex": "#9E3B26",
+      "name": "Красная охра",
+      "group": "pigment"
+    },
+    "chalk": {
+      "hex": "#E8E2D2",
+      "name": "Мел, известь",
+      "group": "pigment"
+    },
+    "soot": {
+      "hex": "#2B2826",
+      "name": "Сажа",
+      "group": "pigment"
+    },
+    "verdigris": {
+      "hex": "#4F8A78",
+      "name": "Ярь-медянка (редкая)",
+      "group": "pigment"
+    },
+    "wood": {
+      "hex": "#C29A66",
+      "name": "Дерево без краски",
+      "group": "pigment"
+    },
+    "iron": {
+      "hex": "#767C83",
+      "name": "Железо",
+      "group": "metal"
+    },
+    "iron-dark": {
+      "hex": "#474C52",
+      "name": "Железо в тени",
+      "group": "metal"
+    },
+    "iron-light": {
+      "hex": "#B8BEC4",
+      "name": "Железо, блик",
+      "group": "metal"
+    },
+    "bronze": {
+      "hex": "#A87735",
+      "name": "Бронза",
+      "group": "metal"
+    },
+    "silver": {
+      "hex": "#C7CBCF",
+      "name": "Серебро",
+      "group": "metal"
+    },
+    "gold": {
+      "hex": "#D4AF4A",
+      "name": "Золото",
+      "group": "metal"
+    },
+    "leather": {
+      "hex": "#8A5A35",
+      "name": "Кожа",
+      "group": "leather"
+    },
+    "leather-dark": {
+      "hex": "#5B3B24",
+      "name": "Кожа тёмная",
+      "group": "leather"
+    },
+    "fur": {
+      "hex": "#7A5A3C",
+      "name": "Мех",
+      "group": "leather"
+    },
+    "haft": {
+      "hex": "#9C7446",
+      "name": "Древко (ясень)",
+      "group": "leather"
+    },
+    "skin-1": {
+      "hex": "#EDC9AC",
+      "name": "Кожа 1",
+      "group": "skin"
+    },
+    "skin-2": {
+      "hex": "#E1B394",
+      "name": "Кожа 2",
+      "group": "skin"
+    },
+    "skin-3": {
+      "hex": "#CC9773",
+      "name": "Кожа 3",
+      "group": "skin"
+    },
+    "skin-4": {
+      "hex": "#A9724F",
+      "name": "Кожа 4",
+      "group": "skin"
+    },
+    "skin-5": {
+      "hex": "#7E5238",
+      "name": "Кожа 5",
+      "group": "skin"
+    },
+    "blond": {
+      "hex": "#D6B66C",
+      "name": "Светлые",
+      "group": "hair"
+    },
+    "ash": {
+      "hex": "#BDAA84",
+      "name": "Пепельные",
+      "group": "hair"
+    },
+    "light-brown": {
+      "hex": "#9A6C42",
+      "name": "Русые",
+      "group": "hair"
+    },
+    "brown": {
+      "hex": "#5E4029",
+      "name": "Каштановые",
+      "group": "hair"
+    },
+    "dark": {
+      "hex": "#33261E",
+      "name": "Тёмные",
+      "group": "hair"
+    },
+    "red": {
+      "hex": "#A5512B",
+      "name": "Рыжие",
+      "group": "hair"
+    },
+    "grey": {
+      "hex": "#A7A39B",
+      "name": "Седые",
+      "group": "hair"
+    }
+  },
+  "map": {
+    "log": "#8C6A48",
+    "logOld": "#5E4A38",
+    "plank": "#9A7650",
+    "post": "#7A5B3E",
+    "haft": "#9C7446",
+    "thatch": "#C2A15E",
+    "turf": "#748449",
+    "boards": "#7A644B",
+    "clay": "#B98A63",
+    "daub": "#BFA88A",
+    "stone": "#9A968C",
+    "stoneDark": "#6F6B63",
+    "ore": "#8E5A3A",
+    "moss": "#6F8048",
+    "water": "#5F84A0",
+    "shallow": "#86A6B4",
+    "grass": "#7B8760",
+    "grassDark": "#66724F",
+    "earth": "#8A7353",
+    "hay": "#C9B26A",
+    "rye": "#B89A55",
+    "barley": "#CDB878",
+    "pine": "#3F5A3A",
+    "spruce": "#2F4A35",
+    "birch": "#7E9A4E",
+    "birchBark": "#E6E2D6",
+    "pineBark": "#9A5A3A",
+    "iron": "#767C83",
+    "ironDark": "#474C52",
+    "fire": "#E08A2E",
+    "fireHot": "#F2C14E",
+    "smoke": "#D9D6CE",
+    "dark": "#2E241B",
+    "fish": "#B9BEC0",
+    "wool": "#E3D7BD",
+    "leather": "#8A5A35"
+  }
+}

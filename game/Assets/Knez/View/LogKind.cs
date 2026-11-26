@@ -35,5 +35,8 @@ namespace Knez.Game.View
 
         /// <summary>A Retainer used his ability (M3 step 11).</summary>
         Ability,
+
+        /// <summary>The enemy AI changed what one of its squads is doing (M4 step 2).</summary>
+        Ai,
     }
 }

@@ -20,9 +20,10 @@ namespace Knez.Sim.Defs
         public ScenarioDef(string id, string description, MapDef map, IReadOnlyList<SquadSpawnDef> squads,
             IReadOnlyList<ScriptedOrderDef>? script = null, MovementDef? movement = null,
             IReadOnlyList<FormationDef>? formations = null, CombatDef? combat = null, MoraleDef? morale = null,
-            IReadOnlyList<RetainerSpawnDef>? retainers = null)
+            IReadOnlyList<RetainerSpawnDef>? retainers = null, AiDef? ai = null, IReadOnlyList<int>? aiSides = null)
         {
             Morale = morale ?? MoraleDef.Standard;
+            Ai = ai ?? AiDef.Standard;
             Id = DefChecks.Id(id, nameof(id));
             Movement = movement ?? MovementDef.Standard;
             Combat = combat ?? CombatDef.Standard;
@@ -92,9 +93,13 @@ namespace Knez.Sim.Defs
             Squads = new ReadOnlyCollection<SquadSpawnDef>(copy);
             Retainers = new ReadOnlyCollection<RetainerSpawnDef>(CheckRetainers(retainers ?? Array.Empty<RetainerSpawnDef>(), copy, map));
             Formations = new ReadOnlyCollection<FormationDef>(Catalogue(formations, copy));
+            AiSides = new ReadOnlyCollection<int>(CheckAiSides(aiSides ?? Array.Empty<int>(), copy, Retainers, out _aiMask));
             Script = new ReadOnlyCollection<ScriptedOrderDef>(CheckScript(script ?? Array.Empty<ScriptedOrderDef>(), copy, Retainers, map, Formations));
+            CheckScriptSides(Script, copy, Retainers, _aiMask);
             Fingerprint = ComputeFingerprint();
         }
+
+        private readonly int _aiMask;
 
         /// <summary>No squads on an open 100 × 100 m map: the empty battle for tests and tools.</summary>
         public static readonly ScenarioDef Empty =
@@ -139,6 +144,52 @@ namespace Knez.Sim.Defs
         /// squad's fighter kit is drawn from them.</summary>
         public CombatDef Combat { get; }
 
+        /// <summary>Enemy-AI rules (content's <c>ai.json</c>; <see cref="AiDef.Standard"/> when built in code).</summary>
+        public AiDef Ai { get; }
+
+        /// <summary>The sides the AI plays (M4 step 2), ascending; empty when the scenario's script and the player give every
+        /// order. A side the AI plays takes no commands and no script orders.</summary>
+        public IReadOnlyList<int> AiSides { get; }
+
+        /// <summary>Whether the AI plays <paramref name="side"/>.</summary>
+        public bool PlaysAi(int side) => side >= 0 && side <= SquadSpawnDef.MaxSideId && ((_aiMask >> side) & 1) != 0;
+
+        /// <summary>
+        /// This scenario with the AI playing <paramref name="sides"/> instead (the CLI's <c>--ai</c>): script orders for
+        /// squads and Retainers of those sides are dropped, since the AI gives their orders.
+        /// </summary>
+        public ScenarioDef WithAi(IReadOnlyList<int> sides)
+        {
+            if (sides == null)
+            {
+                throw new ArgumentNullException(nameof(sides));
+            }
+
+            int mask = 0;
+            for (int i = 0; i < sides.Count; i++)
+            {
+                mask |= sides[i] >= 0 && sides[i] <= SquadSpawnDef.MaxSideId ? 1 << sides[i] : 0;
+            }
+
+            var squads = new SquadSpawnDef[Squads.Count];
+            for (int i = 0; i < squads.Length; i++)
+            {
+                squads[i] = Squads[i];
+            }
+
+            var kept = new List<ScriptedOrderDef>(Script.Count);
+            for (int i = 0; i < Script.Count; i++)
+            {
+                int side = ScriptSide(Script[i], squads, Retainers);
+                if (side < 0 || ((mask >> side) & 1) == 0)
+                {
+                    kept.Add(Script[i]);
+                }
+            }
+
+            return new ScenarioDef(Id, Description, Map, Squads, kept, Movement, Formations, Combat, Morale, Retainers, Ai, sides);
+        }
+
         /// <summary>Starting squads in spawn order (ids are allocated in this order).</summary>
         public IReadOnlyList<SquadSpawnDef> Squads { get; }
 
@@ -149,8 +200,8 @@ namespace Knez.Sim.Defs
         public IReadOnlyList<RetainerSpawnDef> Retainers { get; }
 
         /// <summary>
-        /// FNV-1a hash of everything that affects the battle (map, movement and combat rules, the formation catalogue, squads and the
-        /// defs they use, script), in a canonical order.
+        /// FNV-1a hash of everything that affects the battle (map, movement, combat, morale and AI rules, the sides the AI
+        /// plays, the formation catalogue, squads and the defs they use, script, Retainers), in a canonical order.
         /// Hashed in the state's Core section, so two runs of different content never share a hash.
         /// </summary>
         public ulong Fingerprint { get; }
@@ -372,6 +423,20 @@ namespace Knez.Sim.Defs
                     }
                 }
 
+                if (entry.EnemySquadName != null)
+                {
+                    bool known = false;
+                    for (int s = 0; s < squads.Length && !known; s++)
+                    {
+                        known = string.Equals(squads[s].Name, entry.EnemySquadName, StringComparison.Ordinal);
+                    }
+
+                    if (!known)
+                    {
+                        throw new ArgumentException($"script[{i}]: no squad is named '{entry.EnemySquadName}'.");
+                    }
+                }
+
                 if (entry.RetainerName != null)
                 {
                     bool known = false;
@@ -387,7 +452,8 @@ namespace Knez.Sim.Defs
                 }
 
                 if (entry.Kind == ScriptedOrderKind.DetachRetainer || entry.Kind == ScriptedOrderKind.RetainerAttack
-                    || entry.Kind == ScriptedOrderKind.AttachRetainer || entry.Kind == ScriptedOrderKind.UseAbility)
+                    || entry.Kind == ScriptedOrderKind.AttachRetainer || entry.Kind == ScriptedOrderKind.UseAbility
+                    || entry.Kind == ScriptedOrderKind.AttackSquad || entry.Kind == ScriptedOrderKind.SetStance)
                 {
                     // Nothing on the map to check: who may join whom, and which enemy, is checked when the order runs.
                 }
@@ -415,6 +481,99 @@ namespace Knez.Sim.Defs
             return copy;
         }
 
+        /// <summary>The sides the AI plays: each one has squads or Retainers, none twice; sorted. <paramref name="mask"/>
+        /// has bit <c>side</c> set for each.</summary>
+        private static int[] CheckAiSides(IReadOnlyList<int> sides, SquadSpawnDef[] squads, IReadOnlyList<RetainerSpawnDef> retainers,
+            out int mask)
+        {
+            mask = 0;
+            for (int i = 0; i < sides.Count; i++)
+            {
+                int side = sides[i];
+                if (side < 0 || side > SquadSpawnDef.MaxSideId)
+                {
+                    throw new ArgumentException($"ai[{i}]: side {side} is outside 0..{SquadSpawnDef.MaxSideId}.");
+                }
+
+                if (((mask >> side) & 1) != 0)
+                {
+                    throw new ArgumentException($"ai[{i}]: side {side} is listed twice.");
+                }
+
+                bool present = false;
+                for (int s = 0; s < squads.Length && !present; s++)
+                {
+                    present = squads[s].SideId == side;
+                }
+
+                for (int r = 0; r < retainers.Count && !present; r++)
+                {
+                    present = retainers[r].SideId == side;
+                }
+
+                if (!present)
+                {
+                    throw new ArgumentException($"ai[{i}]: side {side} has no squads or Retainers for the AI to play.");
+                }
+
+                mask |= 1 << side;
+            }
+
+            var sorted = new List<int>(sides.Count);
+            for (int side = 0; side <= SquadSpawnDef.MaxSideId; side++)
+            {
+                if (((mask >> side) & 1) != 0)
+                {
+                    sorted.Add(side);
+                }
+            }
+
+            return sorted.ToArray();
+        }
+
+        /// <summary>The AI gives its own sides' orders: the script may give none of them.</summary>
+        private static void CheckScriptSides(IReadOnlyList<ScriptedOrderDef> script, SquadSpawnDef[] squads,
+            IReadOnlyList<RetainerSpawnDef> retainers, int aiMask)
+        {
+            for (int i = 0; i < script.Count; i++)
+            {
+                int side = ScriptSide(script[i], squads, retainers);
+                if (side >= 0 && ((aiMask >> side) & 1) != 0)
+                {
+                    string who = script[i].SquadName != null ? $"squad '{script[i].SquadName}'" : $"Retainer '{script[i].RetainerName}'";
+                    throw new ArgumentException($"script[{i}]: {who} is side {side}, which the AI plays; the AI gives that side's orders.");
+                }
+            }
+        }
+
+        /// <summary>The side that gives a script order: its squad's, else its Retainer's; −1 if neither is named.</summary>
+        private static int ScriptSide(ScriptedOrderDef entry, SquadSpawnDef[] squads, IReadOnlyList<RetainerSpawnDef> retainers)
+        {
+            if (entry.SquadName != null)
+            {
+                for (int s = 0; s < squads.Length; s++)
+                {
+                    if (string.Equals(squads[s].Name, entry.SquadName, StringComparison.Ordinal))
+                    {
+                        return squads[s].SideId;
+                    }
+                }
+            }
+
+            if (entry.RetainerName != null)
+            {
+                for (int r = 0; r < retainers.Count; r++)
+                {
+                    if (string.Equals(retainers[r].Name, entry.RetainerName, StringComparison.Ordinal))
+                    {
+                        return retainers[r].SideId;
+                    }
+                }
+            }
+
+            return -1;
+        }
+
         private ulong ComputeFingerprint()
         {
             var hash = Fnv1a64.Start();
@@ -423,6 +582,8 @@ namespace Knez.Sim.Defs
             Movement.AddTo(ref hash);
             Combat.AddTo(ref hash);
             Morale.AddTo(ref hash);
+            Ai.AddTo(ref hash); // M4 step 2
+            hash.Add(_aiMask);
             hash.Add(Formations.Count);
             for (int i = 0; i < Formations.Count; i++)
             {

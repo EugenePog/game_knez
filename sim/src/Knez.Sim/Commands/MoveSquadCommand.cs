@@ -64,17 +64,34 @@ namespace Knez.Sim.Commands
         public void Apply(BattleState state, TickContext context)
         {
             Squad squad = state.FindSquad(SquadId)!;
-            FixVec2 delta = Target - squad.Anchor;
+            squad.AttackTarget = EntityId.None; // a move replaces an attack (M4 step 1)…
+            OrderSystem.EndChase(state, squad, reform: false); // …and calls the men back from a chase: the march gathers them
+            March(state, squad, Target, Facing);
+        }
+
+        /// <summary>Orders <paramref name="squad"/> to march to <paramref name="to"/> (fitted onto the map and out of walls),
+        /// then face <paramref name="orderedFacing"/> or the march's way; the attack order (M4 step 1) aims the same way.</summary>
+        internal static void March(BattleState state, Squad squad, FixVec2 to, Angle? orderedFacing)
+        {
+            FixVec2 target = Fit(state, squad, to, orderedFacing, out Angle facing);
+            FixVec2 delta = to - squad.Anchor;
+            squad.Order = SquadOrder.Move(target, facing, facingFromMarch: orderedFacing == null && delta.Length > MovementRules.ArriveDistance);
+            PathPlanner.Request(state, squad);
+        }
+
+        /// <summary>Where a march of <paramref name="squad"/> to <paramref name="to"/> would end, and the facing it would
+        /// take there (the squad must have a member).</summary>
+        internal static FixVec2 Fit(BattleState state, Squad squad, FixVec2 to, Angle? orderedFacing, out Angle facing)
+        {
+            FixVec2 delta = to - squad.Anchor;
             // A target within arrival distance is no march: keep the facing rather than turn toward a sub-centimetre
             // offset, whose direction is noise (view clicks converted from float land there).
-            Angle facing = Facing ?? (delta.Length <= MovementRules.ArriveDistance ? squad.Facing : FixMath.Atan2(delta.Y, delta.X));
+            facing = orderedFacing ?? (delta.Length <= MovementRules.ArriveDistance ? squad.Facing : FixMath.Atan2(delta.Y, delta.X));
             // Past the edge: shift so the formation fits. Inside a wall: the nearest open ground for the anchor's man
             // (decided 2026-11-21); slots that still fall in walls are stood next to.
-            FixVec2 target = FitInside(state, squad, Target, facing);
+            FixVec2 target = FitInside(state, squad, to, facing);
             Fighter? any = state.FindFighter(squad.MemberList[0]);
-            target = Terrain.Constrain(state.Scenario.Map, target, any != null ? any.Radius : Fix.Zero);
-            squad.Order = SquadOrder.Move(target, facing, facingFromMarch: Facing == null && delta.Length > MovementRules.ArriveDistance);
-            PathPlanner.Request(state, squad);
+            return Terrain.Constrain(state.Scenario.Map, target, any != null ? any.Radius : Fix.Zero);
         }
 
         /// <inheritdoc/>
@@ -122,7 +139,7 @@ namespace Knez.Sim.Commands
             return hi > size - r ? size - r - hi : Fix.Zero;
         }
 
-        private static bool HasLivingMember(BattleState state, Squad squad)
+        internal static bool HasLivingMember(BattleState state, Squad squad)
         {
             for (int i = 0; i < squad.MemberList.Count; i++)
             {

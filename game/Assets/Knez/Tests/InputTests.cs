@@ -37,6 +37,37 @@ namespace Knez.Game.Tests
         }
 
         [Test]
+        public void ChainedRetainer_AClickOnHimMeansHisSquad_UnchainedHimself_JoiningAgainChainsHim()
+        {
+            // Asked for by the user 2026-11-26: a Retainer in a squad follows it until unchained.
+            var sim = Villages();
+            var chains = new RetainerChains();
+            var gaut = Retainer(sim, "Gaut");
+            var hird = sim.State.Squads.Single(s => s.Name == "Hird line");
+            Vector2 onGaut = gaut.Position.ToVector2();
+            Assert.That(chains.IsChained(gaut), Is.True, "in a squad: chained by default");
+            Assert.That(RetainerOrders.At(sim.State, onGaut, 0, chains), Is.EqualTo(EntityId.None), "a click on him isn't him…");
+            Assert.That(SquadPicker.At(sim.State, onGaut, 0), Is.EqualTo(hird.Id), "…it is his squad");
+            Assert.That(chains.ChainedTo(sim.State, hird.Id).Select(f => f.Id), Is.EqualTo(new[] { gaut.Id }));
+
+            chains.Unchain(gaut.Id);
+            Assert.That(chains.IsChained(gaut), Is.False);
+            Assert.That(RetainerOrders.At(sim.State, onGaut, 0, chains), Is.EqualTo(gaut.Id), "unchained: a click on him is him");
+            Assert.That(chains.ChainedTo(sim.State, hird.Id), Is.Empty);
+
+            // He leaves (alone, he is always on his own), then joins another squad: chained again.
+            sim.Enqueue(new DetachRetainerCommand(0, gaut.Id));
+            sim.Step();
+            chains.Forget(sim.State);
+            Assert.That(chains.OnHisOwn(gaut), Is.True, "alone");
+            var shields = sim.State.Squads.Single(s => s.Name == "Shield wall");
+            sim.Enqueue(new AttachRetainerCommand(0, gaut.Id, shields.Id));
+            sim.Step();
+            chains.Forget(sim.State);
+            Assert.That(chains.IsChained(gaut), Is.True, "a squad he joins has him chained");
+        }
+
+        [Test]
         public void DragOntoAnotherSquad_JoinsIt_OntoHisOwn_Nothing_OntoGround_LeavesAndWalks()
         {
             var sim = Villages();
@@ -128,6 +159,20 @@ namespace Knez.Game.Tests
             Assert.That(click.Facing, Is.Null);
             Assert.That(click.Target, Is.EqualTo(new Vector2(30, 5).ToFixVec2()));
             Assert.That(drag.Facing, Is.EqualTo(Angle.FromDegrees(0)), "dragged east: face east");
+        }
+
+        [Test]
+        public void RightClickOnAnEnemyMan_AttacksHisSquad_OnGroundNothing()
+        {
+            // M4 step 1.
+            var sim = Drill();
+            var mine = sim.State.Squads.Where(s => s.SideId == 0).Select(s => s.Id).ToArray();
+            var enemy = sim.State.Squads.First(s => s.SideId == 1);
+            Vector2 onEnemy = sim.State.FindFighter(enemy.Members[0])!.Position.ToVector2();
+            var attacks = OrderBuilder.Attacks(sim.State, mine, onEnemy, 0).Cast<AttackSquadCommand>().ToArray();
+            Assert.That(attacks.Select(a => a.SquadId), Is.EqualTo(mine));
+            Assert.That(attacks.Select(a => a.TargetId), Has.All.EqualTo(enemy.Id));
+            Assert.That(OrderBuilder.Attacks(sim.State, mine, new Vector2(1, 1), 0), Is.Empty, "open ground: a move instead");
         }
 
         [Test]

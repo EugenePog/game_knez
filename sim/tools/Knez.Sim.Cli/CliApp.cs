@@ -28,9 +28,9 @@ public static class CliApp
 
         Usage:
           dotnet run --project sim/tools/Knez.Sim.Cli -c Release -- run <scenario.json> [--seed N] [--ticks N]
-              [--frames FILE] [--json]
-          ... -- batch <scenario.json> [--seeds A-B] [--ticks N] [--json]
-          ... -- bench <scenario.json> [--runs N] [--ticks N] [--json]
+              [--ai SIDES] [--frames FILE] [--json]
+          ... -- batch <scenario.json> [--seeds A-B] [--ticks N] [--ai SIDES] [--json]
+          ... -- bench <scenario.json> [--runs N] [--ticks N] [--ai SIDES] [--json]
 
         Commands:
           run     Simulate a scenario; print its squads, the tick count, the movement metrics (overlap, stuck,
@@ -49,6 +49,8 @@ public static class CliApp
           --frames FILE    also write every tick to FILE for tools/replay-viewer/ (folders are created);
                            put it under artifacts/replays/, which git ignores
           --json           print one JSON object instead of text
+          --ai SIDES       the sides the enemy AI plays instead of the scenario's "ai": e.g. 1, or 0,1 (AI against
+                           AI), or none; script orders for those sides are dropped
           --seeds A-B      (batch) the seeds to run, inclusive
           --runs N         (bench) timed runs after the warm-up
 
@@ -83,6 +85,7 @@ public static class CliApp
         bool json = false;
         string? scenarioPath = null;
         string? framesPath = null;
+        int[]? ai = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -91,6 +94,11 @@ public static class CliApp
                 case "--seed" when i + 1 < args.Length && ulong.TryParse(args[i + 1], NumberStyles.None, CultureInfo.InvariantCulture, out seed):
                     i++;
                     break;
+                case "--ai" when i + 1 < args.Length && TryParseSides(args[i + 1], out ai):
+                    i++;
+                    break;
+                case "--ai":
+                    return UsageError(stderr, AiUsage);
                 case "--ticks" when i + 1 < args.Length && int.TryParse(args[i + 1], NumberStyles.None, CultureInfo.InvariantCulture, out ticks) && ticks > 0:
                     i++;
                     break;
@@ -126,6 +134,7 @@ public static class CliApp
         try
         {
             scenario = ScenarioFiles.Load(scenarioPath);
+            scenario = ai != null ? scenario.WithAi(ai) : scenario;
         }
         catch (Exception ex) when (ex is ContentException or IOException or UnauthorizedAccessException or ArgumentException)
         {
@@ -283,8 +292,9 @@ public static class CliApp
 
     /// <summary>Common options of batch and bench: a scenario file plus named numeric options.</summary>
     private static bool ParseScenarioArgs(string command, string[] args, TextWriter stderr, out string scenarioPath, out int ticks,
-        out bool json, out (ulong From, ulong To) seeds, out int runs, out int exit)
+        out bool json, out (ulong From, ulong To) seeds, out int runs, out int[]? ai, out int exit)
     {
+        ai = null;
         scenarioPath = string.Empty;
         ticks = DefaultTicks;
         json = false;
@@ -305,6 +315,12 @@ public static class CliApp
                 case "--seeds" when command == "batch" && i + 1 < args.Length && TryParseRange(args[i + 1], out seeds):
                     i++;
                     break;
+                case "--ai" when i + 1 < args.Length && TryParseSides(args[i + 1], out ai):
+                    i++;
+                    break;
+                case "--ai":
+                    exit = UsageError(stderr, AiUsage);
+                    return false;
                 case "--json":
                     json = true;
                     break;
@@ -357,11 +373,39 @@ public static class CliApp
         return false;
     }
 
-    private static bool TryLoad(string path, TextWriter stderr, out ScenarioDef scenario)
+    private const string AiUsage = "--ai needs the sides the AI plays: e.g. 1, 0,1 or none";
+
+    /// <summary>"none" (no side) or side ids 0–7 separated by commas, e.g. "1" or "0,1".</summary>
+    private static bool TryParseSides(string text, out int[]? sides)
+    {
+        sides = null;
+        if (text == "none")
+        {
+            sides = [];
+            return true;
+        }
+
+        var list = new List<int>();
+        foreach (string part in text.Split(','))
+        {
+            if (!int.TryParse(part, NumberStyles.None, CultureInfo.InvariantCulture, out int side) || side > Knez.Sim.Defs.SquadSpawnDef.MaxSideId)
+            {
+                return false;
+            }
+
+            list.Add(side);
+        }
+
+        sides = list.ToArray();
+        return true;
+    }
+
+    private static bool TryLoad(string path, int[]? ai, TextWriter stderr, out ScenarioDef scenario)
     {
         try
         {
             scenario = ScenarioFiles.Load(path);
+            scenario = ai != null ? scenario.WithAi(ai) : scenario;
             return true;
         }
         catch (Exception ex) when (ex is ContentException or IOException or UnauthorizedAccessException or ArgumentException)
@@ -379,12 +423,12 @@ public static class CliApp
     /// </summary>
     private static int BatchCommand(string[] args, TextWriter stdout, TextWriter stderr)
     {
-        if (!ParseScenarioArgs("batch", args, stderr, out string path, out int ticks, out bool json, out var seeds, out _, out int exit))
+        if (!ParseScenarioArgs("batch", args, stderr, out string path, out int ticks, out bool json, out var seeds, out _, out int[]? ai, out int exit))
         {
             return exit;
         }
 
-        if (!TryLoad(path, stderr, out ScenarioDef scenario))
+        if (!TryLoad(path, ai, stderr, out ScenarioDef scenario))
         {
             return ExitUsage;
         }
@@ -548,12 +592,12 @@ public static class CliApp
     /// </summary>
     private static int BenchCommand(string[] args, TextWriter stdout, TextWriter stderr)
     {
-        if (!ParseScenarioArgs("bench", args, stderr, out string path, out int ticks, out bool json, out _, out int runs, out int exit))
+        if (!ParseScenarioArgs("bench", args, stderr, out string path, out int ticks, out bool json, out _, out int runs, out int[]? ai, out int exit))
         {
             return exit;
         }
 
-        if (!TryLoad(path, stderr, out ScenarioDef scenario))
+        if (!TryLoad(path, ai, stderr, out ScenarioDef scenario))
         {
             return ExitUsage;
         }

@@ -16,12 +16,14 @@ namespace Knez.Sim.Content
     /// </summary>
     public sealed class DefLibrary
     {
-        private const string FileMembers = "description, bodies, formations, movement, combat, morale, traits";
+        private const string FileMembers = "description, bodies, formations, movement, combat, morale, traits, ai";
+        private const string AiMembers = "attackAt, holdBelow, leaveBelow, regroupMorale, readyMorale, regroupDistance, helpBonus, flankOffset, " +
+            "maxOnTarget, jitter, cryEnemies, cryContact, closeRanksRange, standShare";
         private const string MoraleMembers = "shaken, wavering, routing, hysteresis, lossWeight, ownLightWound, ownHeavyWound, " +
             "mateHeavyWound, flankBlow, rearBlow, mateFlankBlow, mateRearBlow, mateRouts, allySquadBroke, enemySquadBroke, nearby, " +
-            "recoveryPerSecond, safeDistance, rallyAt, breakShare, reformShare, waveringHitPenalty, leaderFell";
+            "recoveryPerSecond, safeDistance, rallyAt, breakShare, reformShare, waveringHitPenalty, leaderFell, routPace";
         private const string MovementMembers = "pivotTolerance, slotCatchUpTime, personalSpace, separationTime, holdingReach, " +
-            "formedUpReach, collisionPasses, allyPartingDepth, pathBudget, regroupLead, regroupMaxWait, regroupCost, reformPace, stepBackPace, withdrawClearance, closeInRange, turnLagTime";
+            "formedUpReach, collisionPasses, allyPartingDepth, pathBudget, regroupLead, regroupMaxWait, regroupCost, reformPace, stepBackPace, withdrawClearance, closeInRange, turnLagTime, advanceRange, pursuitTime, pursuitRange";
         private const string BodyMembers = "id, radius, walkSpeed, runSpeed, turnRate";
         private const string CombatMembers = "weapons, shields, bodyArmour, headCover, experience, kits, hitChance, " +
             "hitLimits, position, strikeArc, wounded";
@@ -34,8 +36,9 @@ namespace Knez.Sim.Content
         private readonly Dictionary<string, FormationDef> _formations;
 
         private DefLibrary(List<BodyDef> bodies, List<FormationDef> formations, MovementDef? movement, CombatDef? combat,
-            MoraleDef? morale, List<TraitDef> traits)
+            MoraleDef? morale, List<TraitDef> traits, AiDef? ai)
         {
+            Ai = ai;
             traits.Sort((a, b) => string.CompareOrdinal(a.Id, b.Id));
             Traits = new ReadOnlyCollection<TraitDef>(traits);
             _traits = new Dictionary<string, TraitDef>(StringComparer.Ordinal);
@@ -79,6 +82,9 @@ namespace Knez.Sim.Content
         /// <summary>The morale rules, or null when no def file has a <c>morale</c> object.</summary>
         public MoraleDef? Morale { get; }
 
+        /// <summary>The enemy-AI rules (<c>ai.json</c>, M4 step 2), or null when no def file has an <c>ai</c> object.</summary>
+        public AiDef? Ai { get; }
+
         /// <summary>The combat rules, or null when no def file has a <c>combat</c> object.</summary>
         public CombatDef? Combat { get; }
 
@@ -96,6 +102,7 @@ namespace Knez.Sim.Content
             MovementDef? movement = null;
             CombatDef? combat = null;
             MoraleDef? morale = null;
+            AiDef? ai = null;
 
             for (int f = 0; f < files.Count; f++)
             {
@@ -180,11 +187,14 @@ namespace Knez.Sim.Content
                     var withdrawClearance = item.RequireFix("withdrawClearance");
                     var closeInRange = item.RequireFix("closeInRange");
                     var turnLagTime = item.RequireFix("turnLagTime");
+                    var advanceRange = item.RequireFix("advanceRange");
+                    var pursuitTime = item.RequireFix("pursuitTime");
+                    var pursuitRange = item.RequireFix("pursuitRange");
                     item.RejectUnknownMembers(MovementMembers);
                     movement = Build(item, movementValue, () => new MovementDef(pivotTolerance, slotCatchUpTime, personalSpace,
                         separationTime, holdingReach, formedUpReach, collisionPasses, allyPartingDepth, pathBudget, regroupLead,
                         regroupMaxWait, regroupCost, reformPace, stepBackPace, withdrawClearance,
-                        closeInRange, turnLagTime));
+                        closeInRange, turnLagTime, advanceRange, pursuitTime, pursuitRange));
                 }
 
                 JsonObjectReader? combatReader = root.OptionalObject("combat");
@@ -203,10 +213,18 @@ namespace Knez.Sim.Content
                     morale = ReadMorale(moraleReader, moraleValue);
                 }
 
+                JsonObjectReader? aiReader = root.OptionalObject("ai");
+                if (aiReader != null)
+                {
+                    JsonValue aiValue = rootValue.Get("ai")!;
+                    Claim(seen, "ai", "rules", aiReader, aiValue, file.Name);
+                    ai = ReadAi(aiReader, aiValue);
+                }
+
                 root.RejectUnknownMembers(FileMembers);
             }
 
-            return new DefLibrary(bodies, formations, movement, combat, morale, traits);
+            return new DefLibrary(bodies, formations, movement, combat, morale, traits, ai);
         }
 
         private static CombatDef ReadCombat(JsonObjectReader item, JsonValue at)
@@ -288,6 +306,27 @@ namespace Knez.Sim.Content
                 frontArc, rearArc, strikeArc));
         }
 
+        private static AiDef ReadAi(JsonObjectReader a, JsonValue at)
+        {
+            int attackAt = a.RequireInt("attackAt");
+            int holdBelow = a.RequireInt("holdBelow");
+            int leaveBelow = a.RequireInt("leaveBelow");
+            int regroupMorale = a.RequireInt("regroupMorale");
+            int readyMorale = a.RequireInt("readyMorale");
+            Fix regroupDistance = a.RequireFix("regroupDistance");
+            Fix helpBonus = a.RequireFix("helpBonus");
+            Fix flankOffset = a.RequireFix("flankOffset");
+            int maxOnTarget = a.RequireInt("maxOnTarget");
+            Fix jitter = a.RequireFix("jitter");
+            int cryEnemies = a.RequireInt("cryEnemies");
+            Fix cryContact = a.RequireFix("cryContact");
+            Fix closeRanksRange = a.RequireFix("closeRanksRange");
+            int standShare = a.RequireInt("standShare");
+            a.RejectUnknownMembers(AiMembers);
+            return Build(a, at, () => new AiDef(attackAt, holdBelow, leaveBelow, regroupMorale, readyMorale, regroupDistance, helpBonus,
+                flankOffset, maxOnTarget, jitter, cryEnemies, cryContact, closeRanksRange, standShare));
+        }
+
         private static MoraleDef ReadMorale(JsonObjectReader m, JsonValue at)
         {
             int shaken = m.RequireInt("shaken");
@@ -313,10 +352,11 @@ namespace Knez.Sim.Content
             int reformShare = m.RequireInt("reformShare");
             int waveringPenalty = m.RequireInt("waveringHitPenalty");
             Fix leaderFell = m.RequireFix("leaderFell");
+            Fix routPace = m.RequireFix("routPace");
             m.RejectUnknownMembers(MoraleMembers);
             return Build(m, at, () => new MoraleDef(shaken, wavering, routing, hysteresis, lossWeight, ownLight, ownHeavy, mateHeavy,
                 flank, rear, mateFlank, mateRear, mateRouts, allyBroke, enemyBroke, nearby, recovery, safe, rallyAt, breakShare,
-                reformShare, waveringPenalty, leaderFell));
+                reformShare, waveringPenalty, leaderFell, routPace));
         }
 
         private static List<ExperienceDef> ReadExperience(JsonObjectReader combat)

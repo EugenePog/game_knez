@@ -234,7 +234,8 @@ namespace Knez.Sim.Content
             return result;
         }
 
-        private int ToInt(JsonValue value, string path)
+        /// <summary>An integer item (an array element), with <paramref name="path"/> for errors.</summary>
+        public int ToInt(JsonValue value, string path)
         {
             if (value.Kind != JsonKind.Number)
             {

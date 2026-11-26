@@ -86,6 +86,8 @@ public sealed class BattleLog
             sb.Append(CultureInfo.InvariantCulture, $"{men.Count(f => f.IsAlive && f.IsRouting)} running, ");
             sb.Append(CultureInfo.InvariantCulture, $"{men.Count(f => f.Wound == WoundLevel.Down)} fallen, ");
             sb.Append(CultureInfo.InvariantCulture, $"{men.Count(f => f.MoraleState == MoraleState.Fled)} fled");
+            int left = men.Count(f => f.MoraleState == MoraleState.Left);
+            sb.Append(left > 0 ? string.Create(CultureInfo.InvariantCulture, $", {left} left the field") : string.Empty);
         }
 
         return sb.ToString();

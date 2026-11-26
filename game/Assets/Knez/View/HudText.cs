@@ -1,5 +1,6 @@
 #nullable enable
 using Knez.Sim;
+using Knez.Sim.Ai;
 using Knez.Sim.Combat;
 using Knez.Sim.Commands;
 using Knez.Sim.Defs;
@@ -51,6 +52,69 @@ namespace Knez.Game.View
             return squad.Reforming ? "re-forming" : "holding";
         }
 
+        /// <summary>A stance in a word (M4 step 1).</summary>
+        public static string Stance(SquadStance stance) => stance switch
+        {
+            SquadStance.Advance => "advance",
+            SquadStance.Pursue => "pursue",
+            _ => "hold",
+        };
+
+        /// <summary>"attacking Raider line", "chasing the runners, 6.2 s": what a squad is doing about the enemy (M4 step
+        /// 1); empty when nothing.</summary>
+        public static string Fight(BattleState state, Squad squad)
+        {
+            if (squad.Pursuing)
+            {
+                return "chasing the runners, " + Seconds(squad.PursuitUntil - state.Tick);
+            }
+
+            Squad? target = squad.AttackTarget.IsNone ? null : state.FindSquad(squad.AttackTarget);
+            return target != null ? "attacking " + target.Name : string.Empty;
+        }
+
+        /// <summary>What the enemy AI has a squad doing (M4 step 2): "AI: attacking Hird line", "AI: going round Hird line's
+        /// flank", "AI: holding its ground", "AI: falling back to regroup", "AI: leaving the field"; empty when idle.</summary>
+        public static string Ai(BattleState state, Squad squad)
+        {
+            string target = TargetName(state, squad.AiTarget);
+            return squad.AiState switch
+            {
+                SquadAiState.Engage => "AI: attacking " + target,
+                SquadAiState.Advance => "AI: going round " + target + "'s flank",
+                SquadAiState.Hold => "AI: holding its ground",
+                SquadAiState.Regroup => "AI: falling back to regroup",
+                SquadAiState.Withdraw => "AI: leaving the field",
+                _ => string.Empty,
+            };
+        }
+
+        /// <summary>The log's line for an AI decision (M4 step 2): "Raider line attacks Hird line", "Raider levy goes round
+        /// Hird line's flank", "Raider line turns on Shield wall", "Raider line holds its ground, outnumbered", "Raider line
+        /// falls back to regroup", "Raider line leaves the field"; empty when it goes idle.</summary>
+        public static string AiLine(BattleState state, SquadAiChanged changed)
+        {
+            Squad? squad = state.FindSquad(changed.Squad);
+            string name = squad != null ? squad.Name : "squad #" + changed.Squad.Value;
+            string target = TargetName(state, changed.Target);
+            return changed.To switch
+            {
+                SquadAiState.Engage => changed.From == SquadAiState.Engage ? name + " turns on " + target
+                    : changed.From == SquadAiState.Advance ? name + " falls on " + target + "'s flank" : name + " attacks " + target,
+                SquadAiState.Advance => name + " goes round " + target + "'s flank",
+                SquadAiState.Hold => name + " holds its ground, outnumbered",
+                SquadAiState.Regroup => name + " falls back to regroup",
+                SquadAiState.Withdraw => name + " leaves the field",
+                _ => string.Empty,
+            };
+        }
+
+        private static string TargetName(BattleState state, EntityId id)
+        {
+            Squad? squad = id.IsNone ? null : state.FindSquad(id);
+            return squad != null ? squad.Name : string.Empty;
+        }
+
         /// <summary>Why an order was refused, for the player.</summary>
         public static string Refusal(RejectReason reason) => reason.Code switch
         {
@@ -67,6 +131,8 @@ namespace Knez.Game.View
             "not-an-enemy" => "that man is on his side",
             "cooling-down" => "his ability is still cooling down",
             "not-built" => "that ability isn't built yet",
+            "target-broken" => "that squad is running already",
+            "ai-side" => "the AI commands that side",
             _ => reason.Code ?? "refused",
         };
 
@@ -215,6 +281,7 @@ namespace Knez.Game.View
             MoraleState.Routing => "running",
             MoraleState.Rallying => "rallying",
             MoraleState.Fled => "fled",
+            MoraleState.Left => "left the field",
             _ => "steady",
         };
 
@@ -233,6 +300,11 @@ namespace Knez.Game.View
             if (fighter.MoraleState == MoraleState.Fled)
             {
                 return "fled the field";
+            }
+
+            if (fighter.MoraleState == MoraleState.Left)
+            {
+                return "left the field with his squad";
             }
 
             if (fighter.IsRouting)
@@ -384,10 +456,22 @@ namespace Knez.Game.View
             {
                 MoveSquadCommand move => move.SquadId,
                 SetFormationCommand formation => formation.SquadId,
+                AttackSquadCommand attack => attack.SquadId,
+                SetStanceCommand stance => stance.SquadId,
                 _ => EntityId.None,
             };
             Squad? squad = squadId.IsNone ? null : state.FindSquad(squadId);
-            return (squad != null ? squad.Name + ": " : "Order refused: ") + Refusal(reason);
+            string why = command is AttackSquadCommand ? AttackRefusal(reason) : Refusal(reason);
+            return (squad != null ? squad.Name + ": " : "Order refused: ") + why;
         }
+
+        /// <summary>Why an attack on a squad was refused (M4 step 1): some codes read differently than for a move.</summary>
+        public static string AttackRefusal(RejectReason reason) => reason.Code switch
+        {
+            "not-an-enemy" => "that squad is yours",
+            "unknown-entity" => "that squad is gone",
+            "not-alive" => "nobody is left to fight",
+            _ => Refusal(reason),
+        };
     }
 }
